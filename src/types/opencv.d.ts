@@ -31,8 +31,10 @@ export interface OpenCV {
   COLOR_RGBA2GRAY: number;
   COLOR_RGB2HSV: number;
   RETR_EXTERNAL: number;
+  RETR_LIST: number;
   CHAIN_APPROX_SIMPLE: number;
   THRESH_BINARY: number;
+  THRESH_OTSU: number;
   THRESH_OTSU: number;
   MORPH_CLOSE: number;
   MORPH_RECT: number;
@@ -98,6 +100,8 @@ export interface OpenCV {
     maxval: number,
     type: number,
   ): void;
+  bitwise_or(src1: OpenCVMat, src2: OpenCVMat, dst: OpenCVMat): void;
+  COLOR_RGB2GRAY: number;
   imshow(canvas: HTMLCanvasElement, mat: OpenCVMat): void;
   onRuntimeInitialized?: () => void;
 }

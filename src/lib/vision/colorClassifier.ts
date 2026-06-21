@@ -116,6 +116,13 @@ export function sampleFaceColors(
   return colors;
 }
 
+export function countMatchingStickers(
+  colors: StickerColor[],
+  expected: StickerColor,
+): number {
+  return colors.filter((c) => c === expected).length;
+}
+
 export function isFaceColorValid(
   colors: StickerColor[],
   expectedCenter: StickerColor,
@@ -123,11 +130,18 @@ export function isFaceColorValid(
   if (colors.length !== 9) return false;
   const center = colors[4];
   if (center !== expectedCenter) return false;
+  return countMatchingStickers(colors, expectedCenter) >= 4;
+}
 
-  const counts = new Map<StickerColor, number>();
-  for (const c of colors) {
-    counts.set(c, (counts.get(c) ?? 0) + 1);
+export function getCalibrationFeedback(
+  colors: StickerColor[] | null,
+  expected: StickerColor,
+): { valid: boolean; matchCount: number; detectedCenter: StickerColor | null } {
+  if (!colors || colors.length !== 9) {
+    return { valid: false, matchCount: 0, detectedCenter: null };
   }
-
-  return (counts.get(expectedCenter) ?? 0) >= 5;
+  const detectedCenter = colors[4] ?? null;
+  const matchCount = countMatchingStickers(colors, expected);
+  const valid = detectedCenter === expected && matchCount >= 4;
+  return { valid, matchCount, detectedCenter };
 }

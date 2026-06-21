@@ -1,12 +1,94 @@
 import type { DetectedFace, Point2D, StickerColor } from '../../types';
+import type { OpenCVMat } from '../../types/opencv';
 import { sampleFaceColors } from './colorClassifier';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 
 const WARP_SIZE = 150;
 
-export interface DetectionResult {
-  corners: [Point2D, Point2D, Point2D, Point2D] | null;
-  colors: StickerColor[] | null;
+function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
+  const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
+  const top = d(corners[0], corners[1]);
+  const right = d(corners[1], corners[2]);
+  const bottom = d(corners[2], corners[3]);
+  const left = d(corners[3], corners[0]);
+  const avg = (top + right + bottom + left) / 4;
+  if (avg < 1) return false;
+  const sides = [top, right, bottom, left];
+  return sides.every((s) => Math.abs(s - avg) / avg < 0.45);
+}
+
+function scoreQuad(
+  corners: [Point2D, Point2D, Point2D, Point2D],
+  area: number,
+  frameWidth: number,
+  frameHeight: number,
+): number {
+  const frameArea = frameWidth * frameHeight;
+  const ratio = area / frameArea;
+  if (ratio < 0.006 || ratio > 0.65) return 0;
+  if (!isSquareLike(corners)) return area * 0.3;
+
+  const quadCx = corners.reduce((s, p) => s + p.x, 0) / 4;
+  const quadCy = corners.reduce((s, p) => s + p.y, 0) / 4;
+  const centerDist = Math.hypot(quadCx - frameWidth / 2, quadCy - frameHeight / 2);
+  const maxDist = Math.hypot(frameWidth / 2, frameHeight / 2);
+  const centrality = 1 - Math.min(1, centerDist / maxDist);
+
+  return area * (0.6 + centrality * 0.4);
+}
+
+function findBestQuad(
+  contours: { size(): number; get(i: number): OpenCVMat; delete(): void },
+  cv: typeof window.cv,
+  frameWidth: number,
+  frameHeight: number,
+): [Point2D, Point2D, Point2D, Point2D] | null {
+  const frameArea = frameWidth * frameHeight;
+  let bestCorners: [Point2D, Point2D, Point2D, Point2D] | null = null;
+  let bestScore = 0;
+
+  for (let i = 0; i < contours.size(); i++) {
+    const contour = contours.get(i);
+    const area = cv.contourArea(contour);
+    if (area < frameArea * 0.006) {
+      contour.delete();
+      continue;
+    }
+
+    const peri = cv.arcLength(contour, true);
+    for (const eps of [0.02, 0.035, 0.05]) {
+      const approx = new cv.Mat();
+      cv.approxPolyDP(contour, approx, eps * peri, true);
+
+      if (approx.rows >= 4 && approx.rows <= 6) {
+        const points: Point2D[] = [];
+        const count = Math.min(approx.rows, 4);
+        for (let j = 0; j < count; j++) {
+          points.push({
+            x: approx.data32S[j * 2]!,
+            y: approx.data32S[j * 2 + 1]!,
+          });
+        }
+
+        if (points.length === 4) {
+          const ordered = orderCorners(points);
+          if (ordered) {
+            const score = scoreQuad(ordered, area, frameWidth, frameHeight);
+            if (score > bestScore) {
+              bestScore = score;
+              bestCorners = ordered;
+            }
+          }
+        }
+      }
+
+      approx.delete();
+    }
+
+    contour.delete();
+  }
+
+  return bestCorners;
 }
 
 export function detectCubeCorners(
@@ -17,59 +99,47 @@ export function detectCubeCorners(
   const cv = window.cv;
   const src = cv.imread(sourceCanvas);
   const rgb = new cv.Mat();
+  const gray = new cv.Mat();
   const blurred = new cv.Mat();
   const edges = new cv.Mat();
+  const thresh = new cv.Mat();
+  const combined = new cv.Mat();
   const contours = new cv.MatVector();
   const hierarchy = new cv.Mat();
 
   cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-  cv.GaussianBlur(rgb, blurred, new cv.Size(5, 5), 0);
-  cv.Canny(blurred, edges, 40, 120);
-  cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+  cv.cvtColor(rgb, gray, cv.COLOR_RGB2GRAY);
+  cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+  cv.Canny(blurred, edges, 30, 100);
+  cv.threshold(blurred, thresh, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+  cv.bitwise_or(edges, thresh, combined);
+  cv.findContours(combined, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
-  let bestCorners: [Point2D, Point2D, Point2D, Point2D] | null = null;
-  let bestArea = 0;
+  let best = findBestQuad(contours, cv, frameWidth, frameHeight);
 
-  for (let i = 0; i < contours.size(); i++) {
-    const contour = contours.get(i);
-    const area = cv.contourArea(contour);
-    if (area < frameWidth * frameHeight * 0.015) {
-      contour.delete();
-      continue;
-    }
-
-    const peri = cv.arcLength(contour, true);
-    const approx = new cv.Mat();
-    cv.approxPolyDP(contour, approx, 0.03 * peri, true);
-
-    if (approx.rows === 4) {
-      const points: Point2D[] = [];
-      for (let j = 0; j < 4; j++) {
-        points.push({
-          x: approx.data32S[j * 2]!,
-          y: approx.data32S[j * 2 + 1]!,
-        });
-      }
-
-      const ordered = orderCorners(points);
-      if (ordered && area > bestArea) {
-        bestArea = area;
-        bestCorners = ordered;
-      }
-    }
-
-    approx.delete();
-    contour.delete();
+  if (!best) {
+    contours.delete();
+    hierarchy.delete();
+    cv.Canny(blurred, edges, 20, 80);
+    contours.delete();
+    const contours2 = new cv.MatVector();
+    cv.findContours(edges, contours2, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    best = findBestQuad(contours2, cv, frameWidth, frameHeight);
+    contours2.delete();
+  } else {
+    contours.delete();
   }
 
   src.delete();
   rgb.delete();
+  gray.delete();
   blurred.delete();
   edges.delete();
-  contours.delete();
+  thresh.delete();
+  combined.delete();
   hierarchy.delete();
 
-  return bestCorners;
+  return best;
 }
 
 export function detectCubeFace(

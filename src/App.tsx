@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AROverlay } from './components/AROverlay';
 import { CalibrationOverlay } from './components/CalibrationOverlay';
 import { CameraView } from './components/CameraView';
+import { DetectionOverlay } from './components/DetectionOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
@@ -54,11 +55,21 @@ export default function App() {
               active={showAr}
             />
 
+            <DetectionOverlay
+              pose={state.currentPose}
+              feedback={state.detectionFeedback}
+              videoWidth={dimensions.width}
+              videoHeight={dimensions.height}
+              visible={state.phase === 'calibrating'}
+            />
+
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
             <CalibrationOverlay
               phase={state.phase}
               hint={state.calibrationHint}
               progress={state.calibrationProgress}
+              currentFace={state.currentCalibrationFace}
+              faceIndex={state.scannedFaces.length}
             />
 
             {state.phase === 'camera' && (

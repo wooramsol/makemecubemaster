@@ -53,6 +53,22 @@ export interface SolutionProgress {
   currentIndex: number;
 }
 
+export type DetectionStatus =
+  | 'searching'
+  | 'detected'
+  | 'wrong-color'
+  | 'stabilizing'
+  | 'captured';
+
+export interface DetectionFeedback {
+  status: DetectionStatus;
+  stableProgress: number;
+  stableTarget: number;
+  detectedCenter: StickerColor | null;
+  expectedCenter: StickerColor | null;
+  matchCount: number;
+}
+
 export interface FrameResult {
   pose: CubePose | null;
   detectedFace: DetectedFace | null;
