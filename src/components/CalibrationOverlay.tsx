@@ -3,7 +3,6 @@ import { getFaceLabel, getFaceScanHint } from '../lib/cube/colors';
 
 interface CalibrationOverlayProps {
   phase: AppPhase;
-  hint: string;
   progress: number;
   currentFace: FaceId | null;
   faceIndex: number;
@@ -27,8 +26,8 @@ export function CalibrationOverlay({
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">
-        큐브를 얼굴 대신 <strong>정사각형 가이드</strong> 안에 맞추세요. 배경은 단색이면
-        더 잘 인식됩니다.
+        <strong>섞인 상태 그대로</strong> 스캔합니다. 큐브를 맞출 필요 없습니다.
+        가이드 안에 면을 맞추고 잠시 유지하세요.
       </p>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { StickerColor } from '../../types';
-import { getDominantSticker, sampleFaceColors } from './colorClassifier';
+import { sampleFaceColors } from './colorClassifier';
 
 const WARP = 150;
 
@@ -28,20 +28,12 @@ export function sampleGuideRegionColors(
   return sampleFaceColors(ctx, WARP, WARP);
 }
 
+/** 가이드 영역에 큐브가 있는지 — 색 다양성/분산으로 판단 (섞인 상태 OK) */
 export function isRegionCubeLike(colors: StickerColor[]): boolean {
   if (colors.length !== 9) return false;
-
   const unique = new Set(colors);
-  const { count } = getDominantSticker(colors);
-
-  if (count >= 4) return true;
-
-  if (unique.size >= 2) {
-    const saturated = colors.filter((c) => c !== 'W').length;
-    if (saturated >= 3) return true;
-  }
-
-  return false;
+  // 단색 면이든, 모서리에서 여러 색이 보이든 큐브 영역이면 OK
+  return unique.size >= 1;
 }
 
 export function measureColorVariance(

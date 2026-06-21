@@ -23,12 +23,11 @@ export function getFaceLabel(faceId: FaceId): string {
 export function getFaceScanHint(faceId: FaceId): string {
   const n = FACE_NUMBER[faceId];
   if (n === 1) {
-    return '면 1 — 아무 면이나 카메라에 비추세요 (이후 다른 면 5개를 순서대로)';
+    return '섞인 큐브 그대로 — 아무 면부터 가이드 안에 맞추세요';
   }
-  return `면 ${n} — 아직 안 비친 다른 면을 보여주세요`;
+  return `면 ${n} — 아직 스캔 안 한 다른 면을 보여주세요`;
 }
 
-/** @deprecated scrambled cube scan — labels only */
 export const FACE_LABELS: Record<FaceId, string> = {
   U: '면 1',
   D: '면 6',

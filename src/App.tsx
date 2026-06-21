@@ -66,17 +66,16 @@ export default function App() {
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
             <CalibrationOverlay
               phase={state.phase}
-              hint={state.calibrationHint}
               progress={state.calibrationProgress}
               currentFace={state.currentCalibrationFace}
               faceIndex={state.scannedFaces.length}
             />
 
-            {state.phase === 'camera' && (
-              <button type="button" className="primary-button" onClick={startCalibration}>
-                큐브 스캔 시작
-              </button>
-            )}
+        {state.phase === 'camera' && (
+          <button type="button" className="primary-button" onClick={startCalibration}>
+            섞인 큐브 스캔
+          </button>
+        )}
 
             {state.phase === 'solved' && (
               <div className="solved-banner">

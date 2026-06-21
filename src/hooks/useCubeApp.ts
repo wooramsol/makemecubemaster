@@ -16,7 +16,7 @@ import {
 } from '../lib/cube/colors';
 import { buildFaceletString } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
-import { getCalibrationFeedback } from '../lib/vision/colorClassifier';
+import { getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 
@@ -104,22 +104,23 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colors: StickerColor[] | null,
       stableCount: number,
     ): DetectionFeedback => {
-      const { valid, matchCount, detectedCenter } = getCalibrationFeedback(colors);
+      const { detectedCenter, matchCount } = getCalibrationFeedback(colors);
+      const readable = isColorsReadable(colors);
 
       let status: DetectionStatus = 'searching';
       if (!hasPose) {
         status = 'searching';
-      } else if (!colors) {
+      } else if (!readable) {
         status = 'detected';
-      } else if (!valid) {
-        status = matchCount >= 3 ? 'weak-read' : 'detected';
       } else if (stableCount > 0) {
         status = 'stabilizing';
+      } else {
+        status = 'detected';
       }
 
       return {
         status,
-        stableProgress: valid ? stableCount : 0,
+        stableProgress: readable && hasPose ? stableCount : 0,
         stableTarget: STABLE_CALIBRATION_FRAMES,
         detectedCenter,
         matchCount,
@@ -205,7 +206,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
         const faceId = prev.currentCalibrationFace;
         const colors = result.detectedFace?.colors ?? null;
-        const { valid } = getCalibrationFeedback(colors);
+        const ready = Boolean(result.pose) && isColorsReadable(colors);
 
         const feedback = buildFeedback(
           Boolean(result.pose),
@@ -213,7 +214,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           stableCalibCount.current,
         );
 
-        if (valid) {
+        if (ready) {
           stableCalibCount.current++;
           feedback.status = 'stabilizing';
           feedback.stableProgress = stableCalibCount.current;

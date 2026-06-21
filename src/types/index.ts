@@ -56,7 +56,6 @@ export interface SolutionProgress {
 export type DetectionStatus =
   | 'searching'
   | 'detected'
-  | 'weak-read'
   | 'stabilizing'
   | 'captured';
 

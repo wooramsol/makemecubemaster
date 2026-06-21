@@ -135,24 +135,28 @@ export function getDominantSticker(colors: StickerColor[]): {
   return { dominant, count };
 }
 
-/** 섞인 큐브: 한 면이면 9칸 중 같은 색이 대부분이어야 함 */
-export function isFaceReadStable(colors: StickerColor[] | null): boolean {
-  if (!colors || colors.length !== 9) return false;
-  const { dominant, count } = getDominantSticker(colors);
-  const center = colors[4];
-  return count >= 3 && center === dominant;
+/** 9칸 색상이 읽혔는지 — 섞인 큐브도 그대로 스캔 (맞춰진 면 불필요) */
+export function isColorsReadable(colors: StickerColor[] | null): boolean {
+  return Boolean(colors && colors.length === 9);
 }
 
 export function getCalibrationFeedback(colors: StickerColor[] | null): {
   valid: boolean;
   matchCount: number;
   detectedCenter: StickerColor | null;
+  uniqueColors: number;
 } {
-  if (!colors || colors.length !== 9) {
-    return { valid: false, matchCount: 0, detectedCenter: null };
+  if (!isColorsReadable(colors)) {
+    return { valid: false, matchCount: 0, detectedCenter: null, uniqueColors: 0 };
   }
-  const { dominant, count } = getDominantSticker(colors);
-  const detectedCenter = colors[4] ?? null;
-  const valid = count >= 3 && detectedCenter === dominant;
-  return { valid, matchCount: count, detectedCenter };
+
+  const { count } = getDominantSticker(colors!);
+  const uniqueColors = new Set(colors).size;
+
+  return {
+    valid: true,
+    matchCount: count,
+    detectedCenter: colors![4] ?? null,
+    uniqueColors,
+  };
 }

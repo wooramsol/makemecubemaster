@@ -11,9 +11,8 @@ const STICKER_HEX: Record<StickerColor, string> = {
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
-  detected: '큐브 감지됨',
-  'weak-read': '한 면만 보이게 맞춰주세요',
-  stabilizing: '인식 중 — 잠시 유지하세요',
+  detected: '큐브 감지됨 — 색상 읽는 중',
+  stabilizing: '스캔 중 — 잠시 유지하세요',
   captured: '캡처 완료!',
 };
 
@@ -82,8 +81,8 @@ export function DetectionOverlay({
               style={{ background: STICKER_HEX[feedback.detectedCenter] }}
             />
             <span className="color-label">
-              감지 색상: {colorName(feedback.detectedCenter)}
-              {feedback.matchCount > 0 && <> · 일치 {feedback.matchCount}/9</>}
+              9칸 읽음
+              {feedback.matchCount > 0 && <> · {feedback.detectedCenter && colorName(feedback.detectedCenter)}</>}
             </span>
           </div>
         )}
