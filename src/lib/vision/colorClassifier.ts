@@ -1,4 +1,9 @@
 import type { StickerColor } from '../../types';
+import {
+  isCalibratedWhitePixel,
+  isLikelyYellowPixel,
+  warmLightYellowPenalty,
+} from './colorCalibration';
 import { applyWhiteBalance, isWhiteBalanceCalibrated } from './whiteBalance';
 
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
@@ -122,6 +127,8 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   [r, g, b] = applyWhiteBalance(r, g, b);
   if (isGapPixel(r, g, b)) return classifyByLab(r, g, b);
 
+  if (isCalibratedWhitePixel(r, g, b)) return 'W';
+
   const [h, s] = rgbToHsv(r, g, b);
   const sn = s / 255;
   const max = Math.max(r, g, b);
@@ -129,7 +136,7 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   if (isWhiteBalanceCalibrated()) {
     const chroma = max - Math.min(r, g, b);
     const brightness = (r + g + b) / 3;
-    if (brightness > 195 && chroma < 38) return 'W';
+    if (brightness > 185 && chroma < 42) return 'W';
   }
 
   if (isWhitePixel(r, g, b)) return 'W';
@@ -148,8 +155,8 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   if (g >= r + 10 && g >= b + 10 && g > 70) {
     scores.set('G', (scores.get('G') ?? 0) + 0.45);
   }
-  if (r > 95 && g > 85 && b < Math.min(r, g) - 18) {
-    scores.set('Y', (scores.get('Y') ?? 0) + 0.5);
+  if (isLikelyYellowPixel(r, g, b) || (r > 95 && g > 85 && b < Math.min(r, g) - 18)) {
+    scores.set('Y', (scores.get('Y') ?? 0) + 0.55);
   }
   if (r > g + 8 && g > b + 5 && r > 110 && h >= 8 && h < 42) {
     scores.set('O', (scores.get('O') ?? 0) + 0.45);
@@ -166,6 +173,8 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   if (max > 175 && sn < 0.22 && !isWhitePixel(r, g, b)) {
     scores.set('W', (scores.get('W') ?? 0) - 0.35);
   }
+
+  scores.set('Y', (scores.get('Y') ?? 0) - warmLightYellowPenalty(r, g, b));
 
   let best: StickerColor = 'W';
   let bestScore = -Infinity;

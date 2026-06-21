@@ -12,6 +12,7 @@ import type {
 import { buildFaceletFromMap } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
+import { reconcileCubeFaces, formatImbalanceHint } from '../lib/vision/cubeColorReconcile';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
@@ -320,10 +321,16 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
         solveTriggeredRef.current = true;
         try {
-          const facelet = buildFaceletFromMap(snapshot.faces);
+          const reconciled = reconcileCubeFaces(snapshot.faces);
+          const facelet = buildFaceletFromMap(reconciled);
           const validationError = validateFaceletString(facelet);
           if (validationError) {
-            setState((s) => ({ ...s, phase: 'error', error: validationError }));
+            const hint = formatImbalanceHint(reconciled);
+            const detail =
+              hint.length > 0
+                ? `${validationError} (${hint}. 노란 조명에서는 흰 면 기준 보정을 다시 해 보세요.)`
+                : `${validationError} (노란 조명에서는 흰 면 기준 보정을 다시 해 보세요.)`;
+            setState((s) => ({ ...s, phase: 'error', error: detail }));
             return;
           }
           faceletRef.current = facelet;

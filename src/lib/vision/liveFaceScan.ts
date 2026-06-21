@@ -1,9 +1,9 @@
 import { identifyFaceFromCenter } from '../cube/colors';
 import type { FaceId, StickerColor } from '../../types';
 
-const STABLE_FRAMES = 10;
+const STABLE_FRAMES = 14;
 const FRAME_MATCH_TOLERANCE = 2;
-const MAX_READINGS_PER_FACE = 6;
+const MAX_READINGS_PER_FACE = 8;
 
 export interface LiveScanSnapshot {
   faces: Map<FaceId, StickerColor[]>;

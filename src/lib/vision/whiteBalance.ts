@@ -43,11 +43,18 @@ export function setWhiteBalance(gains: WhiteBalanceGains): void {
 
 export function setWhiteBalanceFromSample(sample: WhiteBalanceSample): void {
   whiteReference = { r: sample.r, g: sample.g, b: sample.b };
-  activeGains = {
-    r: clampGain(WHITE_TARGET / Math.max(sample.r, 1)),
-    g: clampGain(WHITE_TARGET / Math.max(sample.g, 1)),
-    b: clampGain(WHITE_TARGET / Math.max(sample.b, 1)),
-  };
+  let rGain = clampGain(WHITE_TARGET / Math.max(sample.r, 1));
+  let gGain = clampGain(WHITE_TARGET / Math.max(sample.g, 1));
+  let bGain = clampGain(WHITE_TARGET / Math.max(sample.b, 1));
+
+  // 노란 방 조명: 파란 채널을 조금 더 올려 흰색/노란색 혼동 완화
+  if (sample.warmth > 10) {
+    const warmBoost = 1 + Math.min(0.14, sample.warmth / 180);
+    bGain = clampGain(bGain * warmBoost);
+    gGain = clampGain(gGain * (1 + Math.min(0.04, sample.warmth / 400)));
+  }
+
+  activeGains = { r: rGain, g: gGain, b: bGain };
   calibrated = true;
 }
 

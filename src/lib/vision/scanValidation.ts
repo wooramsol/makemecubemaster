@@ -23,7 +23,7 @@ export function validateFaceletString(facelet: string): string | null {
 
   for (const face of FACELETTERS) {
     if (counts.get(face) !== 9) {
-      return '색상 인식이 맞지 않습니다. 조명을 밝게 하고 6면을 다시 스캔해 주세요.';
+      return '색상 인식이 맞지 않습니다. 조명을 밝게 하고 6면을 다시 스캔해 주세요';
     }
   }
 
