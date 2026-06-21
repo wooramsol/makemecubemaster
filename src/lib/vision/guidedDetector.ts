@@ -63,10 +63,16 @@ export function isRegionCubeLike(
   const unique = new Set(colors);
   const nonWhite = colors.filter((c) => c !== 'W').length;
 
-  // 스티커 색 다양성 + 픽셀 분산
   if (variance < 120) return false;
-  if (unique.size >= 2 && nonWhite >= 2) return true;
-  if (unique.size >= 1 && nonWhite >= 4 && variance > 200) return true;
+
+  // 단색 면 (풀린 큐브 한 면)
+  if (unique.size === 1) return true;
+
+  // 얼굴/피부: 색이 2종류뿐이고 채도가 낮은 경우 제외
+  if (unique.size === 2 && nonWhite <= 3 && variance < 300) return false;
+
+  if (unique.size >= 3 && nonWhite >= 2) return true;
+  if (unique.size >= 2 && nonWhite >= 4 && variance > 220) return true;
 
   return false;
 }

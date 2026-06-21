@@ -4,6 +4,7 @@ import { CameraView } from './components/CameraView';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
+import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
 import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
@@ -13,7 +14,7 @@ import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const { state, currentMove, confirmWhiteBalance, retryLiveScan, retryFromWhiteBalance, startTracking, stopTracking } =
+  const { state, currentMove, confirmWhiteBalance, startLiveScan, retryLiveScan, retryFromWhiteBalance, startTracking, stopTracking } =
     useCubeApp(videoRef);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -93,6 +94,13 @@ export default function App() {
               error={state.whiteBalanceError}
               onConfirm={confirmWhiteBalance}
               guideRect={guideRect}
+            />
+
+            <ScanReadyOverlay
+              visible={state.phase === 'scanReady'}
+              feedback={state.detectionFeedback}
+              guideRect={guideRect}
+              onStart={startLiveScan}
             />
 
             <DetectionOverlay

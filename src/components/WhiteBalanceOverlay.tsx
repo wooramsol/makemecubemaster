@@ -60,7 +60,7 @@ export function WhiteBalanceOverlay({
           disabled={!ready}
           onClick={onConfirm}
         >
-          {ready ? '흰색 기준 저장 → 라이브 스캔' : '흰 면을 가이드에 맞추세요'}
+          {ready ? '흰색 기준 저장 → 큐브 준비' : '흰 면을 가이드에 맞추세요'}
         </button>
         {error && <p className="wb-error">{error}</p>}
       </div>

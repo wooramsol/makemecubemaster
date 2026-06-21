@@ -294,6 +294,51 @@ body,
   pointer-events: none;
 }
 
+.scan-ready-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.scan-ready-panel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(28px, env(safe-area-inset-bottom));
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+  width: min(92vw, 320px);
+  text-align: center;
+}
+
+.scan-ready-step {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.scan-ready-hint {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.scan-ready-sub {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.scan-ready-panel .capture-button {
+  margin-top: 0;
+}
+
 .wb-panel {
   padding: 10px 12px;
   border-radius: 14px;

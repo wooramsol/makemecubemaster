@@ -21,7 +21,7 @@ export function LiveScanOverlay({
 
   return (
     <div className="calibration-overlay live-scan-overlay">
-      <p className="calibration-step">2단계 — 라이브 스캔</p>
+      <p className="calibration-step">3단계 — 라이브 스캔</p>
       <p className="calibration-hint">큐브를 천천히 돌려 6면을 인식하세요</p>
       <div className="calibration-bar">
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />

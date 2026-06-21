@@ -173,6 +173,22 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     [],
   );
 
+  const enterScanReady = useCallback(() => {
+    liveAccumulator.current.reset();
+    solveTriggeredRef.current = false;
+    lastPoseRef.current = null;
+    setState((s) => ({
+      ...s,
+      phase: 'scanReady',
+      error: null,
+      knownFaces: [],
+      currentVisibleFace: null,
+      liveScanProgress: 0,
+      detectionFeedback: initialFeedback,
+    }));
+    frameProcessor.current?.disableTracking();
+  }, []);
+
   const beginLiveScan = useCallback(() => {
     liveAccumulator.current.reset();
     solveTriggeredRef.current = false;
@@ -275,7 +291,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       return;
     }
 
-    beginLiveScan();
+    enterScanReady();
     setState((s) => ({
       ...s,
       whiteBalanceSample: result.sample,
@@ -283,7 +299,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       whiteBalanceError: null,
       whiteBalanceCalibrated: true,
     }));
-  }, [videoRef, beginLiveScan]);
+  }, [videoRef, enterScanReady]);
+
+  const startLiveScan = useCallback(() => {
+    beginLiveScan();
+  }, [beginLiveScan]);
 
   const processFrame = useCallback(() => {
     const video = videoRef.current;
@@ -301,6 +321,16 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         whiteBalanceSample: sample,
         whiteBalanceReady: sample?.ready ?? false,
         whiteBalanceError: null,
+      }));
+      return;
+    }
+
+    if (phase === 'scanReady') {
+      const colors = result.detectedFace?.colors ?? null;
+      const hasPose = Boolean(result.pose);
+      setState((prev) => ({
+        ...prev,
+        detectionFeedback: buildFeedback(hasPose, colors, 0, 0, false),
       }));
       return;
     }
@@ -402,9 +432,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
   const retryLiveScan = useCallback(() => {
     clearSolveTimeout();
-    beginLiveScan();
+    enterScanReady();
     setState((s) => ({ ...s, solution: null }));
-  }, [clearSolveTimeout, beginLiveScan]);
+  }, [clearSolveTimeout, enterScanReady]);
 
   const retryFromWhiteBalance = useCallback(() => {
     clearSolveTimeout();
@@ -438,6 +468,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     state,
     currentMove,
     confirmWhiteBalance,
+    startLiveScan,
     retryLiveScan,
     retryFromWhiteBalance,
     startTracking,
