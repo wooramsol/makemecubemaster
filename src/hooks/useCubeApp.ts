@@ -16,7 +16,7 @@ import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClien
 import { getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
-import { colorsDifferEnough } from '../lib/vision/scanValidation';
+import { colorsDifferEnough, validateFaceletString } from '../lib/vision/scanValidation';
 
 export interface CubeAppState {
   phase: AppPhase;
@@ -70,6 +70,35 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const solutionRef = useRef<SolutionProgress | null>(null);
   const pendingFrameRef = useRef<PendingFrame | null>(null);
   const solvingStartMs = useRef(0);
+  const solveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearSolveTimeout = useCallback(() => {
+    if (solveTimeoutRef.current) {
+      clearTimeout(solveTimeoutRef.current);
+      solveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const requestSolve = useCallback(
+    (facelet: string, pose: CubePose) => {
+      clearSolveTimeout();
+      const id = ++requestId.current;
+      solverWorker.current?.postMessage({ type: 'solve', facelet, id });
+      frameProcessor.current?.syncPose(pose);
+
+      solveTimeoutRef.current = setTimeout(() => {
+        setState((s) => {
+          if (s.phase !== 'computing') return s;
+          return {
+            ...s,
+            phase: 'error',
+            error: '해법 계산 시간이 초과되었습니다. 다시 스캔해 주세요.',
+          };
+        });
+      }, 20000);
+    },
+    [clearSolveTimeout],
+  );
 
   useEffect(() => {
     phaseRef.current = state.phase;
@@ -140,20 +169,31 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         if (msg.type === 'ready') {
           setState((s) => ({ ...s, solverReady: true }));
         } else if (msg.type === 'solution') {
+          clearSolveTimeout();
           solvingStartMs.current = Date.now();
           setState((s) => ({
             ...s,
-            phase: 'solving',
+            phase: msg.moves.length === 0 ? 'solved' : 'solving',
             solution: { moves: msg.moves, currentIndex: 0 },
             calibrationHint: '',
             detectionFeedback: initialFeedback,
             canCaptureFace: false,
           }));
-          frameProcessor.current?.enableTracking();
+          if (msg.moves.length > 0) {
+            frameProcessor.current?.enableTracking();
+          }
         } else if (msg.type === 'facelet') {
           faceletRef.current = msg.facelet;
         } else if (msg.type === 'error') {
-          setState((s) => ({ ...s, phase: 'error', error: msg.message }));
+          clearSolveTimeout();
+          setState((s) => ({
+            ...s,
+            phase: 'error',
+            error:
+              msg.message.includes('Invalid') || msg.message.includes('invalid')
+                ? '인식된 큐브 상태가 올바르지 않습니다. 조명을 밝게 하고 6면을 다시 스캔해 주세요.'
+                : msg.message,
+          }));
         }
       };
 
@@ -166,16 +206,17 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         error: error instanceof Error ? error.message : '초기화 실패',
       }));
     }
-  }, []);
+  }, [clearSolveTimeout]);
 
   useEffect(() => {
     void init();
     return () => {
       cancelAnimationFrame(rafRef.current);
+      clearSolveTimeout();
       solverWorker.current?.terminate();
       frameProcessor.current?.disableTracking();
     };
-  }, [init]);
+  }, [init, clearSolveTimeout]);
 
   const startCalibration = useCallback(() => {
     pendingFrameRef.current = null;
@@ -230,19 +271,29 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       try {
         const facelet = buildFaceletString(newFaces);
+        const validationError = validateFaceletString(facelet);
+        if (validationError) {
+          return { ...prev, phase: 'error', error: validationError };
+        }
+
         faceletRef.current = facelet;
-        const id = ++requestId.current;
-        solverWorker.current?.postMessage({ type: 'solve', facelet, id });
-        frameProcessor.current?.syncPose(pending.pose);
+        queueMicrotask(() => requestSolve(facelet, pending.pose));
 
         return {
           ...prev,
+          phase: 'computing',
           scannedFaces: newFaces,
           currentCalibrationFace: null,
           calibrationProgress: 1,
-          calibrationHint: '해법 계산 중...',
+          calibrationHint: '',
           canCaptureFace: false,
-          detectionFeedback: { status: 'captured', stableProgress: 0, stableTarget: 0, detectedCenter: null, matchCount: 0 },
+          detectionFeedback: {
+            status: 'captured',
+            stableProgress: 0,
+            stableTarget: 0,
+            detectedCenter: null,
+            matchCount: 0,
+          },
         };
       } catch (error) {
         return {
@@ -252,7 +303,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         };
       }
     });
-  }, []);
+  }, [requestSolve]);
 
   const processFrame = useCallback(() => {
     const video = videoRef.current;

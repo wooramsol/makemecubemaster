@@ -33,6 +33,7 @@ export default function App() {
 
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
+  const isComputing = state.phase === 'computing';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -56,10 +57,7 @@ export default function App() {
             />
 
             <DetectionOverlay
-              pose={state.currentPose}
               feedback={state.detectionFeedback}
-              videoWidth={dimensions.width}
-              videoHeight={dimensions.height}
               visible={state.phase === 'calibrating'}
             />
 
@@ -79,12 +77,23 @@ export default function App() {
           </button>
         )}
 
+            {state.phase === 'solving' && currentMove && (
+              <div className="solving-banner">
+                <p className="solving-move">{currentMove}</p>
+                <p className="solving-hint">화살표 방향으로 면을 돌리세요</p>
+              </div>
+            )}
+
             {state.phase === 'solved' && (
               <div className="solved-banner">
                 <p>완료!</p>
               </div>
             )}
           </>
+        )}
+
+        {isComputing && (
+          <LoadingScreen overlay message="6면 스캔 완료 — 해법 계산 중..." />
         )}
 
         {isBooting && (

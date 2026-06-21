@@ -46,7 +46,14 @@ export interface ScannedFace {
   colors: StickerColor[];
 }
 
-export type AppPhase = 'loading' | 'camera' | 'calibrating' | 'solving' | 'solved' | 'error';
+export type AppPhase =
+  | 'loading'
+  | 'camera'
+  | 'calibrating'
+  | 'computing'
+  | 'solving'
+  | 'solved'
+  | 'error';
 
 export interface SolutionProgress {
   moves: Move[];
