@@ -9,7 +9,7 @@ import {
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { getGuideSquare, guideToCorners, translateCorners } from './roi';
 
-const WARP_SIZE = 200;
+const WARP_SIZE = 256;
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
   const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);

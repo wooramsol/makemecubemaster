@@ -1,4 +1,6 @@
 import type { WhiteBalanceSample } from '../lib/vision/whiteBalance';
+import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
+import { GuideFrame } from './GuideFrame';
 
 interface WhiteBalanceOverlayProps {
   visible: boolean;
@@ -6,6 +8,7 @@ interface WhiteBalanceOverlayProps {
   ready: boolean;
   error: string | null;
   onConfirm: () => void;
+  guideRect: GuideOverlayRect | null;
 }
 
 function warmthLabel(warmth: number): string {
@@ -20,12 +23,13 @@ export function WhiteBalanceOverlay({
   ready,
   error,
   onConfirm,
+  guideRect,
 }: WhiteBalanceOverlayProps) {
   if (!visible) return null;
 
   return (
     <div className="wb-overlay" aria-live="polite">
-      <div className="guide-frame-css" />
+      <GuideFrame rect={guideRect} />
 
         <div className="wb-panel scan-ui-panel">
         <p className="wb-step">1단계 — 흰색 기준 맞추기</p>
@@ -61,7 +65,14 @@ export function WhiteBalanceOverlay({
         {error && <p className="wb-error">{error}</p>}
       </div>
 
-      <div className="wb-guide-note">
+      <div
+        className="wb-guide-note"
+        style={
+          guideRect
+            ? { top: guideRect.top + guideRect.height + 10, transform: 'translateX(-50%)' }
+            : undefined
+        }
+      >
         <p>현재 방 조명에서의 흰색을 먼저 학습합니다</p>
       </div>
     </div>

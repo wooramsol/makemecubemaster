@@ -62,7 +62,7 @@ export function reconcileCubeFaces(
     }
   }
 
-  for (let iter = 0; iter < 64; iter++) {
+  for (let iter = 0; iter < 96; iter++) {
     const counts = countAllStickers(result);
     let over: StickerColor | null = null;
     let under: StickerColor | null = null;

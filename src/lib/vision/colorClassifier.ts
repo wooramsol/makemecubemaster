@@ -187,6 +187,15 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   return best;
 }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]!
+    : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
+}
+
 function classifyCellPixels(
   data: Uint8ClampedArray,
   width: number,
@@ -196,7 +205,11 @@ function classifyCellPixels(
   y1: number,
 ): StickerColor {
   const votes = new Map<StickerColor, number>();
-  const step = 2;
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  const cellW = x1 - x0;
+  const step = cellW > 40 ? 1 : 2;
 
   for (let y = Math.floor(y0); y < Math.floor(y1); y += step) {
     for (let x = Math.floor(x0); x < Math.floor(x1); x += step) {
@@ -206,19 +219,26 @@ function classifyCellPixels(
       const b = data[i + 2]!;
       if (isGapPixel(r, g, b)) continue;
 
+      rs.push(r);
+      gs.push(g);
+      bs.push(b);
+
       const color = classifySticker(r, g, b);
       votes.set(color, (votes.get(color) ?? 0) + 1);
     }
   }
 
-  if (votes.size === 0) {
+  if (rs.length === 0) {
     const cx = Math.floor((x0 + x1) / 2);
     const cy = Math.floor((y0 + y1) / 2);
     const i = (cy * width + cx) * 4;
     return classifySticker(data[i]!, data[i + 1]!, data[i + 2]!);
   }
 
-  let best: StickerColor = 'W';
+  const medianColor = classifySticker(median(rs), median(gs), median(bs));
+  votes.set(medianColor, (votes.get(medianColor) ?? 0) + 3);
+
+  let best: StickerColor = medianColor;
   let bestVotes = 0;
   for (const [color, count] of votes) {
     if (count > bestVotes) {
@@ -239,7 +259,7 @@ export function sampleFaceColors(
   const colors: StickerColor[] = [];
   const cellW = width / 3;
   const cellH = height / 3;
-  const margin = 0.24;
+  const margin = 0.16;
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {

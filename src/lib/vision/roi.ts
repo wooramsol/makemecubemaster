@@ -1,8 +1,11 @@
 import type { Point2D } from '../../types';
 
+/** 화면 중앙 정사각형 가이드 비율 (카메라 프레임 대비) */
+export const GUIDE_SIZE_RATIO = 0.62;
+
 /** 화면 중앙 정사각형 가이드 (카메라 프레임 좌표) */
 export function getGuideSquare(frameWidth: number, frameHeight: number) {
-  const size = Math.min(frameWidth, frameHeight) * 0.55;
+  const size = Math.min(frameWidth, frameHeight) * GUIDE_SIZE_RATIO;
   return {
     x: (frameWidth - size) / 2,
     y: (frameHeight - size) / 2,

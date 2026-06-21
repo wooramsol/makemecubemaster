@@ -98,7 +98,7 @@ export function measureWhiteBalanceSample(
   if (!ctx) return null;
 
   const guide = getGuideSquare(frameWidth, frameHeight);
-  const margin = guide.size * 0.22;
+  const margin = guide.size * 0.18;
   const x0 = Math.floor(guide.x + margin);
   const y0 = Math.floor(guide.y + margin);
   const w = Math.floor(guide.size - margin * 2);

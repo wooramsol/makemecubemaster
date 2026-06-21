@@ -1,5 +1,7 @@
 import type { DetectionFeedback, StickerColor } from '../types';
+import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
 import { mirrorFaceCellsForSelfie } from '../lib/vision/selfieView';
+import { GuideFrame } from './GuideFrame';
 
 const STICKER_HEX: Record<StickerColor, string> = {
   W: '#f5f5f5',
@@ -29,9 +31,10 @@ const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
 interface DetectionOverlayProps {
   feedback: DetectionFeedback;
   visible: boolean;
+  guideRect: GuideOverlayRect | null;
 }
 
-export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
+export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOverlayProps) {
   if (!visible) return null;
 
   const statusClass = feedback.status;
@@ -40,7 +43,7 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
 
   return (
     <div className="detection-overlay" aria-live="polite">
-      <div className="guide-frame-css" />
+      <GuideFrame rect={guideRect} />
 
       <div className="scan-ui-panel scan-ui-panel--compact">
         <div className={`detection-status ${statusClass}`}>

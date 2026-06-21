@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AROverlay } from './components/AROverlay';
 import { CameraView } from './components/CameraView';
 import { DetectionOverlay } from './components/DetectionOverlay';
@@ -8,13 +8,16 @@ import { StepIndicator } from './components/StepIndicator';
 import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
+import { getGuideOverlayRect } from './lib/vision/guideOverlay';
 import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
   const { state, currentMove, confirmWhiteBalance, retryLiveScan, retryFromWhiteBalance, startTracking, stopTracking } =
     useCubeApp(videoRef);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     void startWebcam();
@@ -32,6 +35,34 @@ export default function App() {
     setDimensions({ width, height });
   }, []);
 
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    const updateSize = () => {
+      setViewportSize({
+        width: viewport.clientWidth,
+        height: viewport.clientHeight,
+      });
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(viewport);
+    return () => observer.disconnect();
+  }, []);
+
+  const guideRect = useMemo(
+    () =>
+      getGuideOverlayRect(
+        dimensions.width,
+        dimensions.height,
+        viewportSize.width,
+        viewportSize.height,
+      ),
+    [dimensions.width, dimensions.height, viewportSize.width, viewportSize.height],
+  );
+
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
@@ -42,7 +73,7 @@ export default function App() {
 
   return (
     <main className="app">
-      <div className="viewport">
+      <div className="viewport" ref={viewportRef}>
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
 
         {!isBooting && !hasError && (
@@ -61,11 +92,13 @@ export default function App() {
               ready={state.whiteBalanceReady}
               error={state.whiteBalanceError}
               onConfirm={confirmWhiteBalance}
+              guideRect={guideRect}
             />
 
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
+              guideRect={guideRect}
             />
 
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
