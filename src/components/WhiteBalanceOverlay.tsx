@@ -6,13 +6,12 @@ interface WhiteBalanceOverlayProps {
   ready: boolean;
   error: string | null;
   onConfirm: () => void;
-  onSkip: () => void;
 }
 
 function warmthLabel(warmth: number): string {
-  if (warmth > 18) return '노란 기운이 감지됨';
-  if (warmth < -12) return '푸른 기운이 감지됨';
-  return '조명 균형 양호';
+  if (warmth > 18) return '노란 조명 — 흰 면으로 보정합니다';
+  if (warmth < -12) return '푸른 조명 — 흰 면으로 보정합니다';
+  return '현재 조명에서 흰색 감지 중';
 }
 
 export function WhiteBalanceOverlay({
@@ -21,7 +20,6 @@ export function WhiteBalanceOverlay({
   ready,
   error,
   onConfirm,
-  onSkip,
 }: WhiteBalanceOverlayProps) {
   if (!visible) return null;
 
@@ -29,25 +27,26 @@ export function WhiteBalanceOverlay({
     <div className="wb-overlay" aria-live="polite">
       <div className="guide-frame-css" />
 
-      <div className="wb-panel scan-ui-panel">
-        <p className="wb-title">화이트밸런스 맞추기</p>
-        <p className="wb-hint">흰 스티커 면(또는 흰 종이)을 점선 안에 맞춰 주세요</p>
+        <div className="wb-panel scan-ui-panel">
+        <p className="wb-step">1단계 — 흰색 기준 맞추기</p>
+        <p className="wb-hint">흰 스티커 면을 점선 안에 맞춰 주세요</p>
 
         <div className="wb-meter">
           {sample ? (
             <>
+              <div
+                className="wb-preview-swatch"
+                style={{
+                  background: `rgb(${Math.round(sample.r)}, ${Math.round(sample.g)}, ${Math.round(sample.b)})`,
+                }}
+              />
               <p className={`wb-status ${ready ? 'ready' : ''}`}>
-                {ready ? '흰색 영역 인식됨' : '흰색 영역을 찾는 중...'}
+                {ready ? '이 조명의 흰색을 인식했습니다' : '흰 면을 찾는 중...'}
               </p>
               <p className="wb-warmth">{warmthLabel(sample.warmth)}</p>
-              <div className="wb-rgb">
-                <span>R {Math.round(sample.r)}</span>
-                <span>G {Math.round(sample.g)}</span>
-                <span>B {Math.round(sample.b)}</span>
-              </div>
             </>
           ) : (
-            <p className="wb-status">가이드 안에 흰 면을 보여주세요</p>
+            <p className="wb-status">가이드 안에 흰 면만 보이게 맞춰 주세요</p>
           )}
         </div>
 
@@ -57,12 +56,13 @@ export function WhiteBalanceOverlay({
           disabled={!ready}
           onClick={onConfirm}
         >
-          {ready ? '화이트밸런스 적용' : '흰 면을 가이드에 맞추세요'}
+          {ready ? '흰색 기준 저장 → 스캔 시작' : '흰 면을 가이드에 맞추세요'}
         </button>
         {error && <p className="wb-error">{error}</p>}
-        <button type="button" className="wb-skip" onClick={onSkip}>
-          건너뛰기
-        </button>
+      </div>
+
+      <div className="wb-guide-note">
+        <p>현재 방 조명에서의 흰색을 먼저 학습합니다</p>
       </div>
     </div>
   );

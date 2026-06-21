@@ -19,8 +19,8 @@ import { loadOpenCV } from '../lib/vision/opencvLoader';
 import { colorsDifferEnough, validateFaceletString } from '../lib/vision/scanValidation';
 import {
   calibrateWhiteBalanceFromCanvas,
+  isWhiteBalanceCalibrated,
   resetWhiteBalance,
-  setWhiteBalance,
   type WhiteBalanceSample,
 } from '../lib/vision/whiteBalance';
 
@@ -39,6 +39,7 @@ export interface CubeAppState {
   whiteBalanceSample: WhiteBalanceSample | null;
   whiteBalanceReady: boolean;
   whiteBalanceError: string | null;
+  whiteBalanceCalibrated: boolean;
 }
 
 const initialFeedback: DetectionFeedback = {
@@ -65,6 +66,7 @@ const initialState: CubeAppState = {
   whiteBalanceSample: null,
   whiteBalanceReady: false,
   whiteBalanceError: null,
+  whiteBalanceCalibrated: false,
 };
 
 interface PendingFrame {
@@ -212,7 +214,15 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       };
 
       worker.postMessage({ type: 'init' });
-      setState((s) => ({ ...s, phase: 'camera' }));
+      resetWhiteBalance();
+      setState((s) => ({
+        ...s,
+        phase: 'whiteBalance',
+        whiteBalanceCalibrated: false,
+        whiteBalanceSample: null,
+        whiteBalanceReady: false,
+        whiteBalanceError: null,
+      }));
     } catch (error) {
       setState((s) => ({
         ...s,
@@ -232,18 +242,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     };
   }, [init, clearSolveTimeout]);
 
-  const startWhiteBalance = useCallback(() => {
-    resetWhiteBalance();
-    setState((s) => ({
-      ...s,
-      phase: 'whiteBalance',
-      whiteBalanceSample: null,
-      whiteBalanceReady: false,
-      whiteBalanceError: null,
-      error: null,
-    }));
-  }, []);
-
   const confirmWhiteBalance = useCallback(() => {
     const video = videoRef.current;
     const processor = frameProcessor.current;
@@ -261,7 +259,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       return;
     }
 
-    setWhiteBalance(result.gains);
     pendingFrameRef.current = null;
     setState((s) => ({
       ...s,
@@ -276,30 +273,25 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       whiteBalanceSample: result.sample,
       whiteBalanceReady: true,
       whiteBalanceError: null,
+      whiteBalanceCalibrated: true,
     }));
     frameProcessor.current?.disableTracking();
   }, [videoRef]);
 
-  const skipWhiteBalance = useCallback(() => {
-    resetWhiteBalance();
-    pendingFrameRef.current = null;
-    setState((s) => ({
-      ...s,
-      phase: 'calibrating',
-      error: null,
-      scannedFaces: [],
-      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
-      calibrationProgress: 0,
-      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
-      detectionFeedback: initialFeedback,
-      canCaptureFace: false,
-      whiteBalanceSample: null,
-      whiteBalanceReady: false,
-    }));
-    frameProcessor.current?.disableTracking();
-  }, []);
-
   const startCalibration = useCallback(() => {
+    if (!isWhiteBalanceCalibrated()) {
+      resetWhiteBalance();
+      setState((s) => ({
+        ...s,
+        phase: 'whiteBalance',
+        whiteBalanceSample: null,
+        whiteBalanceReady: false,
+        whiteBalanceError: null,
+        whiteBalanceCalibrated: false,
+      }));
+      return;
+    }
+
     pendingFrameRef.current = null;
     setState((s) => ({
       ...s,
@@ -409,6 +401,15 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     if (phase === 'calibrating') {
+      if (!isWhiteBalanceCalibrated()) {
+        setState((s) => ({
+          ...s,
+          phase: 'whiteBalance',
+          whiteBalanceCalibrated: false,
+        }));
+        return;
+      }
+
       setState((prev) => {
         if (!prev.currentCalibrationFace) {
           return { ...prev, currentPose: result.pose };
@@ -477,9 +478,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   return {
     state,
     currentMove,
-    startWhiteBalance,
     confirmWhiteBalance,
-    skipWhiteBalance,
     startCalibration,
     captureCurrentFace,
     startTracking,

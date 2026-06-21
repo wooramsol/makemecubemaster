@@ -25,7 +25,7 @@ export function CalibrationOverlay({
   return (
     <div className="calibration-overlay">
       <p className="calibration-step">
-        {faceIndex + 1} / 6 — {getFaceLabel(currentFace)}
+        2단계 — {faceIndex + 1} / 6 · {getFaceLabel(currentFace)}
       </p>
       <p className="calibration-hint">{getFaceScanHint(currentFace)}</p>
       <div className="calibration-bar">

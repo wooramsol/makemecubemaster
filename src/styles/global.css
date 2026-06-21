@@ -234,18 +234,21 @@ body,
   transform: translateX(-50%);
   top: max(12px, env(safe-area-inset-top));
   width: min(92vw, 360px);
-  max-height: calc(var(--guide-top) - 12px);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
   z-index: 6;
   pointer-events: none;
+  overflow: hidden;
 }
 
-.scan-ui-panel .capture-button,
-.scan-ui-panel .wb-skip {
+.scan-ui-panel--compact {
+  width: auto;
+  max-width: min(92vw, 200px);
+}
+
+.scan-ui-panel .capture-button {
   pointer-events: auto;
 }
 
@@ -257,12 +260,20 @@ body,
 }
 
 .wb-panel {
-  padding: 14px 16px;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   pointer-events: auto;
+  width: min(92vw, 300px);
+}
+
+.wb-step {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 2px;
 }
 
 .wb-title {
@@ -280,11 +291,19 @@ body,
 }
 
 .wb-meter {
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.06);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
+}
+
+.wb-preview-swatch {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 6px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
 }
 
 .wb-status {
@@ -313,21 +332,22 @@ body,
 }
 
 .wb-error {
-  margin-top: 8px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 11px;
   color: #fca5a5;
   text-align: center;
 }
 
-.wb-skip {
-  margin-top: 8px;
-  border: none;
-  background: none;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 6px;
-  pointer-events: auto;
+.wb-guide-note {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(var(--guide-bottom) + 10px);
+  width: min(90vw, 320px);
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.65;
+  pointer-events: none;
 }
 
 .detection-svg,
@@ -344,14 +364,14 @@ body,
 }
 
 .capture-button {
-  margin-top: 16px;
+  margin-top: 8px;
   width: 100%;
-  padding: 14px 20px;
+  padding: 12px 16px;
   border: none;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);
   color: #000;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   pointer-events: auto;
@@ -472,18 +492,18 @@ body,
 
 .cell-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  margin-top: 10px;
-  padding: 4px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  grid-template-columns: repeat(3, 20px);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .cell-grid-item {
-  aspect-ratio: 1;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.3);
 }
 
 .stabilize-bar {

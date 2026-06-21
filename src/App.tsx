@@ -15,9 +15,7 @@ export default function App() {
   const {
     state,
     currentMove,
-    startWhiteBalance,
     confirmWhiteBalance,
-    skipWhiteBalance,
     captureCurrentFace,
     startTracking,
     stopTracking,
@@ -69,7 +67,6 @@ export default function App() {
               ready={state.whiteBalanceReady}
               error={state.whiteBalanceError}
               onConfirm={confirmWhiteBalance}
-              onSkip={skipWhiteBalance}
             />
 
             <DetectionOverlay
@@ -86,12 +83,6 @@ export default function App() {
               canCapture={state.canCaptureFace}
               onCapture={captureCurrentFace}
             />
-
-            {state.phase === 'camera' && (
-              <button type="button" className="primary-button" onClick={startWhiteBalance}>
-                섞인 큐브 스캔
-              </button>
-            )}
 
             {state.phase === 'solving' && currentMove && (
               <div className="solving-banner">

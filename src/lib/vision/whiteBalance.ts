@@ -6,14 +6,31 @@ export interface WhiteBalanceGains {
   b: number;
 }
 
+export interface WhiteReference {
+  r: number;
+  g: number;
+  b: number;
+}
+
 const DEFAULT_GAINS: WhiteBalanceGains = { r: 1, g: 1, b: 1 };
 const MIN_GAIN = 0.45;
 const MAX_GAIN = 2.2;
+const WHITE_TARGET = 240;
 
 let activeGains: WhiteBalanceGains = { ...DEFAULT_GAINS };
+let whiteReference: WhiteReference | null = null;
+let calibrated = false;
 
 export function getWhiteBalance(): WhiteBalanceGains {
   return activeGains;
+}
+
+export function getWhiteReference(): WhiteReference | null {
+  return whiteReference;
+}
+
+export function isWhiteBalanceCalibrated(): boolean {
+  return calibrated;
 }
 
 export function setWhiteBalance(gains: WhiteBalanceGains): void {
@@ -24,13 +41,20 @@ export function setWhiteBalance(gains: WhiteBalanceGains): void {
   };
 }
 
-export function resetWhiteBalance(): void {
-  activeGains = { ...DEFAULT_GAINS };
+export function setWhiteBalanceFromSample(sample: WhiteBalanceSample): void {
+  whiteReference = { r: sample.r, g: sample.g, b: sample.b };
+  activeGains = {
+    r: clampGain(WHITE_TARGET / Math.max(sample.r, 1)),
+    g: clampGain(WHITE_TARGET / Math.max(sample.g, 1)),
+    b: clampGain(WHITE_TARGET / Math.max(sample.b, 1)),
+  };
+  calibrated = true;
 }
 
-export function isWhiteBalanceCalibrated(): boolean {
-  const { r, g, b } = activeGains;
-  return Math.abs(r - 1) > 0.03 || Math.abs(g - 1) > 0.03 || Math.abs(b - 1) > 0.03;
+export function resetWhiteBalance(): void {
+  activeGains = { ...DEFAULT_GAINS };
+  whiteReference = null;
+  calibrated = false;
 }
 
 function clampGain(value: number): number {
@@ -118,14 +142,9 @@ export function calibrateWhiteBalanceFromCanvas(
   const sample = measureWhiteBalanceSample(sourceCanvas, frameWidth, frameHeight);
   if (!sample || !sample.ready) return null;
 
-  const target = (sample.r + sample.g + sample.b) / 3;
-  const gains: WhiteBalanceGains = {
-    r: target / Math.max(sample.r, 1),
-    g: target / Math.max(sample.g, 1),
-    b: target / Math.max(sample.b, 1),
-  };
+  setWhiteBalanceFromSample(sample);
 
-  return { gains, sample };
+  return { gains: getWhiteBalance(), sample };
 }
 
 function median(values: number[]): number {

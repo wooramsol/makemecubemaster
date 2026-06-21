@@ -9,8 +9,6 @@ const STICKER_HEX: Record<StickerColor, string> = {
   B: '#3b82f6',
 };
 
-const COLOR_ORDER: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
-
 const COLOR_SHORT: Record<StickerColor, string> = {
   R: '빨',
   O: '주',
@@ -22,7 +20,7 @@ const COLOR_SHORT: Record<StickerColor, string> = {
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
-  detected: '큐브 감지됨 — 아래 버튼으로 스캔',
+  detected: '아래 버튼으로 스캔',
   stabilizing: '스캔 중',
   captured: '캡처 완료!',
 };
@@ -36,59 +34,28 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
   if (!visible) return null;
 
   const statusClass = feedback.status;
-  const progress =
-    feedback.stableTarget > 0 ? feedback.stableProgress / feedback.stableTarget : 0;
-  const totalRead = Object.values(feedback.colorCounts).reduce((sum, n) => sum + n, 0);
-  const showCounts = totalRead === 9;
+  const showGrid = feedback.cellColors.length === 9;
 
   return (
     <div className="detection-overlay" aria-live="polite">
       <div className="guide-frame-css" />
 
-      <div className="scan-ui-panel">
+      <div className="scan-ui-panel scan-ui-panel--compact">
         <div className={`detection-status ${statusClass}`}>
           <span className="status-dot" />
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
-          {feedback.status === 'stabilizing' && (
-            <span className="status-progress">
-              {feedback.stableProgress}/{feedback.stableTarget}
-            </span>
-          )}
         </div>
 
-        {showCounts && (
-          <div className="color-counts">
-            <p className="color-counts-title">인식된 색상 (9칸)</p>
-            <div className="color-counts-grid">
-              {COLOR_ORDER.map((color) => (
-                <div key={color} className="color-count-item">
-                  <span
-                    className="color-swatch"
-                    style={{ background: STICKER_HEX[color] }}
-                  />
-                  <span className="color-count-label">{COLOR_SHORT[color]}</span>
-                  <span className="color-count-value">{feedback.colorCounts[color]}</span>
-                </div>
-              ))}
-            </div>
-            {feedback.cellColors.length === 9 && (
-              <div className="cell-grid" aria-label="칸별 인식 결과">
-                {feedback.cellColors.map((color, i) => (
-                  <span
-                    key={i}
-                    className="cell-grid-item"
-                    style={{ background: STICKER_HEX[color] }}
-                    title={COLOR_SHORT[color]}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {feedback.status === 'stabilizing' && (
-          <div className="stabilize-bar">
-            <div className="stabilize-fill" style={{ width: `${progress * 100}%` }} />
+        {showGrid && (
+          <div className="cell-grid" aria-label="칸별 인식 결과">
+            {feedback.cellColors.map((color, i) => (
+              <span
+                key={i}
+                className="cell-grid-item"
+                style={{ background: STICKER_HEX[color] }}
+                title={COLOR_SHORT[color]}
+              />
+            ))}
           </div>
         )}
       </div>

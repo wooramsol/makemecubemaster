@@ -1,5 +1,5 @@
 import type { StickerColor } from '../../types';
-import { applyWhiteBalance } from './whiteBalance';
+import { applyWhiteBalance, isWhiteBalanceCalibrated } from './whiteBalance';
 
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
 
@@ -125,6 +125,12 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   const [h, s] = rgbToHsv(r, g, b);
   const sn = s / 255;
   const max = Math.max(r, g, b);
+
+  if (isWhiteBalanceCalibrated()) {
+    const chroma = max - Math.min(r, g, b);
+    const brightness = (r + g + b) / 3;
+    if (brightness > 195 && chroma < 38) return 'W';
+  }
 
   if (isWhitePixel(r, g, b)) return 'W';
 
