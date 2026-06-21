@@ -28,7 +28,7 @@ export function CameraView({ setVideoRef, onDimensions }: CameraViewProps) {
   return (
     <video
       ref={handleRef}
-      className="camera-feed mirrored"
+      className="camera-feed"
       playsInline
       muted
       autoPlay

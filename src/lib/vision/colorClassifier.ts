@@ -140,7 +140,7 @@ export function isFaceReadStable(colors: StickerColor[] | null): boolean {
   if (!colors || colors.length !== 9) return false;
   const { dominant, count } = getDominantSticker(colors);
   const center = colors[4];
-  return count >= 5 && center === dominant;
+  return count >= 3 && center === dominant;
 }
 
 export function getCalibrationFeedback(colors: StickerColor[] | null): {
@@ -153,7 +153,6 @@ export function getCalibrationFeedback(colors: StickerColor[] | null): {
   }
   const { dominant, count } = getDominantSticker(colors);
   const detectedCenter = colors[4] ?? null;
-  const matchCount = count;
-  const valid = count >= 5 && detectedCenter === dominant;
-  return { valid, matchCount, detectedCenter };
+  const valid = count >= 3 && detectedCenter === dominant;
+  return { valid, matchCount: count, detectedCenter };
 }

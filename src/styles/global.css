@@ -43,9 +43,6 @@ body,
   height: 100%;
   object-fit: cover;
   display: block;
-}
-
-.camera-feed.mirrored {
   transform: scaleX(-1);
 }
 
@@ -60,11 +57,10 @@ body,
 
 .ar-overlay.active {
   visibility: visible;
-}
-
-.ar-overlay.mirrored {
   transform: scaleX(-1);
 }
+
+/* remove old .ar-overlay.mirrored */
 
 .step-indicator {
   position: absolute;
@@ -200,7 +196,7 @@ body,
   color: #ff6b6b;
 }
 
-/* ── 큐브 인식 피드백 오버레이 ── */
+/* ── 큐브 인식 피드백 ── */
 .detection-overlay {
   position: absolute;
   inset: 0;
@@ -208,31 +204,31 @@ body,
   z-index: 5;
 }
 
-.detection-graphics {
+.guide-frame-css {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  width: min(68vw, 46vh);
+  aspect-ratio: 1;
+  transform: translate(-50%, -55%);
+  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
 }
 
-.detection-graphics.mirrored {
+.detection-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   transform: scaleX(-1);
+  pointer-events: none;
 }
 
 .detection-ui {
   position: absolute;
   inset: 0;
   pointer-events: none;
-}
-
-.detection-svg {
-  width: 100%;
-  height: 100%;
-}
-
-.guide-frame {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.35);
-  stroke-width: 2;
-  stroke-dasharray: 12 8;
 }
 
 .detected-quad {

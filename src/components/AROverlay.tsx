@@ -49,7 +49,7 @@ export function AROverlay({ pose, move, width, height, active }: AROverlayProps)
   return (
     <canvas
       ref={canvasRef}
-      className={`ar-overlay mirrored${active ? ' active' : ''}`}
+      className={`ar-overlay${active ? ' active' : ''}`}
       aria-hidden="true"
     />
   );

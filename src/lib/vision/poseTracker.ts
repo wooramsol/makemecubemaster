@@ -25,6 +25,42 @@ export function estimatePoseFromCorners(
   frameWidth: number,
   frameHeight: number,
 ): CubePose {
+  try {
+    return estimatePoseOpenCV(corners, frameWidth, frameHeight);
+  } catch {
+    return estimatePoseSimple(corners, frameWidth, frameHeight);
+  }
+}
+
+function estimatePoseSimple(
+  corners: [Point2D, Point2D, Point2D, Point2D],
+  frameWidth: number,
+  _frameHeight: number,
+): CubePose {
+  const center = {
+    x: corners.reduce((s, p) => s + p.x, 0) / 4,
+    y: corners.reduce((s, p) => s + p.y, 0) / 4,
+  };
+  const size =
+    (Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y) +
+      Math.hypot(corners[2].x - corners[3].x, corners[2].y - corners[3].y)) /
+    2;
+
+  return {
+    corners,
+    center,
+    size,
+    rotationMatrix: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    translation: [center.x - frameWidth / 2, center.y, size * 3],
+    confidence: 0.65,
+  };
+}
+
+function estimatePoseOpenCV(
+  corners: [Point2D, Point2D, Point2D, Point2D],
+  frameWidth: number,
+  frameHeight: number,
+): CubePose {
   const cv = window.cv;
   const fx = frameWidth * 0.9;
   const fy = frameWidth * 0.9;
