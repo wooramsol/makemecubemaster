@@ -11,8 +11,8 @@ const STICKER_HEX: Record<StickerColor, string> = {
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
-  detected: '큐브 감지됨 — 색상 읽는 중',
-  stabilizing: '스캔 중 — 잠시 유지하세요',
+  detected: '큐브 감지됨 — 아래 버튼으로 스캔',
+  stabilizing: '스캔 중',
   captured: '캡처 완료!',
 };
 

@@ -249,6 +249,38 @@ body,
   stroke-width: 4;
 }
 
+.capture-button {
+  margin-top: 16px;
+  width: 100%;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #000;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.capture-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.capture-button:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.calibration-overlay {
+  pointer-events: none;
+}
+
+.calibration-overlay .capture-button {
+  pointer-events: auto;
+}
+
 .detected-grid {
   stroke: rgba(255, 255, 255, 0.45);
   stroke-width: 1;

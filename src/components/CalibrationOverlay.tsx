@@ -6,6 +6,8 @@ interface CalibrationOverlayProps {
   progress: number;
   currentFace: FaceId | null;
   faceIndex: number;
+  canCapture: boolean;
+  onCapture: () => void;
 }
 
 export function CalibrationOverlay({
@@ -13,8 +15,12 @@ export function CalibrationOverlay({
   progress,
   currentFace,
   faceIndex,
+  canCapture,
+  onCapture,
 }: CalibrationOverlayProps) {
   if (phase !== 'calibrating' || !currentFace) return null;
+
+  const isRepeatFace = faceIndex > 0;
 
   return (
     <div className="calibration-overlay">
@@ -26,9 +32,18 @@ export function CalibrationOverlay({
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">
-        <strong>섞인 상태 그대로</strong> 스캔합니다. 큐브를 맞출 필요 없습니다.
-        가이드 안에 면을 맞추고 잠시 유지하세요.
+        {isRepeatFace
+          ? '다른 면을 가이드에 맞춘 뒤 아래 버튼을 누르세요.'
+          : '큐브 면을 가이드에 맞추고 준비되면 버튼을 누르세요.'}
       </p>
+      <button
+        type="button"
+        className="capture-button"
+        disabled={!canCapture}
+        onClick={onCapture}
+      >
+        {canCapture ? '이 면 스캔' : '큐브를 가이드 안에 맞추세요'}
+      </button>
     </div>
   );
 }

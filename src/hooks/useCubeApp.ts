@@ -10,17 +10,13 @@ import type {
   SolutionProgress,
   StickerColor,
 } from '../types';
-import {
-  CALIBRATION_ORDER,
-  getFaceScanHint,
-} from '../lib/cube/colors';
+import { CALIBRATION_ORDER, getFaceScanHint } from '../lib/cube/colors';
 import { buildFaceletString } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
-
-const STABLE_CALIBRATION_FRAMES = 8;
+import { colorsDifferEnough } from '../lib/vision/scanValidation';
 
 export interface CubeAppState {
   phase: AppPhase;
@@ -33,12 +29,13 @@ export interface CubeAppState {
   solverReady: boolean;
   calibrationHint: string;
   detectionFeedback: DetectionFeedback;
+  canCaptureFace: boolean;
 }
 
 const initialFeedback: DetectionFeedback = {
   status: 'searching',
   stableProgress: 0,
-  stableTarget: STABLE_CALIBRATION_FRAMES,
+  stableTarget: 0,
   detectedCenter: null,
   matchCount: 0,
 };
@@ -54,18 +51,25 @@ const initialState: CubeAppState = {
   solverReady: false,
   calibrationHint: '',
   detectionFeedback: initialFeedback,
+  canCaptureFace: false,
 };
+
+interface PendingFrame {
+  colors: StickerColor[];
+  pose: CubePose;
+}
 
 export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const [state, setState] = useState<CubeAppState>(initialState);
   const frameProcessor = useRef<FrameProcessor | null>(null);
   const solverWorker = useRef<Worker | null>(null);
   const faceletRef = useRef<string>('');
-  const stableCalibCount = useRef(0);
   const rafRef = useRef<number>(0);
   const requestId = useRef(0);
   const phaseRef = useRef<AppPhase>('loading');
   const solutionRef = useRef<SolutionProgress | null>(null);
+  const pendingFrameRef = useRef<PendingFrame | null>(null);
+  const solvingStartMs = useRef(0);
 
   useEffect(() => {
     phaseRef.current = state.phase;
@@ -99,29 +103,23 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const buildFeedback = useCallback(
-    (
-      hasPose: boolean,
-      colors: StickerColor[] | null,
-      stableCount: number,
-    ): DetectionFeedback => {
+    (hasPose: boolean, colors: StickerColor[] | null, canCapture: boolean): DetectionFeedback => {
       const { detectedCenter, matchCount } = getCalibrationFeedback(colors);
       const readable = isColorsReadable(colors);
 
       let status: DetectionStatus = 'searching';
-      if (!hasPose) {
+      if (!hasPose || !readable) {
         status = 'searching';
-      } else if (!readable) {
+      } else if (canCapture) {
         status = 'detected';
-      } else if (stableCount > 0) {
-        status = 'stabilizing';
       } else {
         status = 'detected';
       }
 
       return {
         status,
-        stableProgress: readable && hasPose ? stableCount : 0,
-        stableTarget: STABLE_CALIBRATION_FRAMES,
+        stableProgress: 0,
+        stableTarget: 0,
         detectedCenter,
         matchCount,
       };
@@ -142,12 +140,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         if (msg.type === 'ready') {
           setState((s) => ({ ...s, solverReady: true }));
         } else if (msg.type === 'solution') {
+          solvingStartMs.current = Date.now();
           setState((s) => ({
             ...s,
             phase: 'solving',
             solution: { moves: msg.moves, currentIndex: 0 },
             calibrationHint: '',
             detectionFeedback: initialFeedback,
+            canCaptureFace: false,
           }));
           frameProcessor.current?.enableTracking();
         } else if (msg.type === 'facelet') {
@@ -178,18 +178,80 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, [init]);
 
   const startCalibration = useCallback(() => {
-    stableCalibCount.current = 0;
-    const first = CALIBRATION_ORDER[0] ?? null;
+    pendingFrameRef.current = null;
     setState((s) => ({
       ...s,
       phase: 'calibrating',
       scannedFaces: [],
-      currentCalibrationFace: first,
+      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
       calibrationProgress: 0,
-      calibrationHint: first ? getFaceScanHint(first) : '',
+      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
       detectionFeedback: initialFeedback,
+      canCaptureFace: false,
     }));
     frameProcessor.current?.disableTracking();
+  }, []);
+
+  const captureCurrentFace = useCallback(() => {
+    const pending = pendingFrameRef.current;
+    if (!pending) return;
+
+    setState((prev) => {
+      if (prev.phase !== 'calibrating' || !prev.currentCalibrationFace) return prev;
+
+      const faceId = prev.currentCalibrationFace;
+      const lastScanned = prev.scannedFaces[prev.scannedFaces.length - 1];
+      if (lastScanned && !colorsDifferEnough(pending.colors, lastScanned.colors)) {
+        return prev;
+      }
+
+      const scanned: ScannedFace = { faceId, colors: pending.colors };
+      const newFaces = [...prev.scannedFaces, scanned];
+      const nextFace = CALIBRATION_ORDER[newFaces.length] ?? null;
+      pendingFrameRef.current = null;
+
+      if (nextFace) {
+        return {
+          ...prev,
+          scannedFaces: newFaces,
+          currentCalibrationFace: nextFace,
+          calibrationProgress: newFaces.length / 6,
+          calibrationHint: getFaceScanHint(nextFace),
+          canCaptureFace: false,
+          detectionFeedback: {
+            status: 'captured',
+            stableProgress: 0,
+            stableTarget: 0,
+            detectedCenter: pending.colors[4] ?? null,
+            matchCount: 9,
+          },
+        };
+      }
+
+      try {
+        const facelet = buildFaceletString(newFaces);
+        faceletRef.current = facelet;
+        const id = ++requestId.current;
+        solverWorker.current?.postMessage({ type: 'solve', facelet, id });
+        frameProcessor.current?.syncPose(pending.pose);
+
+        return {
+          ...prev,
+          scannedFaces: newFaces,
+          currentCalibrationFace: null,
+          calibrationProgress: 1,
+          calibrationHint: '해법 계산 중...',
+          canCaptureFace: false,
+          detectionFeedback: { status: 'captured', stableProgress: 0, stableTarget: 0, detectedCenter: null, matchCount: 0 },
+        };
+      } catch (error) {
+        return {
+          ...prev,
+          phase: 'error',
+          error: error instanceof Error ? error.message : '큐브 상태 생성 실패',
+        };
+      }
+    });
   }, []);
 
   const processFrame = useCallback(() => {
@@ -202,78 +264,31 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     if (phase === 'calibrating') {
       setState((prev) => {
-        if (!prev.currentCalibrationFace) return { ...prev, currentPose: result.pose };
-
-        const faceId = prev.currentCalibrationFace;
-        const colors = result.detectedFace?.colors ?? null;
-        const ready = Boolean(result.pose) && isColorsReadable(colors);
-
-        const feedback = buildFeedback(
-          Boolean(result.pose),
-          colors,
-          stableCalibCount.current,
-        );
-
-        if (ready) {
-          stableCalibCount.current++;
-          feedback.status = 'stabilizing';
-          feedback.stableProgress = stableCalibCount.current;
-
-          if (stableCalibCount.current >= STABLE_CALIBRATION_FRAMES) {
-            const scanned: ScannedFace = { faceId, colors: colors! };
-            const newFaces = [...prev.scannedFaces, scanned];
-            const nextFace = CALIBRATION_ORDER[newFaces.length] ?? null;
-            stableCalibCount.current = 0;
-
-            if (nextFace) {
-              return {
-                ...prev,
-                currentPose: result.pose,
-                scannedFaces: newFaces,
-                currentCalibrationFace: nextFace,
-                calibrationProgress: newFaces.length / 6,
-                calibrationHint: getFaceScanHint(nextFace),
-                detectionFeedback: {
-                  status: 'captured',
-                  stableProgress: STABLE_CALIBRATION_FRAMES,
-                  stableTarget: STABLE_CALIBRATION_FRAMES,
-                  detectedCenter: colors?.[4] ?? null,
-                  matchCount: feedback.matchCount,
-                },
-              };
-            }
-
-            try {
-              const facelet = buildFaceletString(newFaces);
-              faceletRef.current = facelet;
-              const id = ++requestId.current;
-              solverWorker.current?.postMessage({ type: 'solve', facelet, id });
-              if (result.pose) processor.syncPose(result.pose);
-
-              return {
-                ...prev,
-                currentPose: result.pose,
-                scannedFaces: newFaces,
-                currentCalibrationFace: null,
-                calibrationProgress: 1,
-                calibrationHint: '해법 계산 중...',
-                detectionFeedback: { ...feedback, status: 'captured' },
-              };
-            } catch (error) {
-              return {
-                ...prev,
-                currentPose: result.pose,
-                phase: 'error',
-                error: error instanceof Error ? error.message : '큐브 상태 생성 실패',
-                detectionFeedback: feedback,
-              };
-            }
-          }
-        } else {
-          stableCalibCount.current = Math.max(0, stableCalibCount.current - 1);
+        if (!prev.currentCalibrationFace) {
+          return { ...prev, currentPose: result.pose };
         }
 
-        return { ...prev, currentPose: result.pose, detectionFeedback: feedback };
+        const colors = result.detectedFace?.colors ?? null;
+        const hasDetection = Boolean(result.pose) && isColorsReadable(colors);
+
+        let canCapture = hasDetection;
+        const lastScanned = prev.scannedFaces[prev.scannedFaces.length - 1];
+        if (canCapture && lastScanned && colors) {
+          canCapture = colorsDifferEnough(colors, lastScanned.colors);
+        }
+
+        if (hasDetection && colors && result.pose) {
+          pendingFrameRef.current = { colors, pose: result.pose };
+        } else {
+          pendingFrameRef.current = null;
+        }
+
+        return {
+          ...prev,
+          currentPose: result.pose,
+          canCaptureFace: canCapture,
+          detectionFeedback: buildFeedback(Boolean(result.pose), colors, canCapture),
+        };
       });
       return;
     }
@@ -281,6 +296,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     setState((s) => ({ ...s, currentPose: result.pose }));
 
     if (phase === 'solving' && result.rotationMove) {
+      if (Date.now() - solvingStartMs.current < 3000) return;
+
       const solution = solutionRef.current;
       if (solution) {
         const expected = solution.moves[solution.currentIndex];
@@ -315,6 +332,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     state,
     currentMove,
     startCalibration,
+    captureCurrentFace,
     startTracking,
     stopTracking,
   };

@@ -113,12 +113,10 @@ function tryGuidedDetect(
 ): { corners: [Point2D, Point2D, Point2D, Point2D]; colors: StickerColor[] } | null {
   const guide = getGuideSquare(frameWidth, frameHeight);
   const colors = sampleGuideRegionColors(sourceCanvas, guide);
+  const variance = measureColorVariance(sourceCanvas, guide);
 
-  if (!isRegionCubeLike(colors)) {
-    const variance = measureColorVariance(sourceCanvas, guide);
-    if (variance < 80) return null;
-    // 분산이 충분하면 큐브일 가능성 — 색 분류 재시도
-    if (colors.filter((c) => c !== 'W').length < 2) return null;
+  if (!isRegionCubeLike(colors, variance)) {
+    return null;
   }
 
   return { corners: guideToCorners(guide), colors };
@@ -165,6 +163,14 @@ export function detectCubeFace(
   frameWidth: number,
   frameHeight: number,
 ): DetectedFace | null {
+  const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
+
+  if (corners) {
+    const colors = warpAndSampleColors(sourceCanvas, corners);
+    const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight);
+    return { colors, pose };
+  }
+
   const guided = tryGuidedDetect(sourceCanvas, frameWidth, frameHeight);
   if (guided) {
     const pose = estimatePoseFromCorners(guided.corners, frameWidth, frameHeight);
@@ -172,12 +178,7 @@ export function detectCubeFace(
     return { colors: guided.colors, pose };
   }
 
-  const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
-  if (!corners) return null;
-
-  const colors = warpAndSampleColors(sourceCanvas, corners);
-  const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight);
-  return { colors, pose };
+  return null;
 }
 
 export function createGrayMat(sourceCanvas: HTMLCanvasElement): import('../../types/opencv').OpenCVMat {

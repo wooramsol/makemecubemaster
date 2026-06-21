@@ -11,7 +11,7 @@ import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const { state, currentMove, startCalibration, startTracking, stopTracking } =
+  const { state, currentMove, startCalibration, captureCurrentFace, startTracking, stopTracking } =
     useCubeApp(videoRef);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -69,6 +69,8 @@ export default function App() {
               progress={state.calibrationProgress}
               currentFace={state.currentCalibrationFace}
               faceIndex={state.scannedFaces.length}
+              canCapture={state.canCaptureFace}
+              onCapture={captureCurrentFace}
             />
 
         {state.phase === 'camera' && (
