@@ -48,7 +48,7 @@ function colorDistance(a: [number, number, number], b: ColorRef): number {
 export function classifySticker(r: number, g: number, b: number): StickerColor {
   const hsv = rgbToHsv(r, g, b);
 
-  if (hsv[2] > 200 && hsv[1] < 50) return 'W';
+  if (hsv[2] > 180 && hsv[1] < 55) return 'W';
   if (hsv[1] < 40 && hsv[2] < 80) return 'B';
 
   let best: StickerColor = 'W';
@@ -78,7 +78,7 @@ export function sampleFaceColors(
     for (let col = 0; col < 3; col++) {
       const cx = col * cellW + cellW / 2;
       const cy = row * cellH + cellH / 2;
-      const radius = Math.min(cellW, cellH) * 0.2;
+      const radius = Math.min(cellW, cellH) * 0.22;
       let rSum = 0;
       let gSum = 0;
       let bSum = 0;
@@ -116,32 +116,44 @@ export function sampleFaceColors(
   return colors;
 }
 
-export function countMatchingStickers(
-  colors: StickerColor[],
-  expected: StickerColor,
-): number {
-  return colors.filter((c) => c === expected).length;
+export function getDominantSticker(colors: StickerColor[]): {
+  dominant: StickerColor;
+  count: number;
+} {
+  const counts = new Map<StickerColor, number>();
+  for (const c of colors) {
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let dominant: StickerColor = 'W';
+  let count = 0;
+  for (const [color, n] of counts) {
+    if (n > count) {
+      count = n;
+      dominant = color;
+    }
+  }
+  return { dominant, count };
 }
 
-export function isFaceColorValid(
-  colors: StickerColor[],
-  expectedCenter: StickerColor,
-): boolean {
-  if (colors.length !== 9) return false;
+/** 섞인 큐브: 한 면이면 9칸 중 같은 색이 대부분이어야 함 */
+export function isFaceReadStable(colors: StickerColor[] | null): boolean {
+  if (!colors || colors.length !== 9) return false;
+  const { dominant, count } = getDominantSticker(colors);
   const center = colors[4];
-  if (center !== expectedCenter) return false;
-  return countMatchingStickers(colors, expectedCenter) >= 4;
+  return count >= 5 && center === dominant;
 }
 
-export function getCalibrationFeedback(
-  colors: StickerColor[] | null,
-  expected: StickerColor,
-): { valid: boolean; matchCount: number; detectedCenter: StickerColor | null } {
+export function getCalibrationFeedback(colors: StickerColor[] | null): {
+  valid: boolean;
+  matchCount: number;
+  detectedCenter: StickerColor | null;
+} {
   if (!colors || colors.length !== 9) {
     return { valid: false, matchCount: 0, detectedCenter: null };
   }
+  const { dominant, count } = getDominantSticker(colors);
   const detectedCenter = colors[4] ?? null;
-  const matchCount = countMatchingStickers(colors, expected);
-  const valid = detectedCenter === expected && matchCount >= 4;
+  const matchCount = count;
+  const valid = count >= 5 && detectedCenter === dominant;
   return { valid, matchCount, detectedCenter };
 }

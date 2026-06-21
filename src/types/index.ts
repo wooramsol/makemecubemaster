@@ -56,7 +56,7 @@ export interface SolutionProgress {
 export type DetectionStatus =
   | 'searching'
   | 'detected'
-  | 'wrong-color'
+  | 'weak-read'
   | 'stabilizing'
   | 'captured';
 
@@ -65,7 +65,6 @@ export interface DetectionFeedback {
   stableProgress: number;
   stableTarget: number;
   detectedCenter: StickerColor | null;
-  expectedCenter: StickerColor | null;
   matchCount: number;
 }
 

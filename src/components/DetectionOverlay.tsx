@@ -1,4 +1,5 @@
 import type { CubePose, DetectionFeedback, Point2D, StickerColor } from '../types';
+import { getGuideSquare } from '../lib/vision/roi';
 
 const STICKER_HEX: Record<StickerColor, string> = {
   W: '#f5f5f5',
@@ -11,8 +12,8 @@ const STICKER_HEX: Record<StickerColor, string> = {
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
-  detected: '큐브 감지됨 — 색상 확인 중',
-  'wrong-color': '색상이 맞지 않아요 — 면을 다시 맞춰주세요',
+  detected: '큐브 감지됨',
+  'weak-read': '한 면만 보이게 맞춰주세요',
   stabilizing: '인식 중 — 잠시 유지하세요',
   captured: '캡처 완료!',
 };
@@ -39,73 +40,72 @@ export function DetectionOverlay({
   const progress =
     feedback.stableTarget > 0 ? feedback.stableProgress / feedback.stableTarget : 0;
 
-  const polygonPoints = corners
-    ? corners.map((p) => `${p.x},${p.y}`).join(' ')
-    : '';
-
+  const guide = getGuideSquare(videoWidth, videoHeight);
+  const polygonPoints = corners ? corners.map((p) => `${p.x},${p.y}`).join(' ') : '';
   const gridLines = corners ? buildGridLines(corners) : null;
 
   return (
-    <div className="detection-overlay mirrored" aria-live="polite">
-      <svg
-        className="detection-svg"
-        viewBox={`0 0 ${videoWidth} ${videoHeight}`}
-        preserveAspectRatio="xMidYMid slice"
-      >
-        {/* 가이드 프레임 */}
-        <rect
-          x={videoWidth * 0.2}
-          y={videoHeight * 0.15}
-          width={videoWidth * 0.6}
-          height={videoHeight * 0.55}
-          className="guide-frame"
-          rx={12}
-        />
+    <div className="detection-overlay" aria-live="polite">
+      {/* 그래픽만 미러 — 텍스트는 정상 방향 */}
+      <div className="detection-graphics mirrored">
+        <svg
+          className="detection-svg"
+          viewBox={`0 0 ${videoWidth} ${videoHeight}`}
+          preserveAspectRatio="xMidYMid slice"
+        >
+          <rect
+            x={guide.x}
+            y={guide.y}
+            width={guide.size}
+            height={guide.size}
+            className="guide-frame"
+            rx={8}
+          />
 
-        {corners && (
-          <>
-            <polygon points={polygonPoints} className={`detected-quad ${statusClass}`} />
-            {gridLines?.map((line, i) => (
-              <line key={i} {...line} className="detected-grid" />
-            ))}
-            {corners.map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r={8} className={`corner-dot ${statusClass}`} />
-            ))}
-          </>
-        )}
-      </svg>
-
-      <div className={`detection-status ${statusClass}`}>
-        <span className="status-dot" />
-        <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
-        {feedback.status === 'stabilizing' && (
-          <span className="status-progress">
-            {feedback.stableProgress}/{feedback.stableTarget}
-          </span>
-        )}
+          {corners && (
+            <>
+              <polygon points={polygonPoints} className={`detected-quad ${statusClass}`} />
+              {gridLines?.map((line, i) => (
+                <line key={i} {...line} className="detected-grid" />
+              ))}
+              {corners.map((p, i) => (
+                <circle key={i} cx={p.x} cy={p.y} r={8} className={`corner-dot ${statusClass}`} />
+              ))}
+            </>
+          )}
+        </svg>
       </div>
 
-      {feedback.detectedCenter && (
-        <div className="color-preview">
-          <span
-            className="color-swatch"
-            style={{ background: STICKER_HEX[feedback.detectedCenter] }}
-          />
-          <span className="color-label">
-            감지: {colorName(feedback.detectedCenter)}
-            {feedback.expectedCenter && feedback.detectedCenter !== feedback.expectedCenter && (
-              <> → 필요: {colorName(feedback.expectedCenter)}</>
-            )}
-            {feedback.matchCount > 0 && <> ({feedback.matchCount}/9)</>}
-          </span>
+      <div className="detection-ui">
+        <div className={`detection-status ${statusClass}`}>
+          <span className="status-dot" />
+          <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
+          {feedback.status === 'stabilizing' && (
+            <span className="status-progress">
+              {feedback.stableProgress}/{feedback.stableTarget}
+            </span>
+          )}
         </div>
-      )}
 
-      {feedback.status === 'stabilizing' && (
-        <div className="stabilize-bar">
-          <div className="stabilize-fill" style={{ width: `${progress * 100}%` }} />
-        </div>
-      )}
+        {feedback.detectedCenter && (
+          <div className="color-preview">
+            <span
+              className="color-swatch"
+              style={{ background: STICKER_HEX[feedback.detectedCenter] }}
+            />
+            <span className="color-label">
+              감지 색상: {colorName(feedback.detectedCenter)}
+              {feedback.matchCount > 0 && <> · 일치 {feedback.matchCount}/9</>}
+            </span>
+          </div>
+        )}
+
+        {feedback.status === 'stabilizing' && (
+          <div className="stabilize-bar">
+            <div className="stabilize-fill" style={{ width: `${progress * 100}%` }} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

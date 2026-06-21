@@ -208,8 +208,19 @@ body,
   z-index: 5;
 }
 
-.detection-overlay.mirrored {
+.detection-graphics {
+  position: absolute;
+  inset: 0;
+}
+
+.detection-graphics.mirrored {
   transform: scaleX(-1);
+}
+
+.detection-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .detection-svg {
@@ -231,9 +242,9 @@ body,
   transition: stroke 0.2s ease;
 }
 
-.detected-quad.wrong-color {
-  fill: rgba(239, 68, 68, 0.12);
-  stroke: #ef4444;
+.detected-quad.weak-read {
+  fill: rgba(250, 204, 21, 0.12);
+  stroke: #facc15;
 }
 
 .detected-quad.stabilizing {
@@ -253,8 +264,8 @@ body,
   stroke-width: 2;
 }
 
-.corner-dot.wrong-color {
-  fill: #ef4444;
+.corner-dot.weak-read {
+  fill: #facc15;
 }
 
 .corner-dot.stabilizing {
@@ -288,8 +299,8 @@ body,
   background: #60a5fa;
 }
 
-.detection-status.wrong-color .status-dot {
-  background: #ef4444;
+.detection-status.weak-read .status-dot {
+  background: #facc15;
 }
 
 .detection-status.stabilizing .status-dot {
@@ -357,6 +368,10 @@ body,
   font-size: 13px;
   opacity: 0.7;
   margin-bottom: 4px;
+}
+
+.calibration-sub strong {
+  font-weight: 600;
 }
 
 @keyframes pulse {

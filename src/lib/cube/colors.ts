@@ -1,40 +1,39 @@
-import type { FaceId, StickerColor } from '../../types';
+import type { FaceId } from '../../types';
 
-/** Western color scheme: sticker color → cubejs face letter */
-export const STICKER_TO_FACE: Record<StickerColor, FaceId> = {
-  W: 'U',
-  Y: 'D',
-  R: 'R',
-  O: 'L',
-  G: 'F',
-  B: 'B',
-};
-
-export const FACE_TO_STICKER: Record<FaceId, StickerColor> = {
-  U: 'W',
-  D: 'Y',
-  R: 'R',
-  L: 'O',
-  F: 'G',
-  B: 'B',
-};
-
-export const FACE_LABELS: Record<FaceId, string> = {
-  U: '흰색 (위)',
-  D: '노란색 (아래)',
-  F: '초록색 (앞)',
-  B: '파란색 (뒤)',
-  R: '빨간색 (오른쪽)',
-  L: '주황색 (왼쪽)',
-};
-
+/** 스캔 순서: 면1(U) → 면2(F) → 면3(R) → 면4(B) → 면5(L) → 면6(D) */
 export const CALIBRATION_ORDER: FaceId[] = ['U', 'F', 'R', 'B', 'L', 'D'];
 
-export const FACE_CENTER_COLORS: Record<FaceId, StickerColor> = {
-  U: 'W',
-  D: 'Y',
-  F: 'G',
-  B: 'B',
-  R: 'R',
-  L: 'O',
+const FACE_NUMBER: Record<FaceId, number> = {
+  U: 1,
+  F: 2,
+  R: 3,
+  B: 4,
+  L: 5,
+  D: 6,
+};
+
+export function getFaceNumber(faceId: FaceId): number {
+  return FACE_NUMBER[faceId];
+}
+
+export function getFaceLabel(faceId: FaceId): string {
+  return `면 ${FACE_NUMBER[faceId]}`;
+}
+
+export function getFaceScanHint(faceId: FaceId): string {
+  const n = FACE_NUMBER[faceId];
+  if (n === 1) {
+    return '면 1 — 아무 면이나 카메라에 비추세요 (이후 다른 면 5개를 순서대로)';
+  }
+  return `면 ${n} — 아직 안 비친 다른 면을 보여주세요`;
+}
+
+/** @deprecated scrambled cube scan — labels only */
+export const FACE_LABELS: Record<FaceId, string> = {
+  U: '면 1',
+  D: '면 6',
+  F: '면 2',
+  B: '면 4',
+  R: '면 3',
+  L: '면 5',
 };

@@ -101,6 +101,12 @@ export interface OpenCV {
     type: number,
   ): void;
   bitwise_or(src1: OpenCVMat, src2: OpenCVMat, dst: OpenCVMat): void;
+  inRange(
+    src: OpenCVMat,
+    lower: unknown,
+    upper: unknown,
+    dst: OpenCVMat,
+  ): void;
   COLOR_RGB2GRAY: number;
   imshow(canvas: HTMLCanvasElement, mat: OpenCVMat): void;
   onRuntimeInitialized?: () => void;

@@ -10,7 +10,10 @@ import type {
   SolutionProgress,
   StickerColor,
 } from '../types';
-import { CALIBRATION_ORDER, FACE_CENTER_COLORS, FACE_LABELS } from '../lib/cube/colors';
+import {
+  CALIBRATION_ORDER,
+  getFaceScanHint,
+} from '../lib/cube/colors';
 import { buildFaceletString } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { getCalibrationFeedback } from '../lib/vision/colorClassifier';
@@ -37,7 +40,6 @@ const initialFeedback: DetectionFeedback = {
   stableProgress: 0,
   stableTarget: STABLE_CALIBRATION_FRAMES,
   detectedCenter: null,
-  expectedCenter: null,
   matchCount: 0,
 };
 
@@ -100,10 +102,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     (
       hasPose: boolean,
       colors: StickerColor[] | null,
-      expected: StickerColor,
       stableCount: number,
     ): DetectionFeedback => {
-      const { valid, matchCount, detectedCenter } = getCalibrationFeedback(colors, expected);
+      const { valid, matchCount, detectedCenter } = getCalibrationFeedback(colors);
 
       let status: DetectionStatus = 'searching';
       if (!hasPose) {
@@ -111,11 +112,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       } else if (!colors) {
         status = 'detected';
       } else if (!valid) {
-        status = detectedCenter === expected ? 'detected' : 'wrong-color';
-        if (detectedCenter && matchCount >= 2 && matchCount < 4) status = 'detected';
-      } else if (stableCount > 0 && stableCount < STABLE_CALIBRATION_FRAMES) {
-        status = 'stabilizing';
-      } else if (valid) {
+        status = matchCount >= 3 ? 'weak-read' : 'detected';
+      } else if (stableCount > 0) {
         status = 'stabilizing';
       }
 
@@ -124,7 +122,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         stableProgress: valid ? stableCount : 0,
         stableTarget: STABLE_CALIBRATION_FRAMES,
         detectedCenter,
-        expectedCenter: expected,
         matchCount,
       };
     },
@@ -188,11 +185,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       scannedFaces: [],
       currentCalibrationFace: first,
       calibrationProgress: 0,
-      calibrationHint: first ? FACE_LABELS[first] : '',
-      detectionFeedback: {
-        ...initialFeedback,
-        expectedCenter: first ? FACE_CENTER_COLORS[first] : null,
-      },
+      calibrationHint: first ? getFaceScanHint(first) : '',
+      detectionFeedback: initialFeedback,
     }));
     frameProcessor.current?.disableTracking();
   }, []);
@@ -210,14 +204,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         if (!prev.currentCalibrationFace) return { ...prev, currentPose: result.pose };
 
         const faceId = prev.currentCalibrationFace;
-        const expected = FACE_CENTER_COLORS[faceId];
         const colors = result.detectedFace?.colors ?? null;
-        const { valid } = getCalibrationFeedback(colors, expected);
+        const { valid } = getCalibrationFeedback(colors);
 
         const feedback = buildFeedback(
           Boolean(result.pose),
           colors,
-          expected,
           stableCalibCount.current,
         );
 
@@ -239,14 +231,13 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
                 scannedFaces: newFaces,
                 currentCalibrationFace: nextFace,
                 calibrationProgress: newFaces.length / 6,
-                calibrationHint: FACE_LABELS[nextFace],
+                calibrationHint: getFaceScanHint(nextFace),
                 detectionFeedback: {
                   status: 'captured',
                   stableProgress: STABLE_CALIBRATION_FRAMES,
                   stableTarget: STABLE_CALIBRATION_FRAMES,
                   detectedCenter: colors?.[4] ?? null,
-                  expectedCenter: FACE_CENTER_COLORS[nextFace],
-                  matchCount: 9,
+                  matchCount: feedback.matchCount,
                 },
               };
             }
