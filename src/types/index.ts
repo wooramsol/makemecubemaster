@@ -50,7 +50,7 @@ export type AppPhase =
   | 'loading'
   | 'camera'
   | 'whiteBalance'
-  | 'calibrating'
+  | 'liveScan'
   | 'computing'
   | 'solving'
   | 'solved'

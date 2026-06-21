@@ -21,9 +21,9 @@ const COLOR_SHORT: Record<StickerColor, string> = {
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
-  detected: '아래 버튼으로 스캔',
-  stabilizing: '스캔 중',
-  captured: '캡처 완료!',
+  detected: '면 감지됨',
+  stabilizing: '인식 중',
+  captured: '면 저장됨!',
 };
 
 interface DetectionOverlayProps {
@@ -46,6 +46,11 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
         <div className={`detection-status ${statusClass}`}>
           <span className="status-dot" />
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
+          {feedback.status === 'stabilizing' && (
+            <span className="status-progress">
+              {feedback.stableProgress}/{feedback.stableTarget}
+            </span>
+          )}
         </div>
 
         {showGrid && (

@@ -6,17 +6,16 @@ import type {
   DetectionStatus,
   FaceId,
   Move,
-  ScannedFace,
   SolutionProgress,
   StickerColor,
 } from '../types';
-import { CALIBRATION_ORDER, getFaceScanHint } from '../lib/cube/colors';
-import { buildFaceletString } from '../lib/cube/state';
+import { buildFaceletFromMap } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
-import { countStickerColors, emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
+import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
+import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
-import { colorsDifferEnough, validateFaceletString } from '../lib/vision/scanValidation';
+import { validateFaceletString } from '../lib/vision/scanValidation';
 import {
   calibrateWhiteBalanceFromCanvas,
   isWhiteBalanceCalibrated,
@@ -27,15 +26,13 @@ import {
 export interface CubeAppState {
   phase: AppPhase;
   error: string | null;
-  scannedFaces: ScannedFace[];
-  currentCalibrationFace: FaceId | null;
-  calibrationProgress: number;
+  knownFaces: FaceId[];
+  currentVisibleFace: FaceId | null;
+  liveScanProgress: number;
   solution: SolutionProgress | null;
   currentPose: CubePose | null;
   solverReady: boolean;
-  calibrationHint: string;
   detectionFeedback: DetectionFeedback;
-  canCaptureFace: boolean;
   whiteBalanceSample: WhiteBalanceSample | null;
   whiteBalanceReady: boolean;
   whiteBalanceError: string | null;
@@ -54,38 +51,33 @@ const initialFeedback: DetectionFeedback = {
 const initialState: CubeAppState = {
   phase: 'loading',
   error: null,
-  scannedFaces: [],
-  currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
-  calibrationProgress: 0,
+  knownFaces: [],
+  currentVisibleFace: null,
+  liveScanProgress: 0,
   solution: null,
   currentPose: null,
   solverReady: false,
-  calibrationHint: '',
   detectionFeedback: initialFeedback,
-  canCaptureFace: false,
   whiteBalanceSample: null,
   whiteBalanceReady: false,
   whiteBalanceError: null,
   whiteBalanceCalibrated: false,
 };
 
-interface PendingFrame {
-  colors: StickerColor[];
-  pose: CubePose;
-}
-
 export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const [state, setState] = useState<CubeAppState>(initialState);
   const frameProcessor = useRef<FrameProcessor | null>(null);
   const solverWorker = useRef<Worker | null>(null);
+  const liveAccumulator = useRef(new LiveFaceAccumulator());
   const faceletRef = useRef<string>('');
   const rafRef = useRef<number>(0);
   const requestId = useRef(0);
   const phaseRef = useRef<AppPhase>('loading');
   const solutionRef = useRef<SolutionProgress | null>(null);
-  const pendingFrameRef = useRef<PendingFrame | null>(null);
   const solvingStartMs = useRef(0);
   const solveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPoseRef = useRef<CubePose | null>(null);
+  const solveTriggeredRef = useRef(false);
 
   const clearSolveTimeout = useCallback(() => {
     if (solveTimeoutRef.current) {
@@ -107,7 +99,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           return {
             ...s,
             phase: 'error',
-            error: '해법 계산 시간이 초과되었습니다. 다시 스캔해 주세요.',
+            error: '해법 계산 시간이 초과되었습니다. 다시 시도해 주세요.',
           };
         });
       }, 20000);
@@ -147,23 +139,31 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const buildFeedback = useCallback(
-    (hasPose: boolean, colors: StickerColor[] | null, canCapture: boolean): DetectionFeedback => {
+    (
+      hasPose: boolean,
+      colors: StickerColor[] | null,
+      stableProgress: number,
+      stableTarget: number,
+      captured: boolean,
+    ): DetectionFeedback => {
       const { detectedCenter, colorCounts } = getCalibrationFeedback(colors);
       const readable = isColorsReadable(colors);
 
       let status: DetectionStatus = 'searching';
       if (!hasPose || !readable) {
         status = 'searching';
-      } else if (canCapture) {
-        status = 'detected';
+      } else if (captured) {
+        status = 'captured';
+      } else if (stableProgress > 0 && stableProgress < stableTarget) {
+        status = 'stabilizing';
       } else {
         status = 'detected';
       }
 
       return {
         status,
-        stableProgress: 0,
-        stableTarget: 0,
+        stableProgress,
+        stableTarget,
         detectedCenter,
         colorCounts,
         cellColors: readable && colors ? [...colors] : [],
@@ -171,6 +171,22 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     },
     [],
   );
+
+  const beginLiveScan = useCallback(() => {
+    liveAccumulator.current.reset();
+    solveTriggeredRef.current = false;
+    lastPoseRef.current = null;
+    setState((s) => ({
+      ...s,
+      phase: 'liveScan',
+      error: null,
+      knownFaces: [],
+      currentVisibleFace: null,
+      liveScanProgress: 0,
+      detectionFeedback: initialFeedback,
+    }));
+    frameProcessor.current?.disableTracking();
+  }, []);
 
   const init = useCallback(async () => {
     try {
@@ -191,9 +207,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             ...s,
             phase: msg.moves.length === 0 ? 'solved' : 'solving',
             solution: { moves: msg.moves, currentIndex: 0 },
-            calibrationHint: '',
             detectionFeedback: initialFeedback,
-            canCaptureFace: false,
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.enableTracking();
@@ -207,7 +221,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             phase: 'error',
             error:
               msg.message.includes('Invalid') || msg.message.includes('invalid')
-                ? '인식된 큐브 상태가 올바르지 않습니다. 조명을 밝게 하고 6면을 다시 스캔해 주세요.'
+                ? '인식된 큐브 상태가 올바르지 않습니다. 큐브를 돌려 다시 스캔해 주세요.'
                 : msg.message,
           }));
         }
@@ -215,6 +229,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       worker.postMessage({ type: 'init' });
       resetWhiteBalance();
+      liveAccumulator.current.reset();
       setState((s) => ({
         ...s,
         phase: 'whiteBalance',
@@ -259,126 +274,15 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       return;
     }
 
-    pendingFrameRef.current = null;
+    beginLiveScan();
     setState((s) => ({
       ...s,
-      phase: 'calibrating',
-      error: null,
-      scannedFaces: [],
-      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
-      calibrationProgress: 0,
-      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
-      detectionFeedback: initialFeedback,
-      canCaptureFace: false,
       whiteBalanceSample: result.sample,
       whiteBalanceReady: true,
       whiteBalanceError: null,
       whiteBalanceCalibrated: true,
     }));
-    frameProcessor.current?.disableTracking();
-  }, [videoRef]);
-
-  const startCalibration = useCallback(() => {
-    if (!isWhiteBalanceCalibrated()) {
-      resetWhiteBalance();
-      setState((s) => ({
-        ...s,
-        phase: 'whiteBalance',
-        whiteBalanceSample: null,
-        whiteBalanceReady: false,
-        whiteBalanceError: null,
-        whiteBalanceCalibrated: false,
-      }));
-      return;
-    }
-
-    pendingFrameRef.current = null;
-    setState((s) => ({
-      ...s,
-      phase: 'calibrating',
-      scannedFaces: [],
-      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
-      calibrationProgress: 0,
-      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
-      detectionFeedback: initialFeedback,
-      canCaptureFace: false,
-    }));
-    frameProcessor.current?.disableTracking();
-  }, []);
-
-  const captureCurrentFace = useCallback(() => {
-    const pending = pendingFrameRef.current;
-    if (!pending) return;
-
-    setState((prev) => {
-      if (prev.phase !== 'calibrating' || !prev.currentCalibrationFace) return prev;
-
-      const faceId = prev.currentCalibrationFace;
-      const lastScanned = prev.scannedFaces[prev.scannedFaces.length - 1];
-      if (lastScanned && !colorsDifferEnough(pending.colors, lastScanned.colors)) {
-        return prev;
-      }
-
-      const scanned: ScannedFace = { faceId, colors: pending.colors };
-      const newFaces = [...prev.scannedFaces, scanned];
-      const nextFace = CALIBRATION_ORDER[newFaces.length] ?? null;
-      pendingFrameRef.current = null;
-
-      if (nextFace) {
-        return {
-          ...prev,
-          scannedFaces: newFaces,
-          currentCalibrationFace: nextFace,
-          calibrationProgress: newFaces.length / 6,
-          calibrationHint: getFaceScanHint(nextFace),
-          canCaptureFace: false,
-          detectionFeedback: {
-            status: 'captured',
-            stableProgress: 0,
-            stableTarget: 0,
-            detectedCenter: pending.colors[4] ?? null,
-            colorCounts: countStickerColors(pending.colors),
-            cellColors: [...pending.colors],
-          },
-        };
-      }
-
-      try {
-        const facelet = buildFaceletString(newFaces);
-        const validationError = validateFaceletString(facelet);
-        if (validationError) {
-          return { ...prev, phase: 'error', error: validationError };
-        }
-
-        faceletRef.current = facelet;
-        queueMicrotask(() => requestSolve(facelet, pending.pose));
-
-        return {
-          ...prev,
-          phase: 'computing',
-          scannedFaces: newFaces,
-          currentCalibrationFace: null,
-          calibrationProgress: 1,
-          calibrationHint: '',
-          canCaptureFace: false,
-          detectionFeedback: {
-            status: 'captured',
-            stableProgress: 0,
-            stableTarget: 0,
-            detectedCenter: null,
-            colorCounts: emptyColorCounts(),
-            cellColors: [],
-          },
-        };
-      } catch (error) {
-        return {
-          ...prev,
-          phase: 'error',
-          error: error instanceof Error ? error.message : '큐브 상태 생성 실패',
-        };
-      }
-    });
-  }, [requestSolve]);
+  }, [videoRef, beginLiveScan]);
 
   const processFrame = useCallback(() => {
     const video = videoRef.current;
@@ -400,43 +304,62 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       return;
     }
 
-    if (phase === 'calibrating') {
+    if (phase === 'liveScan') {
       if (!isWhiteBalanceCalibrated()) {
-        setState((s) => ({
-          ...s,
-          phase: 'whiteBalance',
-          whiteBalanceCalibrated: false,
-        }));
+        setState((s) => ({ ...s, phase: 'whiteBalance', whiteBalanceCalibrated: false }));
         return;
       }
 
-      setState((prev) => {
-        if (!prev.currentCalibrationFace) {
-          return { ...prev, currentPose: result.pose };
+      const colors = result.detectedFace?.colors ?? null;
+      const hasPose = Boolean(result.pose);
+      if (result.pose) lastPoseRef.current = result.pose;
+
+      const snapshot = liveAccumulator.current.update(colors);
+      const captured = Boolean(snapshot.newlyCaptured);
+
+      if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
+        solveTriggeredRef.current = true;
+        try {
+          const facelet = buildFaceletFromMap(snapshot.faces);
+          const validationError = validateFaceletString(facelet);
+          if (validationError) {
+            setState((s) => ({ ...s, phase: 'error', error: validationError }));
+            return;
+          }
+          faceletRef.current = facelet;
+          const pose = lastPoseRef.current;
+          setState((s) => ({
+            ...s,
+            phase: 'computing',
+            knownFaces: snapshot.knownFaces,
+            liveScanProgress: 1,
+            currentPose: pose,
+          }));
+          queueMicrotask(() => requestSolve(facelet, pose));
+        } catch (error) {
+          setState((s) => ({
+            ...s,
+            phase: 'error',
+            error: error instanceof Error ? error.message : '큐브 상태 생성 실패',
+          }));
         }
+        return;
+      }
 
-        const colors = result.detectedFace?.colors ?? null;
-        const hasDetection = Boolean(result.pose) && isColorsReadable(colors);
-
-        let canCapture = hasDetection;
-        const lastScanned = prev.scannedFaces[prev.scannedFaces.length - 1];
-        if (canCapture && lastScanned && colors) {
-          canCapture = colorsDifferEnough(colors, lastScanned.colors);
-        }
-
-        if (hasDetection && colors && result.pose) {
-          pendingFrameRef.current = { colors, pose: result.pose };
-        } else {
-          pendingFrameRef.current = null;
-        }
-
-        return {
-          ...prev,
-          currentPose: result.pose,
-          canCaptureFace: canCapture,
-          detectionFeedback: buildFeedback(Boolean(result.pose), colors, canCapture),
-        };
-      });
+      setState((prev) => ({
+        ...prev,
+        currentPose: result.pose,
+        knownFaces: snapshot.knownFaces,
+        currentVisibleFace: snapshot.currentFace,
+        liveScanProgress: snapshot.knownFaces.length / 6,
+        detectionFeedback: buildFeedback(
+          hasPose,
+          colors,
+          snapshot.stableProgress,
+          snapshot.stableTarget,
+          captured,
+        ),
+      }));
       return;
     }
 
@@ -454,7 +377,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         }
       }
     }
-  }, [videoRef, applyCompletedMove, buildFeedback]);
+  }, [videoRef, applyCompletedMove, buildFeedback, requestSolve]);
 
   const runLoop = useCallback(() => {
     processFrame();
@@ -479,8 +402,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     state,
     currentMove,
     confirmWhiteBalance,
-    startCalibration,
-    captureCurrentFace,
     startTracking,
     stopTracking,
   };

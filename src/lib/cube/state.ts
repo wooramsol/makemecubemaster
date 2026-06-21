@@ -9,7 +9,10 @@ export function buildFaceletString(faces: ScannedFace[]): string {
   for (const f of faces) {
     map.set(f.faceId, f.colors);
   }
+  return buildFaceletFromMap(map);
+}
 
+export function buildFaceletFromMap(map: Map<FaceId, StickerColor[]>): string {
   const order: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
   let result = '';
 

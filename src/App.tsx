@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AROverlay } from './components/AROverlay';
-import { CalibrationOverlay } from './components/CalibrationOverlay';
 import { CameraView } from './components/CameraView';
 import { DetectionOverlay } from './components/DetectionOverlay';
+import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { StepIndicator } from './components/StepIndicator';
 import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
@@ -12,14 +12,8 @@ import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const {
-    state,
-    currentMove,
-    confirmWhiteBalance,
-    captureCurrentFace,
-    startTracking,
-    stopTracking,
-  } = useCubeApp(videoRef);
+  const { state, currentMove, confirmWhiteBalance, startTracking, stopTracking } =
+    useCubeApp(videoRef);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -71,17 +65,15 @@ export default function App() {
 
             <DetectionOverlay
               feedback={state.detectionFeedback}
-              visible={state.phase === 'calibrating'}
+              visible={state.phase === 'liveScan'}
             />
 
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
-            <CalibrationOverlay
+            <LiveScanOverlay
               phase={state.phase}
-              progress={state.calibrationProgress}
-              currentFace={state.currentCalibrationFace}
-              faceIndex={state.scannedFaces.length}
-              canCapture={state.canCaptureFace}
-              onCapture={captureCurrentFace}
+              knownFaces={state.knownFaces}
+              currentFace={state.currentVisibleFace}
+              progress={state.liveScanProgress}
             />
 
             {state.phase === 'solving' && currentMove && (
@@ -100,7 +92,7 @@ export default function App() {
         )}
 
         {isComputing && (
-          <LoadingScreen overlay message="6면 스캔 완료 — 해법 계산 중..." />
+          <LoadingScreen overlay message="6면 인식 완료 — 해법 계산 중..." />
         )}
 
         {isBooting && (
