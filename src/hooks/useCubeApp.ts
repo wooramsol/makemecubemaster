@@ -393,6 +393,35 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     cancelAnimationFrame(rafRef.current);
   }, []);
 
+  const retryLiveScan = useCallback(() => {
+    clearSolveTimeout();
+    beginLiveScan();
+    setState((s) => ({ ...s, solution: null }));
+  }, [clearSolveTimeout, beginLiveScan]);
+
+  const retryFromWhiteBalance = useCallback(() => {
+    clearSolveTimeout();
+    solveTriggeredRef.current = false;
+    liveAccumulator.current.reset();
+    lastPoseRef.current = null;
+    resetWhiteBalance();
+    frameProcessor.current?.disableTracking();
+    setState((s) => ({
+      ...s,
+      phase: 'whiteBalance',
+      error: null,
+      solution: null,
+      knownFaces: [],
+      currentVisibleFace: null,
+      liveScanProgress: 0,
+      whiteBalanceCalibrated: false,
+      whiteBalanceSample: null,
+      whiteBalanceReady: false,
+      whiteBalanceError: null,
+      detectionFeedback: initialFeedback,
+    }));
+  }, [clearSolveTimeout]);
+
   const currentMove =
     state.solution && state.solution.currentIndex < state.solution.moves.length
       ? (state.solution.moves[state.solution.currentIndex] ?? null)
@@ -402,6 +431,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     state,
     currentMove,
     confirmWhiteBalance,
+    retryLiveScan,
+    retryFromWhiteBalance,
     startTracking,
     stopTracking,
   };

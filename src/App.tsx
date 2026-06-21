@@ -12,7 +12,7 @@ import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const { state, currentMove, confirmWhiteBalance, startTracking, stopTracking } =
+  const { state, currentMove, confirmWhiteBalance, retryLiveScan, retryFromWhiteBalance, startTracking, stopTracking } =
     useCubeApp(videoRef);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
@@ -105,6 +105,16 @@ export default function App() {
         {hasError && !isBooting && (
           <div className="error-screen overlay">
             <p>{state.error ?? webcamState.error}</p>
+            <div className="error-actions">
+              {state.whiteBalanceCalibrated && (
+                <button type="button" className="error-button primary" onClick={retryLiveScan}>
+                  다시 스캔
+                </button>
+              )}
+              <button type="button" className="error-button secondary" onClick={retryFromWhiteBalance}>
+                흰색 기준부터 다시
+              </button>
+            </div>
           </div>
         )}
       </div>
