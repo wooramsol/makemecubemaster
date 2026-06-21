@@ -1,4 +1,5 @@
 import type { DetectionFeedback, StickerColor } from '../types';
+import { mirrorFaceCellsForSelfie } from '../lib/vision/selfieView';
 
 const STICKER_HEX: Record<StickerColor, string> = {
   W: '#f5f5f5',
@@ -35,6 +36,7 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
 
   const statusClass = feedback.status;
   const showGrid = feedback.cellColors.length === 9;
+  const displayCells = showGrid ? mirrorFaceCellsForSelfie(feedback.cellColors) : [];
 
   return (
     <div className="detection-overlay" aria-live="polite">
@@ -48,7 +50,7 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
 
         {showGrid && (
           <div className="cell-grid" aria-label="칸별 인식 결과">
-            {feedback.cellColors.map((color, i) => (
+            {displayCells.map((color, i) => (
               <span
                 key={i}
                 className="cell-grid-item"
