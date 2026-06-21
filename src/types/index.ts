@@ -72,6 +72,7 @@ export interface DetectionFeedback {
   stableTarget: number;
   detectedCenter: StickerColor | null;
   colorCounts: Record<StickerColor, number>;
+  cellColors: StickerColor[];
 }
 
 export interface FrameResult {

@@ -71,6 +71,18 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
                 </div>
               ))}
             </div>
+            {feedback.cellColors.length === 9 && (
+              <div className="cell-grid" aria-label="칸별 인식 결과">
+                {feedback.cellColors.map((color, i) => (
+                  <span
+                    key={i}
+                    className="cell-grid-item"
+                    style={{ background: STICKER_HEX[color] }}
+                    title={COLOR_SHORT[color]}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -370,6 +370,22 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.cell-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-top: 10px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cell-grid-item {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
 .stabilize-bar {
   position: absolute;
   top: max(200px, calc(env(safe-area-inset-top) + 140px));

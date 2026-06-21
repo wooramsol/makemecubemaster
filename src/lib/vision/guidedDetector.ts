@@ -1,7 +1,7 @@
 import type { StickerColor } from '../../types';
 import { sampleFaceColors } from './colorClassifier';
 
-const WARP = 150;
+const WARP = 200;
 
 export function sampleGuideRegionColors(
   sourceCanvas: HTMLCanvasElement,

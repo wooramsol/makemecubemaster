@@ -38,6 +38,7 @@ const initialFeedback: DetectionFeedback = {
   stableTarget: 0,
   detectedCenter: null,
   colorCounts: emptyColorCounts(),
+  cellColors: [],
 };
 
 const initialState: CubeAppState = {
@@ -151,6 +152,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         stableTarget: 0,
         detectedCenter,
         colorCounts,
+        cellColors: readable && colors ? [...colors] : [],
       };
     },
     [],
@@ -265,6 +267,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             stableTarget: 0,
             detectedCenter: pending.colors[4] ?? null,
             colorCounts: countStickerColors(pending.colors),
+            cellColors: [...pending.colors],
           },
         };
       }
@@ -293,6 +296,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             stableTarget: 0,
             detectedCenter: null,
             colorCounts: emptyColorCounts(),
+            cellColors: [],
           },
         };
       } catch (error) {
