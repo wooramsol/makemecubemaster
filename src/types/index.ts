@@ -49,6 +49,7 @@ export interface ScannedFace {
 export type AppPhase =
   | 'loading'
   | 'camera'
+  | 'whiteBalance'
   | 'calibrating'
   | 'computing'
   | 'solving'

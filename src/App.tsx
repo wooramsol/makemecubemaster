@@ -5,14 +5,23 @@ import { CameraView } from './components/CameraView';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { StepIndicator } from './components/StepIndicator';
+import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const { state, currentMove, startCalibration, captureCurrentFace, startTracking, stopTracking } =
-    useCubeApp(videoRef);
+  const {
+    state,
+    currentMove,
+    startWhiteBalance,
+    confirmWhiteBalance,
+    skipWhiteBalance,
+    captureCurrentFace,
+    startTracking,
+    stopTracking,
+  } = useCubeApp(videoRef);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -37,13 +46,11 @@ export default function App() {
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
-  const trackingActive = state.phase === 'solving' || state.phase === 'calibrating';
-  const showAr = trackingActive && state.phase === 'solving';
+  const showAr = state.phase === 'solving';
 
   return (
     <main className="app">
       <div className="viewport">
-        {/* video는 항상 마운트 — 로딩 중에도 스트림 연결 유지 */}
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
 
         {!isBooting && !hasError && (
@@ -54,6 +61,15 @@ export default function App() {
               width={dimensions.width}
               height={dimensions.height}
               active={showAr}
+            />
+
+            <WhiteBalanceOverlay
+              visible={state.phase === 'whiteBalance'}
+              sample={state.whiteBalanceSample}
+              ready={state.whiteBalanceReady}
+              error={state.whiteBalanceError}
+              onConfirm={confirmWhiteBalance}
+              onSkip={skipWhiteBalance}
             />
 
             <DetectionOverlay
@@ -71,11 +87,11 @@ export default function App() {
               onCapture={captureCurrentFace}
             />
 
-        {state.phase === 'camera' && (
-          <button type="button" className="primary-button" onClick={startCalibration}>
-            섞인 큐브 스캔
-          </button>
-        )}
+            {state.phase === 'camera' && (
+              <button type="button" className="primary-button" onClick={startWhiteBalance}>
+                섞인 큐브 스캔
+              </button>
+            )}
 
             {state.phase === 'solving' && currentMove && (
               <div className="solving-banner">

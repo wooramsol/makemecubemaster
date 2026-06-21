@@ -36,6 +36,9 @@ body,
   height: 100%;
   overflow: hidden;
   background: #111;
+  --guide-size: min(68vw, 46vh);
+  --guide-top: calc(50% - var(--guide-size) * 0.55);
+  --guide-bottom: calc(50% + var(--guide-size) * 0.45);
 }
 
 .camera-feed {
@@ -80,16 +83,24 @@ body,
 
 .calibration-overlay {
   position: absolute;
-  bottom: max(32px, env(safe-area-inset-bottom));
+  top: calc(var(--guide-bottom) + 12px);
+  bottom: auto;
   left: 50%;
   transform: translateX(-50%);
   width: min(90vw, 360px);
   text-align: center;
-  padding: 20px;
+  padding: 16px 20px;
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  max-height: calc(100% - var(--guide-bottom) - 24px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.calibration-overlay .capture-button {
+  pointer-events: auto;
 }
 
 .calibration-hint {
@@ -208,12 +219,115 @@ body,
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(68vw, 46vh);
+  width: var(--guide-size);
   aspect-ratio: 1;
   transform: translate(-50%, -55%);
   border: 2px dashed rgba(255, 255, 255, 0.45);
   border-radius: 12px;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+.scan-ui-panel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: max(12px, env(safe-area-inset-top));
+  width: min(92vw, 360px);
+  max-height: calc(var(--guide-top) - 12px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.scan-ui-panel .capture-button,
+.scan-ui-panel .wb-skip {
+  pointer-events: auto;
+}
+
+.wb-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.wb-panel {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.wb-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.wb-hint {
+  font-size: 13px;
+  opacity: 0.8;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.wb-meter {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.wb-status {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.wb-status.ready {
+  color: #86efac;
+}
+
+.wb-warmth {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.wb-rgb {
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.wb-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #fca5a5;
+  text-align: center;
+}
+
+.wb-skip {
+  margin-top: 8px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px;
+  pointer-events: auto;
 }
 
 .detection-svg,
@@ -253,19 +367,9 @@ body,
   transform: scale(0.98);
 }
 
-.calibration-overlay {
-  pointer-events: none;
-}
-
-.calibration-overlay .capture-button {
-  pointer-events: auto;
-}
-
 .detection-status {
-  position: absolute;
-  top: max(60px, env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  align-self: center;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -314,16 +418,12 @@ body,
 }
 
 .color-counts {
-  position: absolute;
-  top: max(108px, calc(env(safe-area-inset-top) + 48px));
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
   padding: 10px 14px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  min-width: 240px;
 }
 
 .color-counts-title {
@@ -387,10 +487,8 @@ body,
 }
 
 .stabilize-bar {
-  position: absolute;
-  top: max(200px, calc(env(safe-area-inset-top) + 140px));
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  align-self: center;
   width: 120px;
   height: 4px;
   border-radius: 2px;

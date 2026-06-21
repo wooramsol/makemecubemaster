@@ -3,6 +3,7 @@ import { createGrayMat, detectCubeCorners, detectCubeFace } from './cubeDetector
 import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
 import { RotationDetector } from './rotationDetector';
+import { measureWhiteBalanceSample } from './whiteBalance';
 
 export class FrameProcessor {
   private rotationDetector = new RotationDetector();
@@ -34,6 +35,24 @@ export class FrameProcessor {
 
   syncPose(pose: CubePose): void {
     this.rotationDetector.sync(pose.rotationMatrix);
+  }
+
+  getFrameCanvas(): HTMLCanvasElement {
+    return this.processCanvas;
+  }
+
+  captureFrame(video: HTMLVideoElement): boolean {
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    if (!width || !height) return false;
+    this.processCanvas.width = width;
+    this.processCanvas.height = height;
+    this.processCtx.drawImage(video, 0, 0, width, height);
+    return true;
+  }
+
+  getWhiteBalanceSample(frameWidth: number, frameHeight: number) {
+    return measureWhiteBalanceSample(this.processCanvas, frameWidth, frameHeight);
   }
 
   process(video: HTMLVideoElement): FrameResult {

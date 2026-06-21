@@ -1,4 +1,5 @@
 import type { StickerColor } from '../../types';
+import { applyWhiteBalance } from './whiteBalance';
 
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
 
@@ -118,6 +119,7 @@ function scoreColor(r: number, g: number, b: number, color: StickerColor): numbe
 }
 
 export function classifySticker(r: number, g: number, b: number): StickerColor {
+  [r, g, b] = applyWhiteBalance(r, g, b);
   if (isGapPixel(r, g, b)) return classifyByLab(r, g, b);
 
   const [h, s] = rgbToHsv(r, g, b);

@@ -17,6 +17,12 @@ import { countStickerColors, emptyColorCounts, getCalibrationFeedback, isColorsR
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 import { colorsDifferEnough, validateFaceletString } from '../lib/vision/scanValidation';
+import {
+  calibrateWhiteBalanceFromCanvas,
+  resetWhiteBalance,
+  setWhiteBalance,
+  type WhiteBalanceSample,
+} from '../lib/vision/whiteBalance';
 
 export interface CubeAppState {
   phase: AppPhase;
@@ -30,6 +36,9 @@ export interface CubeAppState {
   calibrationHint: string;
   detectionFeedback: DetectionFeedback;
   canCaptureFace: boolean;
+  whiteBalanceSample: WhiteBalanceSample | null;
+  whiteBalanceReady: boolean;
+  whiteBalanceError: string | null;
 }
 
 const initialFeedback: DetectionFeedback = {
@@ -53,6 +62,9 @@ const initialState: CubeAppState = {
   calibrationHint: '',
   detectionFeedback: initialFeedback,
   canCaptureFace: false,
+  whiteBalanceSample: null,
+  whiteBalanceReady: false,
+  whiteBalanceError: null,
 };
 
 interface PendingFrame {
@@ -220,6 +232,73 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     };
   }, [init, clearSolveTimeout]);
 
+  const startWhiteBalance = useCallback(() => {
+    resetWhiteBalance();
+    setState((s) => ({
+      ...s,
+      phase: 'whiteBalance',
+      whiteBalanceSample: null,
+      whiteBalanceReady: false,
+      whiteBalanceError: null,
+      error: null,
+    }));
+  }, []);
+
+  const confirmWhiteBalance = useCallback(() => {
+    const video = videoRef.current;
+    const processor = frameProcessor.current;
+    if (!video || !processor || video.readyState < 2) return;
+
+    if (!processor.captureFrame(video)) return;
+
+    const canvas = processor.getFrameCanvas();
+    const result = calibrateWhiteBalanceFromCanvas(canvas, video.videoWidth, video.videoHeight);
+    if (!result) {
+      setState((s) => ({
+        ...s,
+        whiteBalanceError: '흰색 영역을 찾지 못했습니다. 흰 스티커 면을 가이드 안에 밝게 맞춰 주세요.',
+      }));
+      return;
+    }
+
+    setWhiteBalance(result.gains);
+    pendingFrameRef.current = null;
+    setState((s) => ({
+      ...s,
+      phase: 'calibrating',
+      error: null,
+      scannedFaces: [],
+      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
+      calibrationProgress: 0,
+      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
+      detectionFeedback: initialFeedback,
+      canCaptureFace: false,
+      whiteBalanceSample: result.sample,
+      whiteBalanceReady: true,
+      whiteBalanceError: null,
+    }));
+    frameProcessor.current?.disableTracking();
+  }, [videoRef]);
+
+  const skipWhiteBalance = useCallback(() => {
+    resetWhiteBalance();
+    pendingFrameRef.current = null;
+    setState((s) => ({
+      ...s,
+      phase: 'calibrating',
+      error: null,
+      scannedFaces: [],
+      currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
+      calibrationProgress: 0,
+      calibrationHint: CALIBRATION_ORDER[0] ? getFaceScanHint(CALIBRATION_ORDER[0]) : '',
+      detectionFeedback: initialFeedback,
+      canCaptureFace: false,
+      whiteBalanceSample: null,
+      whiteBalanceReady: false,
+    }));
+    frameProcessor.current?.disableTracking();
+  }, []);
+
   const startCalibration = useCallback(() => {
     pendingFrameRef.current = null;
     setState((s) => ({
@@ -317,6 +396,18 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     const result = processor.process(video);
     const phase = phaseRef.current;
 
+    if (phase === 'whiteBalance') {
+      processor.captureFrame(video);
+      const sample = processor.getWhiteBalanceSample(video.videoWidth, video.videoHeight);
+      setState((prev) => ({
+        ...prev,
+        whiteBalanceSample: sample,
+        whiteBalanceReady: sample?.ready ?? false,
+        whiteBalanceError: null,
+      }));
+      return;
+    }
+
     if (phase === 'calibrating') {
       setState((prev) => {
         if (!prev.currentCalibrationFace) {
@@ -386,6 +477,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   return {
     state,
     currentMove,
+    startWhiteBalance,
+    confirmWhiteBalance,
+    skipWhiteBalance,
     startCalibration,
     captureCurrentFace,
     startTracking,

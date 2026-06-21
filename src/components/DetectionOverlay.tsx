@@ -45,7 +45,7 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
     <div className="detection-overlay" aria-live="polite">
       <div className="guide-frame-css" />
 
-      <div className="detection-ui">
+      <div className="scan-ui-panel">
         <div className={`detection-status ${statusClass}`}>
           <span className="status-dot" />
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
