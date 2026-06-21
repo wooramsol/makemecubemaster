@@ -29,6 +29,7 @@ export function ScanReadyOverlay({
         <p className="scan-ready-hint">
           큐브 한 면을 점선 안에 맞춘 뒤 스캔을 시작하세요
         </p>
+        <p className="scan-ready-distance">팔 길이 거리 — 가까이 대면 옆 색이 번져요</p>
         <p className="scan-ready-sub">
           {cubeDetected
             ? '큐브가 감지되었습니다. 준비되면 시작 버튼을 누르세요.'

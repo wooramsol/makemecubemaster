@@ -106,6 +106,12 @@ body,
 .calibration-hint {
   font-size: 18px;
   font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.calibration-distance {
+  font-size: 12px;
+  opacity: 0.72;
   margin-bottom: 12px;
 }
 
@@ -263,6 +269,19 @@ body,
   pointer-events: none;
 }
 
+.guide-spot-css {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -55%);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 .scan-ui-panel {
   position: absolute;
   left: 50%;
@@ -325,6 +344,12 @@ body,
 .scan-ready-hint {
   font-size: 15px;
   font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.scan-ready-distance {
+  font-size: 11px;
+  opacity: 0.7;
   margin-bottom: 6px;
 }
 
@@ -367,7 +392,14 @@ body,
   font-size: 13px;
   opacity: 0.8;
   text-align: center;
-  margin-bottom: 10px;
+  margin-bottom: 4px;
+}
+
+.wb-distance-hint {
+  font-size: 11px;
+  opacity: 0.65;
+  text-align: center;
+  margin-bottom: 8px;
 }
 
 .wb-meter {

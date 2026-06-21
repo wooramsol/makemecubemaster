@@ -1,4 +1,4 @@
-import { getGuideSquare } from './roi';
+import { getGuideSquare, getWhiteBalanceSpot } from './roi';
 
 export interface WhiteBalanceGains {
   r: number;
@@ -98,11 +98,11 @@ export function measureWhiteBalanceSample(
   if (!ctx) return null;
 
   const guide = getGuideSquare(frameWidth, frameHeight);
-  const margin = guide.size * 0.18;
-  const x0 = Math.floor(guide.x + margin);
-  const y0 = Math.floor(guide.y + margin);
-  const w = Math.floor(guide.size - margin * 2);
-  const h = Math.floor(guide.size - margin * 2);
+  const spot = getWhiteBalanceSpot(guide);
+  const x0 = Math.floor(spot.x);
+  const y0 = Math.floor(spot.y);
+  const w = Math.floor(spot.size);
+  const h = Math.floor(spot.size);
   if (w <= 0 || h <= 0) return null;
 
   const data = ctx.getImageData(x0, y0, w, h).data;
@@ -110,20 +110,20 @@ export function measureWhiteBalanceSample(
   const gs: number[] = [];
   const bs: number[] = [];
 
-  for (let i = 0; i < data.length; i += 16) {
+  for (let i = 0; i < data.length; i += 8) {
     const r = data[i]!;
     const g = data[i + 1]!;
     const b = data[i + 2]!;
     const brightness = (r + g + b) / 3;
-    if (brightness < 95) continue;
+    if (brightness < 105) continue;
     const chroma = Math.max(r, g, b) - Math.min(r, g, b);
-    if (chroma > 95) continue;
+    if (chroma > 38) continue;
     rs.push(r);
     gs.push(g);
     bs.push(b);
   }
 
-  if (rs.length < 12) return null;
+  if (rs.length < 8) return null;
 
   const r = median(rs);
   const g = median(gs);
@@ -137,7 +137,7 @@ export function measureWhiteBalanceSample(
     b,
     brightness,
     warmth,
-    ready: brightness > 130 && rs.length >= 20,
+    ready: brightness > 125 && rs.length >= 14,
   };
 }
 

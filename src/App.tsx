@@ -9,7 +9,7 @@ import { StepIndicator } from './components/StepIndicator';
 import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
-import { getGuideOverlayRect } from './lib/vision/guideOverlay';
+import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
 import './styles/global.css';
 
 export default function App() {
@@ -64,6 +64,17 @@ export default function App() {
     [dimensions.width, dimensions.height, viewportSize.width, viewportSize.height],
   );
 
+  const spotRect = useMemo(
+    () =>
+      getWhiteSpotOverlayRect(
+        dimensions.width,
+        dimensions.height,
+        viewportSize.width,
+        viewportSize.height,
+      ),
+    [dimensions.width, dimensions.height, viewportSize.width, viewportSize.height],
+  );
+
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
@@ -94,6 +105,7 @@ export default function App() {
               error={state.whiteBalanceError}
               onConfirm={confirmWhiteBalance}
               guideRect={guideRect}
+              spotRect={spotRect}
             />
 
             <ScanReadyOverlay

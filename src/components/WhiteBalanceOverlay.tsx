@@ -1,6 +1,7 @@
 import type { WhiteBalanceSample } from '../lib/vision/whiteBalance';
 import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
 import { GuideFrame } from './GuideFrame';
+import { GuideSpot } from './GuideSpot';
 
 interface WhiteBalanceOverlayProps {
   visible: boolean;
@@ -9,12 +10,13 @@ interface WhiteBalanceOverlayProps {
   error: string | null;
   onConfirm: () => void;
   guideRect: GuideOverlayRect | null;
+  spotRect: GuideOverlayRect | null;
 }
 
 function warmthLabel(warmth: number): string {
-  if (warmth > 18) return '노란 조명 — 흰 면으로 보정합니다';
-  if (warmth < -12) return '푸른 조명 — 흰 면으로 보정합니다';
-  return '현재 조명에서 흰색 감지 중';
+  if (warmth > 18) return '노란 조명 — 흰 스티커 중심으로 보정합니다';
+  if (warmth < -12) return '푸른 조명 — 흰 스티커 중심으로 보정합니다';
+  return '흰 스티커 중심 색을 읽는 중';
 }
 
 export function WhiteBalanceOverlay({
@@ -24,16 +26,19 @@ export function WhiteBalanceOverlay({
   error,
   onConfirm,
   guideRect,
+  spotRect,
 }: WhiteBalanceOverlayProps) {
   if (!visible) return null;
 
   return (
     <div className="wb-overlay" aria-live="polite">
       <GuideFrame rect={guideRect} />
+      <GuideSpot rect={spotRect} />
 
-        <div className="wb-panel scan-ui-panel">
+      <div className="wb-panel scan-ui-panel">
         <p className="wb-step">1단계 — 흰색 기준 맞추기</p>
-        <p className="wb-hint">흰 스티커 면을 점선 안에 맞춰 주세요</p>
+        <p className="wb-hint">흰 스티커 한 조각을 가운데 동그라미에 맞추세요</p>
+        <p className="wb-distance-hint">팔 길이 정도 거리 — 너무 가까이 대지 마세요</p>
 
         <div className="wb-meter">
           {sample ? (
@@ -45,12 +50,12 @@ export function WhiteBalanceOverlay({
                 }}
               />
               <p className={`wb-status ${ready ? 'ready' : ''}`}>
-                {ready ? '이 조명의 흰색을 인식했습니다' : '흰 면을 찾는 중...'}
+                {ready ? '이 조명의 흰색을 인식했습니다' : '가운데 동그라미에 흰 스티커를...'}
               </p>
               <p className="wb-warmth">{warmthLabel(sample.warmth)}</p>
             </>
           ) : (
-            <p className="wb-status">가이드 안에 흰 면만 보이게 맞춰 주세요</p>
+            <p className="wb-status">흰 종이·흰 스티커 조각도 사용할 수 있어요</p>
           )}
         </div>
 
@@ -60,7 +65,7 @@ export function WhiteBalanceOverlay({
           disabled={!ready}
           onClick={onConfirm}
         >
-          {ready ? '흰색 기준 저장 → 큐브 준비' : '흰 면을 가이드에 맞추세요'}
+          {ready ? '흰색 기준 저장 → 큐브 준비' : '동그라미에 흰색을 맞추세요'}
         </button>
         {error && <p className="wb-error">{error}</p>}
       </div>
@@ -73,7 +78,7 @@ export function WhiteBalanceOverlay({
             : undefined
         }
       >
-        <p>현재 방 조명에서의 흰색을 먼저 학습합니다</p>
+        <p>옆 색이 섞이지 않게 스티커 중심만 읽습니다</p>
       </div>
     </div>
   );

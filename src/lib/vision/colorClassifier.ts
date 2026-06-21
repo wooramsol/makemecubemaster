@@ -198,6 +198,21 @@ function median(values: number[]): number {
     : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
+function cellSampleMargin(row: number, col: number): number {
+  if (row === 1 && col === 1) return 0.12;
+  const isCorner =
+    (row === 0 || row === 2) && (col === 0 || col === 2);
+  if (isCorner) return 0.32;
+  return 0.26;
+}
+
+function pixelStickerWeight(r: number, g: number, b: number): number {
+  const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+  if (chroma > 52) return 0.15;
+  if (chroma > 36) return 0.55;
+  return 1;
+}
+
 function classifyCellPixels(
   data: Uint8ClampedArray,
   width: number,
@@ -226,7 +241,8 @@ function classifyCellPixels(
       bs.push(b);
 
       const color = classifySticker(r, g, b);
-      votes.set(color, (votes.get(color) ?? 0) + 1);
+      const weight = pixelStickerWeight(r, g, b);
+      votes.set(color, (votes.get(color) ?? 0) + weight);
     }
   }
 
@@ -264,8 +280,7 @@ export function sampleFaceColors(
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
-      const isCenter = row === 1 && col === 1;
-      const margin = isCenter ? 0.1 : 0.16;
+      const margin = cellSampleMargin(row, col);
       const x0 = col * cellW + cellW * margin;
       const x1 = col * cellW + cellW * (1 - margin);
       const y0 = row * cellH + cellH * margin;

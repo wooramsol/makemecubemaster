@@ -1,4 +1,4 @@
-import { getGuideSquare } from './roi';
+import { getGuideSquare, getWhiteBalanceSpot } from './roi';
 
 export interface GuideOverlayRect {
   left: number;
@@ -48,5 +48,33 @@ export function getGuideOverlayRect(
     top: offsetY + guide.y * scale,
     width: guide.size * scale,
     height: guide.size * scale,
+  };
+}
+
+/** 흰색 기준 중앙 스팟 (화면 좌표) */
+export function getWhiteSpotOverlayRect(
+  frameWidth: number,
+  frameHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+): GuideOverlayRect | null {
+  if (!frameWidth || !frameHeight || !containerWidth || !containerHeight) {
+    return null;
+  }
+
+  const guide = getGuideSquare(frameWidth, frameHeight);
+  const spot = getWhiteBalanceSpot(guide);
+  const { scale, offsetX, offsetY } = getCoverTransform(
+    frameWidth,
+    frameHeight,
+    containerWidth,
+    containerHeight,
+  );
+
+  return {
+    left: offsetX + spot.x * scale,
+    top: offsetY + spot.y * scale,
+    width: spot.size * scale,
+    height: spot.size * scale,
   };
 }
