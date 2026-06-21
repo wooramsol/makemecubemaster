@@ -1,9 +1,18 @@
 import { identifyFaceFromCenter } from '../cube/colors';
 import type { FaceId, StickerColor } from '../../types';
 
-const STABLE_FRAMES = 14;
+const FACE_CENTER: Record<FaceId, StickerColor> = {
+  U: 'W',
+  D: 'Y',
+  F: 'G',
+  B: 'B',
+  R: 'R',
+  L: 'O',
+};
+
+const STABLE_FRAMES = 16;
 const FRAME_MATCH_TOLERANCE = 2;
-const MAX_READINGS_PER_FACE = 8;
+const MAX_READINGS_PER_FACE = 10;
 
 export interface LiveScanSnapshot {
   faces: Map<FaceId, StickerColor[]>;
@@ -41,6 +50,31 @@ function majorityVoteCells(readings: StickerColor[][]): StickerColor[] {
     }
     result.push(best);
   }
+  return result;
+}
+
+function majorityCenterFaceId(readings: StickerColor[][]): FaceId | null {
+  const counts = new Map<StickerColor, number>();
+  for (const reading of readings) {
+    const center = reading[4]!;
+    counts.set(center, (counts.get(center) ?? 0) + 1);
+  }
+
+  let bestCenter: StickerColor = 'W';
+  let bestCount = 0;
+  for (const [color, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestCenter = color;
+    }
+  }
+
+  return identifyFaceFromCenter(bestCenter);
+}
+
+function finalizeFaceColors(colors: StickerColor[], faceId: FaceId): StickerColor[] {
+  const result = [...colors];
+  result[4] = FACE_CENTER[faceId];
   return result;
 }
 
@@ -100,16 +134,19 @@ export class LiveFaceAccumulator {
     let newlyCaptured: FaceId | null = null;
 
     if (this.stableCount >= STABLE_FRAMES) {
-      const isNew = !this.faces.has(faceId);
       const history = [...(this.readings.get(faceId) ?? []), [...colors]];
       if (history.length > MAX_READINGS_PER_FACE) {
         history.shift();
       }
       this.readings.set(faceId, history);
-      this.faces.set(faceId, majorityVoteCells(history));
+
+      const resolvedFaceId = majorityCenterFaceId(history) ?? faceId;
+      const merged = finalizeFaceColors(majorityVoteCells(history), resolvedFaceId);
+      const isNew = !this.faces.has(resolvedFaceId);
+      this.faces.set(resolvedFaceId, merged);
 
       if (isNew) {
-        newlyCaptured = faceId;
+        newlyCaptured = resolvedFaceId;
       }
 
       this.stableCount = 0;

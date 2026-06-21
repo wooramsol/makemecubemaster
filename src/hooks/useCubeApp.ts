@@ -12,7 +12,7 @@ import type {
 import { buildFaceletFromMap } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { reconcileCubeFaces, formatImbalanceHint } from '../lib/vision/cubeColorReconcile';
+import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '../lib/vision/cubeColorReconcile';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
@@ -352,14 +352,25 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         solveTriggeredRef.current = true;
         try {
           const reconciled = reconcileCubeFaces(snapshot.faces);
+          if (!isCubeColorBalanced(reconciled)) {
+            const rawHint = formatImbalanceHint(snapshot.faces);
+            const fixedHint = formatImbalanceHint(reconciled);
+            const detail = rawHint
+              ? `색상 인식이 맞지 않습니다. (${rawHint}) 조명을 밝게 하고 흰 면 기준 보정 후 다시 스캔해 주세요.`
+              : fixedHint
+                ? `색상 인식이 맞지 않습니다. (${fixedHint}) 조명을 밝게 하고 다시 스캔해 주세요.`
+                : '색상 인식이 맞지 않습니다. 6면이 모두 다른 면인지 확인하고 다시 스캔해 주세요.';
+            setState((s) => ({ ...s, phase: 'error', error: detail }));
+            return;
+          }
+
           const facelet = buildFaceletFromMap(reconciled);
           const validationError = validateFaceletString(facelet);
           if (validationError) {
             const hint = formatImbalanceHint(reconciled);
-            const detail =
-              hint.length > 0
-                ? `${validationError} (${hint}. 노란 조명에서는 흰 면 기준 보정을 다시 해 보세요.)`
-                : `${validationError} (노란 조명에서는 흰 면 기준 보정을 다시 해 보세요.)`;
+            const detail = hint
+              ? `${validationError} (${hint})`
+              : validationError;
             setState((s) => ({ ...s, phase: 'error', error: detail }));
             return;
           }

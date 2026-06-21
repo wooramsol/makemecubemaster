@@ -13,19 +13,15 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
 const STICKER_COLORS: StickerColor[] = ['W', 'Y', 'R', 'O', 'G', 'B'];
 const TARGET_PER_COLOR = 9;
 
-/** 흔한 오인식 쌍 (노란 조명: W↔Y, R↔O) */
-const SWAP_PAIRS: [StickerColor, StickerColor][] = [
-  ['W', 'Y'],
-  ['Y', 'W'],
-  ['R', 'O'],
-  ['O', 'R'],
-  ['W', 'O'],
-  ['O', 'W'],
-  ['G', 'B'],
-  ['B', 'G'],
-  ['Y', 'O'],
-  ['O', 'Y'],
-];
+/** 색상 간 혼동 비용 (낮을수록 바꾸기 쉬움) */
+const SWAP_COST: Record<StickerColor, Record<StickerColor, number>> = {
+  W: { W: 0, Y: 1, O: 2, R: 4, G: 5, B: 5 },
+  Y: { W: 1, Y: 0, O: 2, R: 5, G: 5, B: 5 },
+  R: { R: 0, O: 1, W: 4, Y: 5, G: 5, B: 5 },
+  O: { O: 0, R: 1, Y: 2, W: 2, G: 5, B: 5 },
+  G: { G: 0, B: 2, W: 5, Y: 5, R: 5, O: 5 },
+  B: { B: 0, G: 2, W: 5, Y: 5, R: 5, O: 5 },
+};
 
 interface MutableCell {
   faceId: FaceId;
@@ -43,7 +39,41 @@ function countAllStickers(faces: Map<FaceId, StickerColor[]>): Record<StickerCol
   return counts;
 }
 
-/** 가운데 스티커 고정 + 전역 9개 제약 맞추기 */
+function getSwapCost(from: StickerColor, to: StickerColor): number {
+  return SWAP_COST[from][to] ?? 6;
+}
+
+function findWorstSurplus(counts: Record<StickerColor, number>): StickerColor | null {
+  let worst: StickerColor | null = null;
+  let amount = 0;
+  for (const color of STICKER_COLORS) {
+    const diff = counts[color] - TARGET_PER_COLOR;
+    if (diff > amount) {
+      amount = diff;
+      worst = color;
+    }
+  }
+  return worst;
+}
+
+function findWorstDeficit(counts: Record<StickerColor, number>): StickerColor | null {
+  let worst: StickerColor | null = null;
+  let amount = 0;
+  for (const color of STICKER_COLORS) {
+    const diff = TARGET_PER_COLOR - counts[color];
+    if (diff > amount) {
+      amount = diff;
+      worst = color;
+    }
+  }
+  return worst;
+}
+
+function isBalanced(counts: Record<StickerColor, number>): boolean {
+  return STICKER_COLORS.every((c) => counts[c] === TARGET_PER_COLOR);
+}
+
+/** 가운데 스티커 고정 + 전역 9개 제약 (최소 비용 스왑) */
 export function reconcileCubeFaces(
   faces: Map<FaceId, StickerColor[]>,
 ): Map<FaceId, StickerColor[]> {
@@ -62,35 +92,34 @@ export function reconcileCubeFaces(
     }
   }
 
-  for (let iter = 0; iter < 96; iter++) {
+  for (let iter = 0; iter < 256; iter++) {
     const counts = countAllStickers(result);
-    let over: StickerColor | null = null;
-    let under: StickerColor | null = null;
-    let overAmount = 0;
-    let underAmount = 0;
+    if (isBalanced(counts)) break;
 
-    for (const color of STICKER_COLORS) {
-      const diff = counts[color] - TARGET_PER_COLOR;
-      if (diff > 0 && diff > overAmount) {
-        over = color;
-        overAmount = diff;
-      }
-      if (diff < 0 && -diff > underAmount) {
-        under = color;
-        underAmount = -diff;
+    const over = findWorstSurplus(counts);
+    const under = findWorstDeficit(counts);
+    if (!over || !under) break;
+
+    let bestCell: MutableCell | null = null;
+    let bestCost = Infinity;
+
+    for (const cell of cells) {
+      if (cell.color !== over) continue;
+      const cost = getSwapCost(over, under);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestCell = cell;
       }
     }
 
-    if (!over || !under) break;
+    if (!bestCell) {
+      const fallback = cells.find((c) => c.color === over);
+      if (!fallback) break;
+      bestCell = fallback;
+    }
 
-    const canSwap = SWAP_PAIRS.some(([a, b]) => a === over && b === under);
-    if (!canSwap) break;
-
-    const cell = cells.find((c) => c.color === over);
-    if (!cell) break;
-
-    cell.color = under;
-    result.get(cell.faceId)![cell.index] = under;
+    bestCell.color = under;
+    result.get(bestCell.faceId)![bestCell.index] = under;
   }
 
   return result;
@@ -105,6 +134,10 @@ export function getStickerImbalance(
     imbalance[color] = counts[color] - TARGET_PER_COLOR;
   }
   return imbalance;
+}
+
+export function isCubeColorBalanced(faces: Map<FaceId, StickerColor[]>): boolean {
+  return isBalanced(countAllStickers(faces));
 }
 
 export function formatImbalanceHint(faces: Map<FaceId, StickerColor[]>): string {

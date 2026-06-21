@@ -132,11 +132,13 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   const [h, s] = rgbToHsv(r, g, b);
   const sn = s / 255;
   const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const chroma = max - min;
+  const brightness = (r + g + b) / 3;
 
   if (isWhiteBalanceCalibrated()) {
-    const chroma = max - Math.min(r, g, b);
-    const brightness = (r + g + b) / 3;
-    if (brightness > 185 && chroma < 42) return 'W';
+    if (brightness > 175 && chroma < 45) return 'W';
+    if (brightness > 155 && chroma < 28) return 'W';
   }
 
   if (isWhitePixel(r, g, b)) return 'W';
@@ -259,10 +261,11 @@ export function sampleFaceColors(
   const colors: StickerColor[] = [];
   const cellW = width / 3;
   const cellH = height / 3;
-  const margin = 0.16;
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
+      const isCenter = row === 1 && col === 1;
+      const margin = isCenter ? 0.1 : 0.16;
       const x0 = col * cellW + cellW * margin;
       const x1 = col * cellW + cellW * (1 - margin);
       const y0 = row * cellH + cellH * margin;

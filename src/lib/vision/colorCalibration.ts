@@ -10,7 +10,7 @@ export function isCalibratedWhitePixel(r: number, g: number, b: number): boolean
   const chroma = max - min;
   const brightness = (cr + cg + cb) / 3;
 
-  if (brightness < 165 || chroma > 48) return false;
+  if (brightness < 165 || chroma > 52) return false;
 
   const ref = getWhiteReference();
   if (!ref) {
@@ -19,7 +19,7 @@ export function isCalibratedWhitePixel(r: number, g: number, b: number): boolean
 
   const [wr, wg, wb] = applyWhiteBalance(ref.r, ref.g, ref.b);
   const dist = Math.hypot(cr - wr, cg - wg, cb - wb);
-  return dist < 50;
+  return dist < 58;
 }
 
 /** 노란 스티커 — WB 후에도 채도가 남아 있는 따뜻한 색 */
@@ -32,7 +32,7 @@ export function isLikelyYellowPixel(r: number, g: number, b: number): boolean {
 
 export function warmLightYellowPenalty(r: number, g: number, b: number): number {
   if (!isWhiteBalanceCalibrated()) return 0;
-  if (isCalibratedWhitePixel(r, g, b)) return 0.6;
-  if (isLikelyYellowPixel(r, g, b)) return -0.2;
+  if (isCalibratedWhitePixel(r, g, b)) return 0.85;
+  if (isLikelyYellowPixel(r, g, b)) return -0.25;
   return 0;
 }
