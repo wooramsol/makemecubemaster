@@ -26,7 +26,9 @@ export interface OpenCV {
   CV_8UC4: number;
   CV_8UC3: number;
   CV_32FC1: number;
+  CV_32FC2: number;
   COLOR_RGBA2RGB: number;
+  COLOR_RGBA2GRAY: number;
   COLOR_RGB2HSV: number;
   RETR_EXTERNAL: number;
   CHAIN_APPROX_SIMPLE: number;

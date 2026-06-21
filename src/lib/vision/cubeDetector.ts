@@ -4,11 +4,16 @@ import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 
 const WARP_SIZE = 150;
 
-export function detectCubeFace(
+export interface DetectionResult {
+  corners: [Point2D, Point2D, Point2D, Point2D] | null;
+  colors: StickerColor[] | null;
+}
+
+export function detectCubeCorners(
   sourceCanvas: HTMLCanvasElement,
   frameWidth: number,
   frameHeight: number,
-): DetectedFace | null {
+): [Point2D, Point2D, Point2D, Point2D] | null {
   const cv = window.cv;
   const src = cv.imread(sourceCanvas);
   const rgb = new cv.Mat();
@@ -64,12 +69,30 @@ export function detectCubeFace(
   contours.delete();
   hierarchy.delete();
 
-  if (!bestCorners) return null;
+  return bestCorners;
+}
 
-  const colors = warpAndSampleColors(sourceCanvas, bestCorners);
-  const pose = estimatePoseFromCorners(bestCorners, frameWidth, frameHeight);
+export function detectCubeFace(
+  sourceCanvas: HTMLCanvasElement,
+  frameWidth: number,
+  frameHeight: number,
+): DetectedFace | null {
+  const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
+  if (!corners) return null;
+
+  const colors = warpAndSampleColors(sourceCanvas, corners);
+  const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight);
 
   return { colors, pose };
+}
+
+export function createGrayMat(sourceCanvas: HTMLCanvasElement): import('../../types/opencv').OpenCVMat {
+  const cv = window.cv;
+  const src = cv.imread(sourceCanvas);
+  const gray = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  src.delete();
+  return gray;
 }
 
 function warpAndSampleColors(

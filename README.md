@@ -21,6 +21,18 @@
 | AR 화살표 | Three.js로 큐브 면에 고정된 반투명 화살표 |
 | 자동 진행 | 90° 회전 감지 시 다음 단계로 자동 전환 |
 
+## 배포 (GitHub Pages)
+
+`main` 브랜치에 push하면 GitHub Actions가 자동으로 빌드·배포합니다.
+
+**라이브 URL:** https://wooramsol.github.io/makemecubemaster/
+
+> 카메라 접근을 위해 HTTPS 환경이 필요합니다. GitHub Pages는 HTTPS를 기본 제공합니다.
+
+## PWA (모바일)
+
+홈 화면에 추가하면 앱처럼 실행할 수 있습니다. Service Worker가 정적 자산과 OpenCV.js를 캐시합니다.
+
 ## 시작하기
 
 ```bash
