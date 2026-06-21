@@ -1,40 +1,38 @@
-import { useEffect, useState } from 'react';
-import type { RefObject } from 'react';
+import { useCallback } from 'react';
 
 interface CameraViewProps {
-  videoRef: RefObject<HTMLVideoElement | null>;
+  setVideoRef: (node: HTMLVideoElement | null) => void;
   onDimensions?: (width: number, height: number) => void;
 }
 
-export function CameraView({ videoRef, onDimensions }: CameraViewProps) {
-  const [mirrored, setMirrored] = useState(true);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    const update = () => {
+export function CameraView({ setVideoRef, onDimensions }: CameraViewProps) {
+  const handleLoadedMetadata = useCallback(
+    (video: HTMLVideoElement) => {
       if (video.videoWidth && video.videoHeight) {
         onDimensions?.(video.videoWidth, video.videoHeight);
       }
-    };
+    },
+    [onDimensions],
+  );
 
-    video.addEventListener('loadedmetadata', update);
-    video.addEventListener('resize', update);
-    return () => {
-      video.removeEventListener('loadedmetadata', update);
-      video.removeEventListener('resize', update);
-    };
-  }, [videoRef, onDimensions]);
+  const handleRef = useCallback(
+    (node: HTMLVideoElement | null) => {
+      setVideoRef(node);
+      if (node && node.readyState >= 1) {
+        handleLoadedMetadata(node);
+      }
+    },
+    [setVideoRef, handleLoadedMetadata],
+  );
 
   return (
     <video
-      ref={videoRef}
-      className={`camera-feed${mirrored ? ' mirrored' : ''}`}
+      ref={handleRef}
+      className="camera-feed mirrored"
       playsInline
       muted
       autoPlay
-      onLoadedMetadata={() => setMirrored(true)}
+      onLoadedMetadata={(e) => handleLoadedMetadata(e.currentTarget)}
     />
   );
 }

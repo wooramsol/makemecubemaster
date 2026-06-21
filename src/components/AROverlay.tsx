@@ -46,5 +46,11 @@ export function AROverlay({ pose, move, width, height, active }: AROverlayProps)
     return () => cancelAnimationFrame(raf);
   }, [pose, active]);
 
-  return <canvas ref={canvasRef} className="ar-overlay mirrored" aria-hidden="true" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      className={`ar-overlay mirrored${active ? ' active' : ''}`}
+      aria-hidden="true"
+    />
+  );
 }
