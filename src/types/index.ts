@@ -71,7 +71,7 @@ export interface DetectionFeedback {
   stableProgress: number;
   stableTarget: number;
   detectedCenter: StickerColor | null;
-  matchCount: number;
+  colorCounts: Record<StickerColor, number>;
 }
 
 export interface FrameResult {

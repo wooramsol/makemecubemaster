@@ -13,7 +13,7 @@ import type {
 import { CALIBRATION_ORDER, getFaceScanHint } from '../lib/cube/colors';
 import { buildFaceletString } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
-import { getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
+import { countStickerColors, emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 import { colorsDifferEnough, validateFaceletString } from '../lib/vision/scanValidation';
@@ -37,7 +37,7 @@ const initialFeedback: DetectionFeedback = {
   stableProgress: 0,
   stableTarget: 0,
   detectedCenter: null,
-  matchCount: 0,
+  colorCounts: emptyColorCounts(),
 };
 
 const initialState: CubeAppState = {
@@ -133,7 +133,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
   const buildFeedback = useCallback(
     (hasPose: boolean, colors: StickerColor[] | null, canCapture: boolean): DetectionFeedback => {
-      const { detectedCenter, matchCount } = getCalibrationFeedback(colors);
+      const { detectedCenter, colorCounts } = getCalibrationFeedback(colors);
       const readable = isColorsReadable(colors);
 
       let status: DetectionStatus = 'searching';
@@ -150,7 +150,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         stableProgress: 0,
         stableTarget: 0,
         detectedCenter,
-        matchCount,
+        colorCounts,
       };
     },
     [],
@@ -264,7 +264,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             stableProgress: 0,
             stableTarget: 0,
             detectedCenter: pending.colors[4] ?? null,
-            matchCount: 9,
+            colorCounts: countStickerColors(pending.colors),
           },
         };
       }
@@ -292,7 +292,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             stableProgress: 0,
             stableTarget: 0,
             detectedCenter: null,
-            matchCount: 0,
+            colorCounts: emptyColorCounts(),
           },
         };
       } catch (error) {

@@ -9,6 +9,17 @@ const STICKER_HEX: Record<StickerColor, string> = {
   B: '#3b82f6',
 };
 
+const COLOR_ORDER: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
+
+const COLOR_SHORT: Record<StickerColor, string> = {
+  R: '빨',
+  O: '주',
+  Y: '노',
+  G: '초',
+  B: '파',
+  W: '흰',
+};
+
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '큐브를 찾는 중...',
   detected: '큐브 감지됨 — 아래 버튼으로 스캔',
@@ -27,6 +38,8 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
   const statusClass = feedback.status;
   const progress =
     feedback.stableTarget > 0 ? feedback.stableProgress / feedback.stableTarget : 0;
+  const totalRead = Object.values(feedback.colorCounts).reduce((sum, n) => sum + n, 0);
+  const showCounts = totalRead === 9;
 
   return (
     <div className="detection-overlay" aria-live="polite">
@@ -43,18 +56,21 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
           )}
         </div>
 
-        {feedback.detectedCenter && (
-          <div className="color-preview">
-            <span
-              className="color-swatch"
-              style={{ background: STICKER_HEX[feedback.detectedCenter] }}
-            />
-            <span className="color-label">
-              9칸 읽음
-              {feedback.matchCount > 0 && (
-                <> · {feedback.detectedCenter && colorName(feedback.detectedCenter)}</>
-              )}
-            </span>
+        {showCounts && (
+          <div className="color-counts">
+            <p className="color-counts-title">인식된 색상 (9칸)</p>
+            <div className="color-counts-grid">
+              {COLOR_ORDER.map((color) => (
+                <div key={color} className="color-count-item">
+                  <span
+                    className="color-swatch"
+                    style={{ background: STICKER_HEX[color] }}
+                  />
+                  <span className="color-count-label">{COLOR_SHORT[color]}</span>
+                  <span className="color-count-value">{feedback.colorCounts[color]}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -66,16 +82,4 @@ export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
       </div>
     </div>
   );
-}
-
-function colorName(c: StickerColor): string {
-  const names: Record<StickerColor, string> = {
-    W: '흰색',
-    Y: '노란색',
-    R: '빨간색',
-    O: '주황색',
-    G: '초록색',
-    B: '파란색',
-  };
-  return names[c];
 }
