@@ -23,9 +23,21 @@
 
 ## 배포 (GitHub Pages)
 
-`main` 브랜치에 push하면 GitHub Actions가 자동으로 빌드·배포합니다.
+`main` 브랜치에 push하면 GitHub Actions가 `gh-pages` 브랜치로 자동 배포합니다.
+
+```bash
+npm run deploy   # 수동 배포 (동일 결과)
+```
 
 **라이브 URL:** https://wooramsol.github.io/makemecubemaster/
+
+### 최초 1회 설정 (필수)
+
+GitHub Pages가 아직 활성화되지 않은 경우, 아래 한 번만 설정하면 됩니다.
+
+1. https://github.com/wooramsol/makemecubemaster/settings/pages 열기
+2. **Source** → `Deploy from a branch`
+3. **Branch** → `gh-pages` / `/ (root)` 선택 → **Save**
 
 > 카메라 접근을 위해 HTTPS 환경이 필요합니다. GitHub Pages는 HTTPS를 기본 제공합니다.
 
