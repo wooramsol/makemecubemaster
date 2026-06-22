@@ -9,8 +9,8 @@ This app uses the **front camera** with a **mirrored video preview** (`scaleX(-1
 
 Vision pipeline rules:
 
-1. Draw video with `drawCameraFrame()` — **never** use `drawSelfieVideoFrame()` (it reversed all scanned faces).
-2. Store raw guide-grid colors from the canvas.
-3. Mirror face grids in **CSS only** (`scaleX(-1)` on `.face-grid-mini-cells` and `.cell-grid`) to match the video preview.
-4. Only capture a face when the center sticker identifies the face (`identifyFaceFromCenter`).
-5. Solver tries mirror + rotation orientations on raw stored colors.
+1. Draw video with `drawCameraFrame()` — never flip the canvas.
+2. After `sampleGuideRegionColors`, call `toSelfiePreviewColors()` **once** in `detectCubeFace`.
+3. Store and display face grids as-is — **no** CSS `scaleX(-1)` on grid components (that double-mirrored 5/6 faces; green looked fine when symmetric).
+4. Only capture when `identifyFaceFromCenter()` identifies the center sticker.
+5. Solver may still try rotations; stored colors are already in preview coordinates.

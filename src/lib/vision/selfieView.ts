@@ -2,7 +2,7 @@ import type { FaceId, StickerColor } from '../../types';
 
 export const SELFIE_CAMERA_MODE = true;
 
-/** Raw camera pixels only — never flip the canvas. */
+/** Raw camera frame — mirroring happens once on the 3×3 color grid, not the canvas. */
 export function drawCameraFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
@@ -12,16 +12,20 @@ export function drawCameraFrame(
   ctx.drawImage(video, 0, 0, width, height);
 }
 
-export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[] {
+/**
+ * Map raw guide-grid colors to the same left/right order as the mirrored selfie
+ * video (CSS scaleX(-1) on `.camera-feed`). Apply exactly once when sampling.
+ */
+export function toSelfiePreviewColors(colors: StickerColor[]): StickerColor[] {
   if (colors.length !== 9) return colors;
 
-  const mirrored: StickerColor[] = [];
+  const out: StickerColor[] = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 2; col >= 0; col--) {
-      mirrored.push(colors[row * 3 + col]!);
+      out.push(colors[row * 3 + col]!);
     }
   }
-  return mirrored;
+  return out;
 }
 
 export function cloneFaceColorsMap(

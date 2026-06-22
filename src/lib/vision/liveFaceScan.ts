@@ -1,5 +1,4 @@
 import { identifyFaceFromCenter } from '../cube/colors';
-import { mirrorFaceCellsHorizontally } from './selfieView';
 import type { FaceId, StickerColor } from '../../types';
 
 /** Periphery cells only — center is used for face ID and may jitter */
@@ -39,14 +38,7 @@ function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
 }
 
 function matchesStoredFace(live: StickerColor[], stored: StickerColor[]): boolean {
-  if (countMatchingPeriphery(live, stored) >= SAME_FACE_PERIPHERY_MATCHES) return true;
-  if (
-    countMatchingPeriphery(mirrorFaceCellsHorizontally(live), stored) >=
-    SAME_FACE_PERIPHERY_MATCHES
-  ) {
-    return true;
-  }
-  return false;
+  return countMatchingPeriphery(live, stored) >= SAME_FACE_PERIPHERY_MATCHES;
 }
 
 function findStoredMatch(
