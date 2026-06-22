@@ -23,12 +23,18 @@ import {
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
-import { validateFaceletString } from '../lib/vision/scanValidation';
+
+function scannedFacesFromMap(
+  faces: Map<FaceId, StickerColor[]>,
+): Partial<Record<FaceId, StickerColor[]>> {
+  return Object.fromEntries(faces) as Partial<Record<FaceId, StickerColor[]>>;
+}
 
 export interface CubeAppState {
   phase: AppPhase;
   error: string | null;
   knownFaces: FaceId[];
+  scannedFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   currentVisibleFace: FaceId | null;
   liveScanProgress: number;
   solution: SolutionProgress | null;
@@ -55,6 +61,7 @@ const initialState: CubeAppState = {
   phase: 'loading',
   error: null,
   knownFaces: [],
+  scannedFaceColors: {},
   currentVisibleFace: null,
   liveScanProgress: 0,
   solution: null,
@@ -92,7 +99,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const requestSolve = useCallback(
-    (facelet: string, pose: CubePose, scannedFaces: Map<FaceId, StickerColor[]>) => {
+    (
+      facelet: string,
+      pose: CubePose,
+      scannedFaces: Map<FaceId, StickerColor[]>,
+      captures: StickerColor[][],
+    ) => {
       const worker = solverWorker.current;
       if (!worker) {
         setState((s) => ({
@@ -109,6 +121,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         type: 'solve',
         facelet,
         scannedFaces: Object.fromEntries(scannedFaces) as Record<FaceId, StickerColor[]>,
+        captures,
         id,
       });
       frameProcessor.current?.syncPose(pose);
@@ -206,6 +219,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       phase: 'scanReady',
       error: null,
       knownFaces: [],
+      scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
       detectionFeedback: initialFeedback,
@@ -222,6 +236,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       phase: 'liveScan',
       error: null,
       knownFaces: [],
+      scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
       detectionFeedback: initialFeedback,
@@ -417,45 +432,43 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
         solveTriggeredRef.current = true;
+        const scannedRecord = scannedFacesFromMap(snapshot.faces);
+        const captures = [...snapshot.faces.values()];
+
         try {
-          const reconciled = reconcileCubeFaces(snapshot.faces);
-          if (!isCubeColorBalanced(reconciled)) {
-            const hint = formatImbalanceHint(snapshot.faces);
-            setState((s) => ({
-              ...s,
-              phase: 'error',
-              error: hint
-                ? `Color mismatch (${hint}). Re-learn colors or re-scan.`
-                : 'Color mismatch. Scan all 6 unique faces.',
-            }));
-            return;
+          let solveMap = snapshot.faces;
+          if (!isCubeColorBalanced(solveMap)) {
+            solveMap = reconcileCubeFaces(snapshot.faces);
+            if (!isCubeColorBalanced(solveMap)) {
+              const hint = formatImbalanceHint(snapshot.faces);
+              setState((s) => ({
+                ...s,
+                phase: 'error',
+                scannedFaceColors: scannedRecord,
+                error: hint
+                  ? `Color mismatch (${hint}). Re-learn colors or re-scan.`
+                  : 'Color mismatch. Scan all 6 unique faces.',
+              }));
+              return;
+            }
           }
 
-          const facelet = buildFaceletFromMap(reconciled);
-          const validationError = validateFaceletString(facelet);
-          if (validationError) {
-            const hint = formatImbalanceHint(reconciled);
-            setState((s) => ({
-              ...s,
-              phase: 'error',
-              error: hint ? `${validationError} (${hint})` : validationError,
-            }));
-            return;
-          }
-          faceletRef.current = facelet;
+          const facelet = buildFaceletFromMap(solveMap);
           const pose = lastPoseRef.current;
           setState((s) => ({
             ...s,
             phase: 'computing',
             knownFaces: snapshot.knownFaces,
+            scannedFaceColors: scannedRecord,
             liveScanProgress: 1,
             currentPose: pose,
           }));
-          queueMicrotask(() => requestSolve(facelet, pose, reconciled));
+          queueMicrotask(() => requestSolve(facelet, pose, solveMap, captures));
         } catch (error) {
           setState((s) => ({
             ...s,
             phase: 'error',
+            scannedFaceColors: scannedRecord,
             error: error instanceof Error ? error.message : 'Failed to build cube state',
           }));
         }
@@ -466,6 +479,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         ...prev,
         currentPose: result.pose,
         knownFaces: snapshot.knownFaces,
+        scannedFaceColors: scannedFacesFromMap(snapshot.faces),
         currentVisibleFace: snapshot.currentFace,
         liveScanProgress: snapshot.knownFaces.length / 6,
         detectionFeedback: buildFeedback(
@@ -529,6 +543,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       error: null,
       solution: null,
       knownFaces: [],
+      scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
       colorLearnIndex: 0,

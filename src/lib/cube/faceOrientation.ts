@@ -3,6 +3,15 @@ import { buildFaceletFromMap } from './state';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
+const FACE_CENTER: Record<FaceId, StickerColor> = {
+  U: 'W',
+  D: 'Y',
+  F: 'G',
+  B: 'B',
+  R: 'R',
+  L: 'O',
+};
+
 /** Rotate a 3×3 face 90° clockwise in the camera/guide frame. */
 export function rotateFaceClockwise(colors: StickerColor[]): StickerColor[] {
   const rotated: StickerColor[] = new Array(9);
@@ -61,6 +70,68 @@ export function findSolvableFacelet(
       digit += 1;
     }
     if (digit >= FACE_ORDER.length) break;
+  }
+
+  return null;
+}
+
+function permutations(items: FaceId[]): FaceId[][] {
+  const result: FaceId[][] = [];
+  const arr = [...items];
+
+  function permute(left: number): void {
+    if (left >= arr.length) {
+      result.push([...arr]);
+      return;
+    }
+    for (let i = left; i < arr.length; i++) {
+      [arr[left], arr[i]] = [arr[i]!, arr[left]!];
+      permute(left + 1);
+      [arr[left], arr[i]] = [arr[i]!, arr[left]!];
+    }
+  }
+
+  permute(0);
+  return result;
+}
+
+function assignmentCost(captures: StickerColor[][], faceOrder: FaceId[]): number {
+  let cost = 0;
+  for (let i = 0; i < captures.length; i++) {
+    const center = captures[i]![4]!;
+    if (center !== FACE_CENTER[faceOrder[i]!]) {
+      cost += 5;
+    }
+  }
+  return cost;
+}
+
+/**
+ * Try every way to map 6 captured patterns onto face slots (handles wrong face IDs
+ * during scan), then every rotation per face.
+ */
+export function findSolvableCubeFromCaptures(
+  captures: StickerColor[][],
+  isSolvableFacelet: (facelet: string) => boolean,
+): string | null {
+  if (captures.length !== 6 || captures.some((c) => c.length !== 9)) {
+    return null;
+  }
+
+  const faceOrders = permutations(FACE_ORDER).sort(
+    (a, b) => assignmentCost(captures, a) - assignmentCost(captures, b),
+  );
+
+  for (const faceOrder of faceOrders) {
+    const trial = new Map<FaceId, StickerColor[]>();
+    for (let i = 0; i < 6; i++) {
+      trial.set(faceOrder[i]!, captures[i]!);
+    }
+
+    const facelet = findSolvableFacelet(trial, isSolvableFacelet);
+    if (facelet) {
+      return facelet;
+    }
   }
 
   return null;

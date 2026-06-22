@@ -1,5 +1,8 @@
 import Cube from 'cubejs';
-import { findSolvableFacelet } from '../lib/cube/faceOrientation';
+import {
+  findSolvableCubeFromCaptures,
+  findSolvableFacelet,
+} from '../lib/cube/faceOrientation';
 import { isCubePhysicallySolvable } from '../lib/cube/solvability';
 import { parseMoves } from '../lib/cube/moves';
 import type { FaceId, StickerColor } from '../types';
@@ -15,8 +18,12 @@ function ensureInit(): void {
 }
 
 function isSolvableFacelet(facelet: string): boolean {
-  const cube = Cube.fromString(facelet);
-  return isCubePhysicallySolvable(cube as never);
+  try {
+    const cube = Cube.fromString(facelet);
+    return isCubePhysicallySolvable(cube as never);
+  } catch {
+    return false;
+  }
 }
 
 function facesFromRecord(record: Record<FaceId, StickerColor[]>): Map<FaceId, StickerColor[]> {
@@ -24,7 +31,7 @@ function facesFromRecord(record: Record<FaceId, StickerColor[]>): Map<FaceId, St
 }
 
 const UNSOLVABLE_MESSAGE =
-  'Could not build a valid cube. Any face order is fine, but hold each face at the same angle — do not spin the face in your hand. Re-scan in steady light.';
+  'Could not solve this cube state. Check the scanned faces above — one color may be wrong. Re-scan in steady light.';
 
 self.onmessage = (event: MessageEvent<SolverMessage>) => {
   const msg = event.data;
@@ -39,18 +46,18 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
     if (msg.type === 'solve') {
       ensureInit();
 
-      let facelet = msg.facelet;
-      if (!isSolvableFacelet(facelet)) {
-        const corrected = findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet);
-        if (!corrected) {
-          self.postMessage({
-            type: 'error',
-            message: UNSOLVABLE_MESSAGE,
-            id: msg.id,
-          } satisfies SolverResponse);
-          return;
-        }
-        facelet = corrected;
+      const facelet =
+        findSolvableCubeFromCaptures(msg.captures, isSolvableFacelet) ??
+        findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet) ??
+        (isSolvableFacelet(msg.facelet) ? msg.facelet : null);
+
+      if (!facelet) {
+        self.postMessage({
+          type: 'error',
+          message: UNSOLVABLE_MESSAGE,
+          id: msg.id,
+        } satisfies SolverResponse);
+        return;
       }
 
       const cube = Cube.fromString(facelet);

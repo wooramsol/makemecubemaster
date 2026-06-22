@@ -6,6 +6,7 @@ export type SolverMessage =
       type: 'solve';
       facelet: string;
       scannedFaces: Record<FaceId, StickerColor[]>;
+      captures: StickerColor[][];
       id: number;
     }
   | { type: 'apply'; move: Move; facelet: string; id: number };

@@ -4,6 +4,7 @@ import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
+import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -90,6 +91,9 @@ export default function App() {
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
+  const showScannedFaces =
+    state.phase === 'liveScan' ||
+    (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
   return (
     <main className="app">
@@ -122,6 +126,11 @@ export default function App() {
               feedback={state.detectionFeedback}
               guideRect={guideRect}
               onStart={startLiveScan}
+            />
+
+            <ScannedFacesBar
+              visible={showScannedFaces}
+              scannedFaces={state.scannedFaceColors}
             />
 
             <DetectionOverlay
@@ -163,6 +172,10 @@ export default function App() {
 
         {hasError && !isBooting && (
           <div className="error-screen overlay">
+            <ScannedFacesBar
+              visible={showScannedFaces}
+              scannedFaces={state.scannedFaceColors}
+            />
             <p>{state.error ?? webcamState.error}</p>
             <div className="error-actions">
               {state.colorsCalibrated && (
