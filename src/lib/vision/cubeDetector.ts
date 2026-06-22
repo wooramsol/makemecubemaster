@@ -168,9 +168,8 @@ export function detectCubeFace(
     return null;
   }
 
-  // Selfie mode: always sample the fixed center guide grid so every face uses the
-  // same orientation as the mirrored preview. OpenCV warp can flip left/right
-  // when contour corners are detected on later faces.
+  // Colors are sampled from the selfie-mirrored process canvas (drawSelfieVideoFrame).
+  // Cell order already matches the on-screen preview — do not mirror again.
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
   const pose = estimatePoseFromCorners(corners ?? guideToCorners(guide), frameWidth, frameHeight);
   pose.confidence = corners ? 0.85 : 0.7;

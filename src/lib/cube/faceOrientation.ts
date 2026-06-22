@@ -23,6 +23,19 @@ export function rotateFaceClockwise(colors: StickerColor[]): StickerColor[] {
   return rotated;
 }
 
+/** Mirror a 3×3 face left-right (selfie camera vs raw sensor frame). */
+export function mirrorFaceHorizontally(colors: StickerColor[]): StickerColor[] {
+  if (colors.length !== 9) return colors;
+
+  const mirrored: StickerColor[] = [];
+  for (let row = 0; row < 3; row++) {
+    for (let col = 2; col >= 0; col--) {
+      mirrored.push(colors[row * 3 + col]!);
+    }
+  }
+  return mirrored;
+}
+
 export function allFaceRotations(colors: StickerColor[]): StickerColor[][] {
   const rotations = [colors];
   let current = colors;
@@ -33,20 +46,37 @@ export function allFaceRotations(colors: StickerColor[]): StickerColor[][] {
   return rotations;
 }
 
+/** Four rotations plus horizontal mirror × four rotations (up to 8 orientations). */
+export function allFaceOrientations(colors: StickerColor[]): StickerColor[][] {
+  const orientations: StickerColor[][] = [];
+  const seen = new Set<string>();
+
+  for (const base of [colors, mirrorFaceHorizontally(colors)]) {
+    for (const rotated of allFaceRotations(base)) {
+      const key = rotated.join('');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      orientations.push(rotated);
+    }
+  }
+
+  return orientations;
+}
+
 /**
- * Each scanned face may be rotated in the user's hand. Try all 4^6 orientations
- * and return the first facelet string that passes the solvability check.
+ * Each scanned face may be rotated or mirrored in the user's hand. Try all 8^6
+ * orientations and return the first facelet string that passes the solvability check.
  */
 export function findSolvableFacelet(
   faces: Map<FaceId, StickerColor[]>,
   isSolvableFacelet: (facelet: string) => boolean,
 ): string | null {
-  const rotationsByFace = FACE_ORDER.map((faceId) => {
+  const orientationsByFace = FACE_ORDER.map((faceId) => {
     const colors = faces.get(faceId);
     if (!colors || colors.length !== 9) {
       throw new Error(`Missing face data for ${faceId}`);
     }
-    return allFaceRotations(colors);
+    return allFaceOrientations(colors);
   });
 
   const indices = [0, 0, 0, 0, 0, 0];
@@ -54,7 +84,7 @@ export function findSolvableFacelet(
   for (;;) {
     const trial = new Map<FaceId, StickerColor[]>();
     for (let i = 0; i < FACE_ORDER.length; i++) {
-      trial.set(FACE_ORDER[i]!, rotationsByFace[i]![indices[i]!]!);
+      trial.set(FACE_ORDER[i]!, orientationsByFace[i]![indices[i]!]!);
     }
 
     const facelet = buildFaceletFromMap(trial);
@@ -65,7 +95,7 @@ export function findSolvableFacelet(
     let digit = 0;
     while (digit < FACE_ORDER.length) {
       indices[digit]! += 1;
-      if (indices[digit]! < 4) break;
+      if (indices[digit]! < orientationsByFace[digit]!.length) break;
       indices[digit] = 0;
       digit += 1;
     }
