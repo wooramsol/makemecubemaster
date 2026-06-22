@@ -1,7 +1,7 @@
 import type { Point2D } from '../../types';
 
 /** 화면 중앙 정사각형 가이드 비율 (카메라 프레임 대비) */
-export const GUIDE_SIZE_RATIO = 0.6;
+export const GUIDE_SIZE_RATIO = 0.3;
 
 /** 흰색 기준용 중앙 스팟 (가이드 대비 한 변 비율) — 옆 색 번짐 회피 */
 export const WB_SPOT_RATIO = 0.22;
