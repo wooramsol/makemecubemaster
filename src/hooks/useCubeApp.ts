@@ -155,10 +155,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             ...s,
             phase: 'error',
             error:
-              'Solve timed out. Scan order and direction do not matter — please try again.',
+              'Solve timed out. Colors may have been misread — re-scan in steady light.',
           };
         });
-      }, 60000);
+      }, 25_000);
     },
     [clearSolveTimeout],
   );
@@ -467,7 +467,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         solveTriggeredRef.current = true;
         const snapshotFaces = canonicalizeScannedFaces(cloneFaceColorsMap(snapshot.faces));
         const scannedRecord = scannedFacesFromMap(snapshotFaces);
-        const captures = [...snapshotFaces.values()].map((colors) => [...colors]);
 
         try {
           let solveMap = snapshotFaces;
@@ -489,6 +488,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
           const facelet = buildFaceletFromMap(solveMap);
           const pose = lastPoseRef.current;
+          const solveCaptures = [...solveMap.values()].map((colors) => [...colors]);
           setState((s) => ({
             ...s,
             phase: 'computing',
@@ -497,7 +497,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             liveScanProgress: 1,
             currentPose: pose,
           }));
-          queueMicrotask(() => requestSolve(facelet, pose, snapshotFaces, captures));
+          queueMicrotask(() => requestSolve(facelet, pose, solveMap, solveCaptures));
         } catch (error) {
           setState((s) => ({
             ...s,
