@@ -1,4 +1,4 @@
-import { ALL_FACES, identifyFaceFromCenter } from '../cube/colors';
+import { identifyFaceFromCenter } from '../cube/colors';
 import type { FaceId, StickerColor } from '../../types';
 
 const FACE_CENTER: Record<FaceId, StickerColor> = {
@@ -53,13 +53,6 @@ function findStoredMatch(
   return null;
 }
 
-function firstUnusedFace(faces: Map<FaceId, StickerColor[]>): FaceId | null {
-  for (const faceId of ALL_FACES) {
-    if (!faces.has(faceId)) return faceId;
-  }
-  return null;
-}
-
 function majorityVoteCells(readings: StickerColor[][]): StickerColor[] {
   const result: StickerColor[] = [];
   for (let i = 0; i < 9; i++) {
@@ -86,19 +79,21 @@ function pickFaceIdForCapture(
   faces: Map<FaceId, StickerColor[]>,
 ): FaceId | null {
   const fromCenter = identifyFaceFromCenter(voted[4]!);
+  if (!fromCenter) {
+    return null;
+  }
 
-  if (fromCenter && !faces.has(fromCenter)) {
+  if (!faces.has(fromCenter)) {
     return fromCenter;
   }
 
-  if (fromCenter && faces.has(fromCenter)) {
-    const stored = faces.get(fromCenter)!;
-    if (matchesStoredFace(voted, stored)) {
-      return null;
-    }
+  const stored = faces.get(fromCenter)!;
+  if (matchesStoredFace(voted, stored)) {
+    return null;
   }
 
-  return firstUnusedFace(faces);
+  // Center color disagrees with a stored face — wait for a clearer reading.
+  return null;
 }
 
 function finalizeFaceColors(colors: StickerColor[], faceId: FaceId): StickerColor[] {

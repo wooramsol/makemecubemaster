@@ -93,17 +93,32 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
   const requestSolve = useCallback(
     (facelet: string, pose: CubePose) => {
+      const worker = solverWorker.current;
+      if (!worker) {
+        setState((s) => ({
+          ...s,
+          phase: 'error',
+          error: 'Solver failed to start. Refresh the page and try again.',
+        }));
+        return;
+      }
+
       clearSolveTimeout();
       const id = ++requestId.current;
-      solverWorker.current?.postMessage({ type: 'solve', facelet, id });
+      worker.postMessage({ type: 'solve', facelet, id });
       frameProcessor.current?.syncPose(pose);
 
       solveTimeoutRef.current = setTimeout(() => {
         setState((s) => {
           if (s.phase !== 'computing') return s;
-          return { ...s, phase: 'error', error: 'Solve timed out. Try again.' };
+          return {
+            ...s,
+            phase: 'error',
+            error:
+              'Solve timed out. Colors may have been misread — re-scan in steady light.',
+          };
         });
-      }, 20000);
+      }, 45000);
     },
     [clearSolveTimeout],
   );
@@ -222,6 +237,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         if (msg.type === 'ready') {
           setState((s) => ({ ...s, solverReady: true }));
         } else if (msg.type === 'solution') {
+          if (msg.id !== requestId.current) return;
           clearSolveTimeout();
           solvingStartMs.current = Date.now();
           setState((s) => ({
@@ -234,18 +250,27 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             frameProcessor.current?.enableTracking();
           }
         } else if (msg.type === 'facelet') {
+          if (msg.id !== requestId.current) return;
           faceletRef.current = msg.facelet;
         } else if (msg.type === 'error') {
+          if (msg.id !== undefined && msg.id !== requestId.current) return;
           clearSolveTimeout();
+          solveTriggeredRef.current = false;
           setState((s) => ({
             ...s,
             phase: 'error',
-            error:
-              msg.message.includes('Invalid') || msg.message.includes('invalid')
-                ? 'Invalid cube state. Re-scan the cube.'
-                : msg.message,
+            error: msg.message,
           }));
         }
+      };
+
+      worker.onerror = () => {
+        clearSolveTimeout();
+        setState((s) => ({
+          ...s,
+          phase: 'error',
+          error: 'Solver failed to load. Refresh the page and try again.',
+        }));
       };
 
       worker.postMessage({ type: 'init' });

@@ -1,4 +1,5 @@
 import Cube from 'cubejs';
+import { isCubePhysicallySolvable } from '../lib/cube/solvability';
 import { parseMoves } from '../lib/cube/moves';
 import type { SolverMessage, SolverResponse } from '../lib/cube/solverClient';
 
@@ -10,6 +11,9 @@ function ensureInit(): void {
     initialized = true;
   }
 }
+
+const UNSOLVABLE_MESSAGE =
+  'Invalid cube state from scan. Re-scan in steady light and hold each face for 2 seconds.';
 
 self.onmessage = (event: MessageEvent<SolverMessage>) => {
   const msg = event.data;
@@ -24,6 +28,15 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
     if (msg.type === 'solve') {
       ensureInit();
       const cube = Cube.fromString(msg.facelet);
+      if (!isCubePhysicallySolvable(cube as never)) {
+        self.postMessage({
+          type: 'error',
+          message: UNSOLVABLE_MESSAGE,
+          id: msg.id,
+        } satisfies SolverResponse);
+        return;
+      }
+
       const algorithm = cube.solve();
       const moves = parseMoves(algorithm);
       self.postMessage({ type: 'solution', moves, id: msg.id } satisfies SolverResponse);
