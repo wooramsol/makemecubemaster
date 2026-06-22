@@ -1,26 +1,17 @@
-import type { StickerColor } from '../../types';
+import type { FaceId, StickerColor } from '../../types';
 
-/** This app is selfie-only: front camera + mirrored preview. */
 export const SELFIE_CAMERA_MODE = true;
 
-/**
- * Draw the video frame horizontally flipped so pixel sampling matches the
- * mirrored on-screen preview (CSS scaleX(-1)).
- */
-export function drawSelfieVideoFrame(
+/** Raw camera pixels only — never flip the canvas. */
+export function drawCameraFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   width: number,
   height: number,
 ): void {
-  ctx.save();
-  ctx.translate(width, 0);
-  ctx.scale(-1, 1);
   ctx.drawImage(video, 0, 0, width, height);
-  ctx.restore();
 }
 
-/** Mirror a 3×3 face grid left-right (camera frame → preview coordinates). */
 export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[] {
   if (colors.length !== 9) return colors;
 
@@ -31,4 +22,14 @@ export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColo
     }
   }
   return mirrored;
+}
+
+export function cloneFaceColorsMap(
+  faces: Map<FaceId, StickerColor[]>,
+): Map<FaceId, StickerColor[]> {
+  const copy = new Map<FaceId, StickerColor[]>();
+  for (const [faceId, colors] of faces) {
+    copy.set(faceId, [...colors]);
+  }
+  return copy;
 }

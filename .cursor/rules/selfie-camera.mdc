@@ -5,12 +5,12 @@ alwaysApply: true
 
 # Selfie camera only
 
-This app always uses the **front (user-facing) camera** with a **mirrored preview** (`scaleX(-1)` on `.camera-feed`).
+This app uses the **front camera** with a **mirrored video preview** (`scaleX(-1)` on `.camera-feed`).
 
 Vision pipeline rules:
 
-1. Draw video to the processing canvas with `drawSelfieVideoFrame()` so color sampling matches what the user sees.
-2. Sample face colors from the **fixed center guide grid** (`sampleGuideRegionColors`) — do not use OpenCV perspective warp for colors (it can flip left/right on some faces).
-3. Do **not** mirror face cell arrays again in UI — pipeline output already matches the preview.
-3. `facingMode` must stay `user` in `useWebcam.ts`.
-4. AR overlay stays mirrored to match the preview.
+1. Draw video with `drawCameraFrame()` — **never** use `drawSelfieVideoFrame()` (it reversed all scanned faces).
+2. Store raw guide-grid colors from the canvas.
+3. Mirror face grids in **CSS only** (`scaleX(-1)` on `.face-grid-mini-cells` and `.cell-grid`) to match the video preview.
+4. Only capture a face when the center sticker identifies the face (`identifyFaceFromCenter`).
+5. Solver tries mirror + rotation orientations on raw stored colors.

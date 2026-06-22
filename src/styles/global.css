@@ -200,6 +200,7 @@ body,
   padding: 2px;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.45);
+  transform: scaleX(-1);
 }
 
 .face-grid-mini-cell {
@@ -748,6 +749,7 @@ body,
   padding: 3px;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.45);
+  transform: scaleX(-1);
 }
 
 .cell-grid-item {

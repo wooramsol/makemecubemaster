@@ -5,6 +5,7 @@ interface LiveScanOverlayProps {
   knownFaces: FaceId[];
   progress: number;
   needsNewFace?: boolean;
+  needsClearerCenter?: boolean;
 }
 
 export function LiveScanOverlay({
@@ -12,6 +13,7 @@ export function LiveScanOverlay({
   knownFaces,
   progress,
   needsNewFace = false,
+  needsClearerCenter = false,
 }: LiveScanOverlayProps) {
   if (phase !== 'liveScan') return null;
 
@@ -26,6 +28,9 @@ export function LiveScanOverlay({
       </p>
       {needsNewFace && (
         <p className="calibration-hint">Show a different face</p>
+      )}
+      {needsClearerCenter && !needsNewFace && (
+        <p className="calibration-hint">Center the face color in the guide</p>
       )}
     </div>
   );

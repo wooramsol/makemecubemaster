@@ -1,25 +1,13 @@
-import { ALL_FACES, identifyFaceFromCenter } from '../cube/colors';
+import { identifyFaceFromCenter } from '../cube/colors';
+import { mirrorFaceCellsHorizontally } from './selfieView';
 import type { FaceId, StickerColor } from '../../types';
-
-const FACE_CENTER: Record<FaceId, StickerColor> = {
-  U: 'W',
-  D: 'Y',
-  F: 'G',
-  B: 'B',
-  R: 'R',
-  L: 'O',
-};
 
 /** Periphery cells only — center is used for face ID and may jitter */
 const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
 
-/** Same face must stay in view this long before capture */
 export const STABLE_DURATION_MS = 2000;
 const MAX_READINGS_PER_FACE = 10;
-
-/** Periphery cells that must match to treat two readings as the same physical face */
 const SAME_FACE_PERIPHERY_MATCHES = 7;
-/** Allow a little jitter while the stability timer runs */
 const STABILITY_JITTER_MATCHES = 6;
 
 export interface LiveScanSnapshot {
@@ -30,8 +18,8 @@ export interface LiveScanSnapshot {
   stableTarget: number;
   isComplete: boolean;
   newlyCaptured: FaceId | null;
-  /** User is still showing a face that was already captured */
   needsNewFace: boolean;
+  needsClearerCenter: boolean;
 }
 
 function countMatchingPeriphery(a: StickerColor[], b: StickerColor[]): number {
@@ -51,7 +39,14 @@ function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
 }
 
 function matchesStoredFace(live: StickerColor[], stored: StickerColor[]): boolean {
-  return countMatchingPeriphery(live, stored) >= SAME_FACE_PERIPHERY_MATCHES;
+  if (countMatchingPeriphery(live, stored) >= SAME_FACE_PERIPHERY_MATCHES) return true;
+  if (
+    countMatchingPeriphery(mirrorFaceCellsHorizontally(live), stored) >=
+    SAME_FACE_PERIPHERY_MATCHES
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function findStoredMatch(
@@ -60,13 +55,6 @@ function findStoredMatch(
 ): FaceId | null {
   for (const [id, stored] of faces) {
     if (matchesStoredFace(colors, stored)) return id;
-  }
-  return null;
-}
-
-function firstUnusedFace(faces: Map<FaceId, StickerColor[]>): FaceId | null {
-  for (const faceId of ALL_FACES) {
-    if (!faces.has(faceId)) return faceId;
   }
   return null;
 }
@@ -92,28 +80,63 @@ function majorityVoteCells(readings: StickerColor[][]): StickerColor[] {
   return result;
 }
 
+function majorityVoteCenter(readings: StickerColor[][]): StickerColor | null {
+  if (readings.length === 0) return null;
+  const counts = new Map<StickerColor, number>();
+  for (const reading of readings) {
+    const c = reading[4]!;
+    counts.set(c, (counts.get(c) ?? 0) + 1);
+  }
+  let best: StickerColor | null = null;
+  let bestCount = 0;
+  for (const [color, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      best = color;
+    }
+  }
+  return best;
+}
+
 function pickFaceIdForCapture(
   voted: StickerColor[],
   faces: Map<FaceId, StickerColor[]>,
+  history: StickerColor[][],
 ): FaceId | null {
-  if (findStoredMatch(voted, faces)) {
-    return null;
+  if (findStoredMatch(voted, faces)) return null;
+
+  for (const center of [majorityVoteCenter(history), voted[4]!]) {
+    if (!center) continue;
+    const faceId = identifyFaceFromCenter(center);
+    if (faceId && !faces.has(faceId)) return faceId;
   }
 
-  const fromCenter = identifyFaceFromCenter(voted[4]!);
-  if (fromCenter && !faces.has(fromCenter)) {
-    return fromCenter;
-  }
-
-  // Center misread or slot taken — pattern is new, assign next free face.
-  // Face orientation is corrected later before solve.
-  return firstUnusedFace(faces);
+  return null;
 }
 
-function finalizeFaceColors(colors: StickerColor[], faceId: FaceId): StickerColor[] {
-  const result = [...colors];
-  result[4] = FACE_CENTER[faceId];
-  return result;
+export function canonicalizeScannedFaces(
+  faces: Map<FaceId, StickerColor[]>,
+): Map<FaceId, StickerColor[]> {
+  if (faces.size !== 6) return faces;
+
+  const result = new Map<FaceId, StickerColor[]>();
+  const claimed = new Set<FaceId>();
+
+  const entries = [...faces.entries()].sort((a, b) => {
+    const aOk = identifyFaceFromCenter(a[1][4]!) === a[0] ? 0 : 1;
+    const bOk = identifyFaceFromCenter(b[1][4]!) === b[0] ? 0 : 1;
+    return aOk - bOk;
+  });
+
+  for (const [, colors] of entries) {
+    const detected = identifyFaceFromCenter(colors[4]!);
+    if (detected && !claimed.has(detected)) {
+      result.set(detected, [...colors]);
+      claimed.add(detected);
+    }
+  }
+
+  return result.size === 6 ? result : faces;
 }
 
 export class LiveFaceAccumulator {
@@ -140,6 +163,7 @@ export class LiveFaceAccumulator {
       isComplete: this.faces.size === 6,
       newlyCaptured: null,
       needsNewFace: false,
+      needsClearerCenter: false,
     };
 
     if (!colors || colors.length !== 9) {
@@ -156,11 +180,7 @@ export class LiveFaceAccumulator {
       this.stableSinceMs = null;
       this.stabilityAnchor = null;
       this.pendingReadings = [];
-      return {
-        ...empty,
-        currentFace: storedMatch,
-        needsNewFace: true,
-      };
+      return { ...empty, currentFace: storedMatch, needsNewFace: true };
     }
 
     if (
@@ -178,30 +198,27 @@ export class LiveFaceAccumulator {
     const stableProgressSec = Math.min(stableMs, STABLE_DURATION_MS) / 1000;
 
     let newlyCaptured: FaceId | null = null;
+    let needsClearerCenter = false;
 
     if (stableMs >= STABLE_DURATION_MS) {
       const history = [...this.pendingReadings, [...colors]];
-      if (history.length > MAX_READINGS_PER_FACE) {
-        history.shift();
-      }
+      if (history.length > MAX_READINGS_PER_FACE) history.shift();
       this.pendingReadings = history;
 
       const voted = majorityVoteCells(history);
-      const resolvedFaceId = pickFaceIdForCapture(voted, this.faces);
+      const resolvedFaceId = pickFaceIdForCapture(voted, this.faces, history);
 
       if (resolvedFaceId) {
-        const merged = finalizeFaceColors(voted, resolvedFaceId);
         const isNew = !this.faces.has(resolvedFaceId);
-        this.faces.set(resolvedFaceId, merged);
-
-        if (isNew) {
-          newlyCaptured = resolvedFaceId;
-        }
+        this.faces.set(resolvedFaceId, [...voted]);
+        if (isNew) newlyCaptured = resolvedFaceId;
+        this.stableSinceMs = null;
+        this.stabilityAnchor = null;
+        this.pendingReadings = [];
+      } else {
+        needsClearerCenter = true;
+        this.stableSinceMs = nowMs - STABLE_DURATION_MS + 400;
       }
-
-      this.stableSinceMs = null;
-      this.stabilityAnchor = null;
-      this.pendingReadings = [];
     }
 
     return {
@@ -213,6 +230,7 @@ export class LiveFaceAccumulator {
       isComplete: this.faces.size === 6,
       newlyCaptured,
       needsNewFace: false,
+      needsClearerCenter,
     };
   }
 }
