@@ -22,12 +22,15 @@ import {
 } from '../lib/vision/colorReference';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
+import { cloneFaceColorsMap } from '../lib/vision/selfieView';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 
 function scannedFacesFromMap(
   faces: Map<FaceId, StickerColor[]>,
 ): Partial<Record<FaceId, StickerColor[]>> {
-  return Object.fromEntries(faces) as Partial<Record<FaceId, StickerColor[]>>;
+  return Object.fromEntries(cloneFaceColorsMap(faces)) as Partial<
+    Record<FaceId, StickerColor[]>
+  >;
 }
 
 export interface CubeAppState {
@@ -432,15 +435,16 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
         solveTriggeredRef.current = true;
-        const scannedRecord = scannedFacesFromMap(snapshot.faces);
-        const captures = [...snapshot.faces.values()];
+        const snapshotFaces = cloneFaceColorsMap(snapshot.faces);
+        const scannedRecord = scannedFacesFromMap(snapshotFaces);
+        const captures = [...snapshotFaces.values()].map((colors) => [...colors]);
 
         try {
-          let solveMap = snapshot.faces;
+          let solveMap = snapshotFaces;
           if (!isCubeColorBalanced(solveMap)) {
-            solveMap = reconcileCubeFaces(snapshot.faces);
+            solveMap = reconcileCubeFaces(snapshotFaces);
             if (!isCubeColorBalanced(solveMap)) {
-              const hint = formatImbalanceHint(snapshot.faces);
+              const hint = formatImbalanceHint(snapshotFaces);
               setState((s) => ({
                 ...s,
                 phase: 'error',
@@ -463,7 +467,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             liveScanProgress: 1,
             currentPose: pose,
           }));
-          queueMicrotask(() => requestSolve(facelet, pose, solveMap, captures));
+          queueMicrotask(() => requestSolve(facelet, pose, snapshotFaces, captures));
         } catch (error) {
           setState((s) => ({
             ...s,
