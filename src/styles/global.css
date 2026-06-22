@@ -260,7 +260,7 @@ body,
   position: absolute;
   top: 50%;
   left: 50%;
-  width: min(72vw, 52vh);
+  width: min(60vw, 44vh);
   aspect-ratio: 1;
   transform: translate(-50%, -55%);
   border: 2px dashed rgba(255, 255, 255, 0.45);
