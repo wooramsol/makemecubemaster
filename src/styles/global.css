@@ -178,13 +178,33 @@ body,
 }
 
 .scanned-faces-bar-title {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.75);
   text-align: center;
+}
+
+.scanned-faces-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.scanned-faces-flip {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .scanned-faces-bar-grid {
@@ -214,7 +234,6 @@ body,
   padding: 3px;
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.45);
-  transform: scaleX(-1);
 }
 
 .face-color-grid--mini {
@@ -232,7 +251,7 @@ body,
 }
 
 .face-color-grid--placeholder {
-  transform: scaleX(-1);
+  /* placeholder grid matches live grid layout */
 }
 
 .face-grid-mini-cell {

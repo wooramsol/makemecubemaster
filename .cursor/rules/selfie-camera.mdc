@@ -10,7 +10,7 @@ This app uses the **front camera** with a **mirrored video preview** (`scaleX(-1
 Vision pipeline rules:
 
 1. Draw video with `drawCameraFrame()` — never flip the canvas.
-2. Store **raw** sensor-order colors from `sampleGuideRegionColors` — do **not** call `toSelfiePreviewColors()` in the detect pipeline.
-3. Mirror face grids **only** in `FaceColorGrid` via CSS `scaleX(-1)` so live scan overlay and result bar match the mirrored video.
+2. Store **raw** sensor-order colors from detection.
+3. Mirror face grids in `FaceColorGrid` via `mirrorFaceCellsHorizontally` when `selfieDisplayMirror` is on (default off; user can tap Flip preview).
 4. Only capture when `identifyFaceFromCenter()` identifies the center sticker.
 5. Solver orientation search (`allFaceOrientations`) handles rotation and mirror on stored raw colors.
