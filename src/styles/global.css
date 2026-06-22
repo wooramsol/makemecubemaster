@@ -28,6 +28,20 @@ body,
   width: 100%;
   height: 100%;
   background: #000;
+  position: relative;
+}
+
+.app-version {
+  position: absolute;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  z-index: 40;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  user-select: none;
 }
 
 .viewport {

@@ -11,6 +11,7 @@ import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
+import { APP_VERSION } from './lib/appVersion';
 import './styles/global.css';
 
 export default function App() {
@@ -203,6 +204,9 @@ export default function App() {
           </div>
         )}
       </div>
+      <p className="app-version" aria-hidden="true">
+        v{APP_VERSION}
+      </p>
     </main>
   );
 }
