@@ -39,7 +39,7 @@ export function ColorLearnOverlay({
   return (
     <div className="color-learn-overlay" aria-live="polite">
       <GuideFrame rect={guideRect} />
-      <GuideSpot rect={spotRect} />
+      <GuideSpot rect={spotRect} strokeColor={COLOR_HEX[target]} />
 
       <div className="color-learn-panel">
         <p className="color-learn-target" style={{ color: COLOR_HEX[target] }}>

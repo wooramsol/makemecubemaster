@@ -10,9 +10,8 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
   L: 'O',
 };
 
-/** Same colors must hold this long before a face is captured */
-export const STABLE_DURATION_MS = 3000;
-const FRAME_MATCH_TOLERANCE = 2;
+/** Same face must stay in view this long before capture */
+export const STABLE_DURATION_MS = 2000;
 const MAX_READINGS_PER_FACE = 10;
 
 export interface LiveScanSnapshot {
@@ -23,14 +22,6 @@ export interface LiveScanSnapshot {
   stableTarget: number;
   isComplete: boolean;
   newlyCaptured: FaceId | null;
-}
-
-function colorsNearlyEqual(a: StickerColor[], b: StickerColor[]): boolean {
-  let diff = 0;
-  for (let i = 0; i < 9; i++) {
-    if (a[i] !== b[i]) diff++;
-  }
-  return diff <= FRAME_MATCH_TOLERANCE;
 }
 
 function majorityVoteCells(readings: StickerColor[][]): StickerColor[] {
@@ -84,14 +75,12 @@ export class LiveFaceAccumulator {
   private readings = new Map<FaceId, StickerColor[][]>();
   private stableSinceMs: number | null = null;
   private lastFaceId: FaceId | null = null;
-  private lastColors: StickerColor[] | null = null;
 
   reset(): void {
     this.faces.clear();
     this.readings.clear();
     this.stableSinceMs = null;
     this.lastFaceId = null;
-    this.lastColors = null;
   }
 
   update(colors: StickerColor[] | null, nowMs = Date.now()): LiveScanSnapshot {
@@ -109,7 +98,6 @@ export class LiveFaceAccumulator {
     if (!colors || colors.length !== 9) {
       this.stableSinceMs = null;
       this.lastFaceId = null;
-      this.lastColors = null;
       return empty;
     }
 
@@ -117,22 +105,26 @@ export class LiveFaceAccumulator {
     if (!faceId) {
       this.stableSinceMs = null;
       this.lastFaceId = null;
-      this.lastColors = null;
       return { ...empty, currentFace: null };
     }
 
-    const isSameReading =
-      faceId === this.lastFaceId &&
-      this.lastColors !== null &&
-      colorsNearlyEqual(colors, this.lastColors);
-
-    if (isSameReading) {
-      if (this.stableSinceMs === null) {
-        this.stableSinceMs = nowMs;
-      }
-    } else {
+    // Already captured — wait until user shows a different face
+    if (this.faces.has(faceId)) {
       this.lastFaceId = faceId;
-      this.lastColors = [...colors];
+      this.stableSinceMs = null;
+      return {
+        ...empty,
+        currentFace: faceId,
+        stableProgress: 0,
+        stableTarget: stableTargetSec,
+      };
+    }
+
+    // Timer tracks face identity only — peripheral color jitter must not reset it
+    if (faceId !== this.lastFaceId) {
+      this.lastFaceId = faceId;
+      this.stableSinceMs = nowMs;
+    } else if (this.stableSinceMs === null) {
       this.stableSinceMs = nowMs;
     }
 
@@ -159,7 +151,6 @@ export class LiveFaceAccumulator {
 
       this.stableSinceMs = null;
       this.lastFaceId = null;
-      this.lastColors = null;
     }
 
     return {
