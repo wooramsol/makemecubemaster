@@ -135,6 +135,7 @@ export default function App() {
               phase={state.phase}
               knownFaces={state.knownFaces}
               progress={state.liveScanProgress}
+              needsNewFace={state.detectionFeedback.status === 'rotate'}
             />
 
             {state.phase === 'solving' && currentMove && (

@@ -66,7 +66,8 @@ export type DetectionStatus =
   | 'searching'
   | 'detected'
   | 'stabilizing'
-  | 'captured';
+  | 'captured'
+  | 'rotate';
 
 export interface DetectionFeedback {
   status: DetectionStatus;

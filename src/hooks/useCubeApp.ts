@@ -147,6 +147,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       stableProgress: number,
       stableTarget: number,
       captured: boolean,
+      needsNewFace: boolean,
     ): DetectionFeedback => {
       const { detectedCenter, colorCounts } = getCalibrationFeedback(colors);
       const readable = isColorsReadable(colors);
@@ -154,6 +155,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       let status: DetectionStatus = 'searching';
       if (!hasPose || !readable) {
         status = 'searching';
+      } else if (needsNewFace) {
+        status = 'rotate';
       } else if (captured) {
         status = 'captured';
       } else if (stableProgress > 0 && stableProgress < stableTarget) {
@@ -358,7 +361,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       const hasPose = Boolean(result.pose);
       setState((prev) => ({
         ...prev,
-        detectionFeedback: buildFeedback(hasPose, colors, 0, 0, false),
+        detectionFeedback: buildFeedback(hasPose, colors, 0, 0, false, false),
       }));
       return;
     }
@@ -440,6 +443,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           snapshot.stableProgress,
           snapshot.stableTarget,
           captured,
+          snapshot.needsNewFace,
         ),
       }));
       return;

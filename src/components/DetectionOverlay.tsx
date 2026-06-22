@@ -9,6 +9,7 @@ const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   detected: 'OK',
   stabilizing: '…',
   captured: '✓',
+  rotate: 'Rotate',
 };
 
 interface DetectionOverlayProps {
@@ -30,6 +31,9 @@ export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOver
       <div className="scan-ui-panel scan-ui-panel--compact">
         <div className={`detection-status ${feedback.status}`}>
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
+          {feedback.status === 'rotate' && (
+            <span className="status-progress">New face</span>
+          )}
           {feedback.status === 'stabilizing' && (
             <span className="status-progress">
               {feedback.stableProgress.toFixed(1)}/{feedback.stableTarget}s

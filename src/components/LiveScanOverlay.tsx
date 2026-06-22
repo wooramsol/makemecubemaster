@@ -4,9 +4,15 @@ interface LiveScanOverlayProps {
   phase: AppPhase;
   knownFaces: FaceId[];
   progress: number;
+  needsNewFace?: boolean;
 }
 
-export function LiveScanOverlay({ phase, knownFaces, progress }: LiveScanOverlayProps) {
+export function LiveScanOverlay({
+  phase,
+  knownFaces,
+  progress,
+  needsNewFace = false,
+}: LiveScanOverlayProps) {
   if (phase !== 'liveScan') return null;
 
   return (
@@ -15,6 +21,9 @@ export function LiveScanOverlay({ phase, knownFaces, progress }: LiveScanOverlay
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">{knownFaces.length} / 6</p>
+      {needsNewFace && (
+        <p className="calibration-hint">Show a different face</p>
+      )}
     </div>
   );
 }
