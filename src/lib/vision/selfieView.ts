@@ -4,19 +4,26 @@ import type { FaceId, StickerColor } from '../../types';
 export const SELFIE_CAMERA_MODE = true;
 
 /**
- * Draw the raw camera frame (no horizontal flip). Mirror for the selfie preview
- * is applied in UI components via mirrorFaceCellsForSelfie.
+ * Draw the video frame horizontally flipped so pixel sampling matches the
+ * mirrored on-screen preview (CSS scaleX(-1) on `.camera-feed`).
+ *
+ * All face color arrays downstream use this preview coordinate system.
+ * Do not mirror again in UI components.
  */
-export function drawCameraFrame(
+export function drawSelfieVideoFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   width: number,
   height: number,
 ): void {
+  ctx.save();
+  ctx.translate(width, 0);
+  ctx.scale(-1, 1);
   ctx.drawImage(video, 0, 0, width, height);
+  ctx.restore();
 }
 
-/** Mirror a 3×3 face grid left-right (camera frame → on-screen selfie preview). */
+/** Mirror a 3×3 face grid left-right. Used for duplicate-face matching only. */
 export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[] {
   if (colors.length !== 9) return colors;
 
@@ -27,14 +34,6 @@ export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColo
     }
   }
   return mirrored;
-}
-
-/**
- * Mirror a 3×3 face grid for selfie preview display (CSS scaleX(-1) on video).
- * Vision pipeline keeps raw camera frame order; apply this only in UI components.
- */
-export function mirrorFaceCellsForSelfie(colors: StickerColor[]): StickerColor[] {
-  return mirrorFaceCellsHorizontally(colors);
 }
 
 /** Deep copy so solver work cannot mutate the UI snapshot. */

@@ -149,6 +149,7 @@ export default function App() {
               knownFaces={state.knownFaces}
               progress={state.liveScanProgress}
               needsNewFace={state.detectionFeedback.status === 'rotate'}
+              needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
             {state.phase === 'solving' && currentMove && (

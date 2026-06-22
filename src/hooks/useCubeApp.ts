@@ -21,7 +21,7 @@ import {
   type ColorLearnSample,
 } from '../lib/vision/colorReference';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
-import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
+import { LiveFaceAccumulator, canonicalizeScannedFaces } from '../lib/vision/liveFaceScan';
 import { cloneFaceColorsMap } from '../lib/vision/selfieView';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 
@@ -49,6 +49,7 @@ export interface CubeAppState {
   colorLearnReady: boolean;
   colorLearnError: string | null;
   colorsCalibrated: boolean;
+  liveScanNeedsClearerCenter: boolean;
 }
 
 const initialFeedback: DetectionFeedback = {
@@ -76,6 +77,7 @@ const initialState: CubeAppState = {
   colorLearnReady: false,
   colorLearnError: null,
   colorsCalibrated: false,
+  liveScanNeedsClearerCenter: false,
 };
 
 export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
@@ -226,6 +228,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       currentVisibleFace: null,
       liveScanProgress: 0,
       detectionFeedback: initialFeedback,
+      liveScanNeedsClearerCenter: false,
     }));
     frameProcessor.current?.disableTracking();
   }, []);
@@ -243,6 +246,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       currentVisibleFace: null,
       liveScanProgress: 0,
       detectionFeedback: initialFeedback,
+      liveScanNeedsClearerCenter: false,
     }));
     frameProcessor.current?.disableTracking();
   }, []);
@@ -435,7 +439,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
         solveTriggeredRef.current = true;
-        const snapshotFaces = cloneFaceColorsMap(snapshot.faces);
+        const snapshotFaces = canonicalizeScannedFaces(cloneFaceColorsMap(snapshot.faces));
         const scannedRecord = scannedFacesFromMap(snapshotFaces);
         const captures = [...snapshotFaces.values()].map((colors) => [...colors]);
 
@@ -483,9 +487,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         ...prev,
         currentPose: result.pose,
         knownFaces: snapshot.knownFaces,
-        scannedFaceColors: scannedFacesFromMap(snapshot.faces),
+        scannedFaceColors: scannedFacesFromMap(
+          canonicalizeScannedFaces(snapshot.faces),
+        ),
         currentVisibleFace: snapshot.currentFace,
         liveScanProgress: snapshot.knownFaces.length / 6,
+        liveScanNeedsClearerCenter: snapshot.needsClearerCenter,
         detectionFeedback: buildFeedback(
           hasPose,
           colors,
@@ -556,6 +563,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colorLearnError: null,
       colorsCalibrated: false,
       detectionFeedback: initialFeedback,
+      liveScanNeedsClearerCenter: false,
     }));
   }, [clearSolveTimeout]);
 

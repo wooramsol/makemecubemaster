@@ -168,8 +168,8 @@ export function detectCubeFace(
     return null;
   }
 
-  // Selfie mode: sample the fixed center guide on the raw camera canvas.
-  // UI mirrors cell grids to match the CSS-mirrored video preview.
+  // Colors are sampled from the selfie-mirrored process canvas (drawSelfieVideoFrame).
+  // Cell order already matches the on-screen preview — do not mirror again.
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
   const pose = estimatePoseFromCorners(corners ?? guideToCorners(guide), frameWidth, frameHeight);
   pose.confidence = corners ? 0.85 : 0.7;
