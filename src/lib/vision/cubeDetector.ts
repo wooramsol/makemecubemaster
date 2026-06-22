@@ -1,6 +1,5 @@
 import type { DetectedFace, Point2D, StickerColor } from '../../types';
 import type { OpenCVMat } from '../../types/opencv';
-import { sampleFaceColors } from './colorClassifier';
 import {
   isRegionCubeLike,
   measureColorVariance,
@@ -8,8 +7,6 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { getGuideSquare, guideToCorners, translateCorners } from './roi';
-
-const WARP_SIZE = 256;
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
   const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -163,22 +160,22 @@ export function detectCubeFace(
   frameWidth: number,
   frameHeight: number,
 ): DetectedFace | null {
+  const guide = getGuideSquare(frameWidth, frameHeight);
+  const colors = sampleGuideRegionColors(sourceCanvas, guide);
+  const variance = measureColorVariance(sourceCanvas, guide);
+
+  if (!isRegionCubeLike(colors, variance)) {
+    return null;
+  }
+
+  // Selfie mode: always sample the fixed center guide grid so every face uses the
+  // same orientation as the mirrored preview. OpenCV warp can flip left/right
+  // when contour corners are detected on later faces.
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
+  const pose = estimatePoseFromCorners(corners ?? guideToCorners(guide), frameWidth, frameHeight);
+  pose.confidence = corners ? 0.85 : 0.7;
 
-  if (corners) {
-    const colors = warpAndSampleColors(sourceCanvas, corners);
-    const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight);
-    return { colors, pose };
-  }
-
-  const guided = tryGuidedDetect(sourceCanvas, frameWidth, frameHeight);
-  if (guided) {
-    const pose = estimatePoseFromCorners(guided.corners, frameWidth, frameHeight);
-    pose.confidence = 0.7;
-    return { colors: guided.colors, pose };
-  }
-
-  return null;
+  return { colors, pose };
 }
 
 export function createGrayMat(sourceCanvas: HTMLCanvasElement): import('../../types/opencv').OpenCVMat {
@@ -188,52 +185,4 @@ export function createGrayMat(sourceCanvas: HTMLCanvasElement): import('../../ty
   cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
   src.delete();
   return gray;
-}
-
-function warpAndSampleColors(
-  sourceCanvas: HTMLCanvasElement,
-  corners: [Point2D, Point2D, Point2D, Point2D],
-): StickerColor[] {
-  if (!window.cv?.Mat) {
-    const guide = getGuideSquare(sourceCanvas.width, sourceCanvas.height);
-    return sampleGuideRegionColors(sourceCanvas, guide);
-  }
-
-  try {
-    const cv = window.cv;
-    const src = cv.imread(sourceCanvas);
-    const rgb = new cv.Mat();
-    cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
-
-    const srcTri = cv.matFromArray(4, 1, cv.CV_32FC1, [
-      corners[0].x, corners[0].y,
-      corners[1].x, corners[1].y,
-      corners[2].x, corners[2].y,
-      corners[3].x, corners[3].y,
-    ]);
-    const dstTri = cv.matFromArray(4, 1, cv.CV_32FC1, [
-      0, 0, WARP_SIZE, 0, WARP_SIZE, WARP_SIZE, 0, WARP_SIZE,
-    ]);
-    const M = cv.getPerspectiveTransform(srcTri, dstTri);
-    const dst = new cv.Mat();
-    cv.warpPerspective(rgb, dst, M, new cv.Size(WARP_SIZE, WARP_SIZE));
-
-    const warpCanvas = document.createElement('canvas');
-    warpCanvas.width = WARP_SIZE;
-    warpCanvas.height = WARP_SIZE;
-    cv.imshow(warpCanvas, dst);
-    const ctx = warpCanvas.getContext('2d', { willReadFrequently: true });
-    const colors = ctx ? sampleFaceColors(ctx, WARP_SIZE, WARP_SIZE) : [];
-
-    src.delete();
-    rgb.delete();
-    srcTri.delete();
-    dstTri.delete();
-    M.delete();
-    dst.delete();
-
-    return colors.length === 9 ? colors : sampleGuideRegionColors(sourceCanvas, getGuideSquare(sourceCanvas.width, sourceCanvas.height));
-  } catch {
-    return sampleGuideRegionColors(sourceCanvas, getGuideSquare(sourceCanvas.width, sourceCanvas.height));
-  }
 }
