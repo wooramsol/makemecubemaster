@@ -5,12 +5,20 @@ import { ARRenderer } from '../lib/three/arRenderer';
 interface AROverlayProps {
   pose: CubePose | null;
   move: Move | null;
+  rotationProgress: number;
   width: number;
   height: number;
   active: boolean;
 }
 
-export function AROverlay({ pose, move, width, height, active }: AROverlayProps) {
+export function AROverlay({
+  pose,
+  move,
+  rotationProgress,
+  width,
+  height,
+  active,
+}: AROverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ARRenderer | null>(null);
 
@@ -34,6 +42,10 @@ export function AROverlay({ pose, move, width, height, active }: AROverlayProps)
   useEffect(() => {
     rendererRef.current?.setMove(move);
   }, [move]);
+
+  useEffect(() => {
+    rendererRef.current?.setRotationProgress(rotationProgress);
+  }, [rotationProgress]);
 
   useEffect(() => {
     if (!active) return;

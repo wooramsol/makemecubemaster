@@ -74,7 +74,7 @@ export class OpticalFlowTracker {
     }
 
     this.trackedCorners = updated as [Point2D, Point2D, Point2D, Point2D];
-    this.lostFrames++;
+    this.lostFrames = 0;
     if (this.lostFrames > MAX_LOST_FRAMES) {
       this.reset();
       return null;

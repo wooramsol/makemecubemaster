@@ -865,6 +865,13 @@ body,
   }
 }
 
+.solving-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+}
+
 .solving-banner {
   position: absolute;
   bottom: max(28px, env(safe-area-inset-bottom));
@@ -877,7 +884,13 @@ body,
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   pointer-events: none;
-  z-index: 8;
+  min-width: min(92vw, 320px);
+}
+
+.solving-description {
+  font-size: 14px;
+  opacity: 0.85;
+  margin-bottom: 6px;
 }
 
 .solving-move {
@@ -890,4 +903,42 @@ body,
 .solving-hint {
   font-size: 13px;
   opacity: 0.75;
+}
+
+.solving-hint--wrong {
+  color: #ff8a80;
+  opacity: 1;
+}
+
+.solving-progress {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.solving-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: #ffffff;
+  transition: width 0.12s linear;
+}
+
+.solving-skip {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  pointer-events: auto;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.solving-skip:active {
+  background: rgba(255, 255, 255, 0.15);
 }

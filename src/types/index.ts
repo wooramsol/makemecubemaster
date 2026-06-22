@@ -78,10 +78,20 @@ export interface DetectionFeedback {
   cellColors: StickerColor[];
 }
 
+export type SolvingTrackingStatus = 'searching' | 'locked' | 'lost';
+
+export interface SolvingFeedback {
+  tracking: SolvingTrackingStatus;
+  rotationProgress: number;
+  wrongMove: Move | null;
+}
+
 export interface FrameResult {
   pose: CubePose | null;
   detectedFace: DetectedFace | null;
   rotationMove: Move | null;
+  rotationProgress: number;
+  wrongMove: Move | null;
 }
 
 export interface CameraIntrinsics {

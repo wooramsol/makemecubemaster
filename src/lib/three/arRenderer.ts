@@ -3,7 +3,6 @@ import type { CubePose, Move } from '../../types';
 import { FACE_NORMALS, isDoubleMove, isPrimeMove, moveAngle, moveFace } from '../cube/moves';
 
 const ARROW_COLOR = 0xffffff;
-const TRACE_SPEED = 0.022;
 
 export class ARRenderer {
   private renderer: THREE.WebGLRenderer;
@@ -54,11 +53,15 @@ export class ARRenderer {
     this.rebuildArrow(move);
   }
 
-  tick(): void {
-    if (!this.currentMove) return;
-    this.traceProgress += TRACE_SPEED;
-    if (this.traceProgress > 1.05) this.traceProgress = 0;
+  setRotationProgress(progress: number): void {
+    const clamped = Math.max(0, Math.min(1, progress));
+    if (Math.abs(clamped - this.traceProgress) < 0.008) return;
+    this.traceProgress = clamped;
     this.updateTrace();
+  }
+
+  tick(): void {
+    // Trace progress is driven by live rotation via setRotationProgress.
   }
 
   render(pose: CubePose | null): void {

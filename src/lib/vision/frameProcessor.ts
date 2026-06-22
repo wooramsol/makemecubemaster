@@ -1,10 +1,20 @@
-import type { CubePose, DetectedFace, FrameResult, StickerColor } from '../../types';
+import type { CubePose, DetectedFace, FrameResult, Move, StickerColor } from '../../types';
 import { createGrayMat, detectCubeCorners, detectCubeFace } from './cubeDetector';
 import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
 import { drawCameraFrame } from './selfieView';
+
+const LOST_TRACKING_THRESHOLD = 30;
+
+const EMPTY_RESULT: FrameResult = {
+  pose: null,
+  detectedFace: null,
+  rotationMove: null,
+  rotationProgress: 0,
+  wrongMove: null,
+};
 
 export class FrameProcessor {
   private rotationDetector = new RotationDetector();
@@ -13,6 +23,7 @@ export class FrameProcessor {
   private processCanvas: HTMLCanvasElement;
   private processCtx: CanvasRenderingContext2D;
   private lastColors: StickerColor[] | null = null;
+  private expectedMove: Move | null = null;
 
   constructor() {
     this.processCanvas = document.createElement('canvas');
@@ -32,6 +43,12 @@ export class FrameProcessor {
     this.rotationDetector.reset();
     this.flowTracker.reset();
     this.lastColors = null;
+  }
+
+  setExpectedMove(move: Move | null): void {
+    if (move === this.expectedMove) return;
+    this.expectedMove = move;
+    this.rotationDetector.setExpectedMove(move);
   }
 
   syncPose(pose: CubePose): void {
@@ -65,7 +82,7 @@ export class FrameProcessor {
     const height = video.videoHeight;
 
     if (!width || !height) {
-      return { pose: null, detectedFace: null, rotationMove: null };
+      return { ...EMPTY_RESULT };
     }
 
     this.processCanvas.width = width;
@@ -78,17 +95,23 @@ export class FrameProcessor {
       }
       return this.processDetectionOnly(width, height);
     } catch {
-      return { pose: null, detectedFace: null, rotationMove: null };
+      return { ...EMPTY_RESULT };
     }
   }
 
   private processDetectionOnly(width: number, height: number): FrameResult {
     const detectedFace = detectCubeFace(this.processCanvas, width, height);
     if (!detectedFace) {
-      return { pose: null, detectedFace: null, rotationMove: null };
+      return { ...EMPTY_RESULT };
     }
     this.lastColors = detectedFace.colors;
-    return { pose: detectedFace.pose, detectedFace, rotationMove: null };
+    return {
+      pose: detectedFace.pose,
+      detectedFace,
+      rotationMove: null,
+      rotationProgress: 0,
+      wrongMove: null,
+    };
   }
 
   private processWithTracking(width: number, height: number): FrameResult {
@@ -98,7 +121,7 @@ export class FrameProcessor {
     gray.delete();
 
     if (!corners) {
-      return { pose: null, detectedFace: null, rotationMove: null };
+      return { ...EMPTY_RESULT };
     }
 
     let colors = this.lastColors;
@@ -111,17 +134,26 @@ export class FrameProcessor {
     }
 
     const pose = estimatePoseFromCorners(corners, width, height);
+    const lostFrames = this.flowTracker.getLostFrames();
     pose.confidence = detectedCorners
       ? 0.85
-      : Math.max(0.35, 0.85 - this.flowTracker.getLostFrames() * 0.01);
+      : Math.max(0.35, 0.85 - lostFrames * 0.01);
 
-    const detectedFace: DetectedFace | null = colors
-      ? { colors, pose }
-      : null;
+    const detectedFace: DetectedFace | null = colors ? { colors, pose } : null;
 
-    const rotationMove = this.rotationDetector.update(pose.rotationMatrix);
+    const rotation = this.rotationDetector.update(pose.rotationMatrix);
 
-    return { pose, detectedFace, rotationMove };
+    return {
+      pose,
+      detectedFace,
+      rotationMove: rotation.completedMove,
+      rotationProgress: rotation.progress,
+      wrongMove: rotation.wrongMove,
+    };
+  }
+
+  isTrackingLost(): boolean {
+    return this.flowTracker.getLostFrames() > LOST_TRACKING_THRESHOLD;
   }
 
   readStableFace(

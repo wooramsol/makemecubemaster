@@ -5,6 +5,7 @@ import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
+import { SolvingOverlay } from './components/SolvingOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -25,6 +26,7 @@ export default function App() {
     retryColorLearn,
     startTracking,
     stopTracking,
+    skipCurrentMove,
   } = useCubeApp(videoRef);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -110,6 +112,7 @@ export default function App() {
             <AROverlay
               pose={state.currentPose}
               move={currentMove}
+              rotationProgress={state.solvingFeedback.rotationProgress}
               width={dimensions.width}
               height={dimensions.height}
               active={showAr}
@@ -153,11 +156,12 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
-            {state.phase === 'solving' && currentMove && (
-              <div className="solving-banner">
-                <p className="solving-move">{currentMove}</p>
-              </div>
-            )}
+            <SolvingOverlay
+              visible={state.phase === 'solving' && Boolean(currentMove)}
+              currentMove={currentMove!}
+              feedback={state.solvingFeedback}
+              onSkip={skipCurrentMove}
+            />
 
             {state.phase === 'solved' && (
               <div className="solved-banner">
