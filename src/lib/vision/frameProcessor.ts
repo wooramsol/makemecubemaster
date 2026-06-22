@@ -4,6 +4,7 @@ import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
+import { drawSelfieVideoFrame } from './selfieView';
 
 export class FrameProcessor {
   private rotationDetector = new RotationDetector();
@@ -47,7 +48,7 @@ export class FrameProcessor {
     if (!width || !height) return false;
     this.processCanvas.width = width;
     this.processCanvas.height = height;
-    this.processCtx.drawImage(video, 0, 0, width, height);
+    drawSelfieVideoFrame(this.processCtx, video, width, height);
     return true;
   }
 
@@ -69,7 +70,7 @@ export class FrameProcessor {
 
     this.processCanvas.width = width;
     this.processCanvas.height = height;
-    this.processCtx.drawImage(video, 0, 0, width, height);
+    drawSelfieVideoFrame(this.processCtx, video, width, height);
 
     try {
       if (this.trackingEnabled) {

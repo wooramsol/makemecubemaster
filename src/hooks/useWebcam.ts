@@ -39,7 +39,7 @@ export function useWebcam() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: { ideal: 'environment' },
+          facingMode: { ideal: 'user' },
           width: { ideal: 1280 },
           height: { ideal: 720 },
           frameRate: { ideal: 60 },

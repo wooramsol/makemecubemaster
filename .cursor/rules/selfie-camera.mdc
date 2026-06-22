@@ -1,0 +1,15 @@
+---
+description: Front/selfie camera assumptions for vision and UI
+alwaysApply: true
+---
+
+# Selfie camera only
+
+This app always uses the **front (user-facing) camera** with a **mirrored preview** (`scaleX(-1)` on `.camera-feed`).
+
+Vision pipeline rules:
+
+1. Draw video to the processing canvas with `drawSelfieVideoFrame()` so color sampling matches what the user sees.
+2. Do **not** mirror face cell arrays again in UI — pipeline output already matches the preview.
+3. `facingMode` must stay `user` in `useWebcam.ts`.
+4. AR overlay stays mirrored to match the preview.

@@ -97,7 +97,10 @@ export default function App() {
 
   return (
     <main className="app">
-      <div className="viewport" ref={viewportRef}>
+      <div
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}`}
+        ref={viewportRef}
+      >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
 
         {!isBooting && !hasError && (

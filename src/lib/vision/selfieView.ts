@@ -1,10 +1,27 @@
 import type { StickerColor } from '../../types';
 
+/** This app is selfie-only: front camera + mirrored preview. */
+export const SELFIE_CAMERA_MODE = true;
+
 /**
- * 전면 카메라 셀카 미러(scaleX(-1)) 화면에 맞게 9칸 색상 배열을 좌우 반전.
- * 비전 파이프라인은 원본 프레임 순서를 유지하고, UI 표시에만 적용한다.
+ * Draw the video frame horizontally flipped so pixel sampling matches the
+ * mirrored on-screen preview (CSS scaleX(-1)).
  */
-export function mirrorFaceCellsForSelfie(colors: StickerColor[]): StickerColor[] {
+export function drawSelfieVideoFrame(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+): void {
+  ctx.save();
+  ctx.translate(width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, width, height);
+  ctx.restore();
+}
+
+/** Mirror a 3×3 face grid left-right (camera frame → preview coordinates). */
+export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[] {
   if (colors.length !== 9) return colors;
 
   const mirrored: StickerColor[] = [];

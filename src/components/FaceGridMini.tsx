@@ -1,6 +1,5 @@
 import type { StickerColor } from '../types';
 import { COLOR_HEX } from '../lib/vision/colorReference';
-import { mirrorFaceCellsForSelfie } from '../lib/vision/selfieView';
 
 interface FaceGridMiniProps {
   colors: StickerColor[] | null;
@@ -10,7 +9,7 @@ interface FaceGridMiniProps {
 
 export function FaceGridMini({ colors, label, empty = false }: FaceGridMiniProps) {
   const hasColors = colors && colors.length === 9;
-  const cells = hasColors ? mirrorFaceCellsForSelfie(colors) : [];
+  const cells = hasColors ? colors : [];
 
   return (
     <div className={`face-grid-mini ${empty ? 'face-grid-mini--empty' : ''}`}>

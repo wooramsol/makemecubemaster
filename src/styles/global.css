@@ -39,6 +39,7 @@ body,
   --guide-size: min(68vw, 46vh);
   --guide-top: calc(50% - var(--guide-size) * 0.55);
   --guide-bottom: calc(50% + var(--guide-size) * 0.45);
+  --scanned-bar-height: 52px;
 }
 
 .camera-feed {
@@ -70,6 +71,7 @@ body,
   top: max(20px, env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
+  z-index: 11;
   padding: 8px 16px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.45);
@@ -79,6 +81,10 @@ body,
   font-weight: 500;
   letter-spacing: 0.02em;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.viewport--scanning .step-indicator {
+  top: max(calc(var(--scanned-bar-height) + 8px), calc(env(safe-area-inset-top) + var(--scanned-bar-height)));
 }
 
 .calibration-overlay {
@@ -144,33 +150,36 @@ body,
 
 .scanned-faces-bar {
   position: absolute;
-  top: max(10px, env(safe-area-inset-top));
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 12;
-  width: min(96vw, 420px);
-  padding: 8px 10px 10px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.62);
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  width: 100%;
+  padding: max(4px, env(safe-area-inset-top)) 8px 6px;
+  border-radius: 0 0 14px 14px;
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   pointer-events: none;
 }
 
 .scanned-faces-bar-title {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 0 0 4px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.75);
+  text-align: center;
 }
 
 .scanned-faces-bar-grid {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .face-grid-mini {
@@ -360,10 +369,12 @@ body,
 
 .scan-ui-panel {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: max(12px, env(safe-area-inset-top));
-  width: min(92vw, 360px);
+  left: auto;
+  right: max(10px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-52%);
+  width: auto;
+  max-width: min(40vw, 120px);
   display: flex;
   flex-direction: column;
   align-items: center;
