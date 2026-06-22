@@ -138,7 +138,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             ...s,
             phase: 'error',
             error:
-              'Solve timed out. Scan order and direction do not matter — try again in steady light.',
+              'Solve timed out. Scan order and direction do not matter — please try again.',
           };
         });
       }, 60000);

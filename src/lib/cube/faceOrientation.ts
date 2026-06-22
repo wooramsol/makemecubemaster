@@ -1,6 +1,7 @@
 import type { FaceId, StickerColor } from '../../types';
 import { buildFaceletFromMap } from './state';
 import { isFaceletColorBalanced } from './faceletValidate';
+import { isFaceletStructurallyValid } from './faceletStructure';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
@@ -111,7 +112,11 @@ export function findSolvableFacelet(
     }
 
     const facelet = buildFaceletFromMap(trial);
-    if (isFaceletColorBalanced(facelet) && isSolvableFacelet(facelet)) {
+    if (
+      isFaceletColorBalanced(facelet) &&
+      isFaceletStructurallyValid(facelet) &&
+      isSolvableFacelet(facelet)
+    ) {
       return facelet;
     }
 
