@@ -13,8 +13,8 @@ export function drawCameraFrame(
 }
 
 /**
- * Map raw guide-grid colors to the same left/right order as the mirrored selfie
- * video (CSS scaleX(-1) on `.camera-feed`). Apply exactly once when sampling.
+ * Map raw guide-grid colors to mirrored selfie preview order.
+ * Prefer storing raw colors and mirroring in `FaceColorGrid` instead.
  */
 export function toSelfiePreviewColors(colors: StickerColor[]): StickerColor[] {
   if (colors.length !== 9) return colors;

@@ -207,13 +207,32 @@ body,
   opacity: 0.45;
 }
 
-.face-grid-mini-cells {
+.face-color-grid {
   display: grid;
+  grid-template-columns: repeat(3, 20px);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  transform: scaleX(-1);
+}
+
+.face-color-grid--mini {
   grid-template-columns: repeat(3, 11px);
   gap: 1px;
   padding: 2px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.45);
+}
+
+.face-color-grid--overlay {
+  grid-template-columns: repeat(3, 20px);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+}
+
+.face-color-grid--placeholder {
+  transform: scaleX(-1);
 }
 
 .face-grid-mini-cell {

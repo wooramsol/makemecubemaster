@@ -7,7 +7,6 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { getGuideSquare, guideToCorners, translateCorners } from './roi';
-import { SELFIE_CAMERA_MODE, toSelfiePreviewColors } from './selfieView';
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
   const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -162,15 +161,11 @@ export function detectCubeFace(
   frameHeight: number,
 ): DetectedFace | null {
   const guide = getGuideSquare(frameWidth, frameHeight);
-  let colors = sampleGuideRegionColors(sourceCanvas, guide);
+  const colors = sampleGuideRegionColors(sourceCanvas, guide);
   const variance = measureColorVariance(sourceCanvas, guide);
 
   if (!isRegionCubeLike(colors, variance)) {
     return null;
-  }
-
-  if (SELFIE_CAMERA_MODE) {
-    colors = toSelfiePreviewColors(colors);
   }
 
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
