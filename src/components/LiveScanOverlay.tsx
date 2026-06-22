@@ -21,6 +21,9 @@ export function LiveScanOverlay({
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">{knownFaces.length} / 6</p>
+      <p className="calibration-hint calibration-hint--muted">
+        Any face order · same tilt each time
+      </p>
       {needsNewFace && (
         <p className="calibration-hint">Show a different face</p>
       )}

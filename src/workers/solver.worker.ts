@@ -1,6 +1,8 @@
 import Cube from 'cubejs';
+import { findSolvableFacelet } from '../lib/cube/faceOrientation';
 import { isCubePhysicallySolvable } from '../lib/cube/solvability';
 import { parseMoves } from '../lib/cube/moves';
+import type { FaceId, StickerColor } from '../types';
 import type { SolverMessage, SolverResponse } from '../lib/cube/solverClient';
 
 let initialized = false;
@@ -12,8 +14,17 @@ function ensureInit(): void {
   }
 }
 
+function isSolvableFacelet(facelet: string): boolean {
+  const cube = Cube.fromString(facelet);
+  return isCubePhysicallySolvable(cube as never);
+}
+
+function facesFromRecord(record: Record<FaceId, StickerColor[]>): Map<FaceId, StickerColor[]> {
+  return new Map(Object.entries(record) as [FaceId, StickerColor[]][]);
+}
+
 const UNSOLVABLE_MESSAGE =
-  'Invalid cube state from scan. Re-scan in steady light and hold each face for 2 seconds.';
+  'Could not build a valid cube. Any face order is fine, but hold each face at the same angle — do not spin the face in your hand. Re-scan in steady light.';
 
 self.onmessage = (event: MessageEvent<SolverMessage>) => {
   const msg = event.data;
@@ -27,19 +38,25 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
 
     if (msg.type === 'solve') {
       ensureInit();
-      const cube = Cube.fromString(msg.facelet);
-      if (!isCubePhysicallySolvable(cube as never)) {
-        self.postMessage({
-          type: 'error',
-          message: UNSOLVABLE_MESSAGE,
-          id: msg.id,
-        } satisfies SolverResponse);
-        return;
+
+      let facelet = msg.facelet;
+      if (!isSolvableFacelet(facelet)) {
+        const corrected = findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet);
+        if (!corrected) {
+          self.postMessage({
+            type: 'error',
+            message: UNSOLVABLE_MESSAGE,
+            id: msg.id,
+          } satisfies SolverResponse);
+          return;
+        }
+        facelet = corrected;
       }
 
+      const cube = Cube.fromString(facelet);
       const algorithm = cube.solve();
       const moves = parseMoves(algorithm);
-      self.postMessage({ type: 'solution', moves, id: msg.id } satisfies SolverResponse);
+      self.postMessage({ type: 'solution', moves, facelet, id: msg.id } satisfies SolverResponse);
       return;
     }
 

@@ -109,6 +109,13 @@ body,
   margin-bottom: 8px;
 }
 
+.calibration-hint--muted {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.72;
+  margin-bottom: 4px;
+}
+
 .calibration-distance {
   font-size: 12px;
   opacity: 0.72;

@@ -1,13 +1,18 @@
-import type { Move } from '../../types';
+import type { FaceId, Move, StickerColor } from '../../types';
 
 export type SolverMessage =
   | { type: 'init' }
-  | { type: 'solve'; facelet: string; id: number }
+  | {
+      type: 'solve';
+      facelet: string;
+      scannedFaces: Record<FaceId, StickerColor[]>;
+      id: number;
+    }
   | { type: 'apply'; move: Move; facelet: string; id: number };
 
 export type SolverResponse =
   | { type: 'ready' }
-  | { type: 'solution'; moves: Move[]; id: number }
+  | { type: 'solution'; moves: Move[]; facelet: string; id: number }
   | { type: 'facelet'; facelet: string; id: number }
   | { type: 'error'; message: string; id?: number };
 

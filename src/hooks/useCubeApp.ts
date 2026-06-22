@@ -92,7 +92,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const requestSolve = useCallback(
-    (facelet: string, pose: CubePose) => {
+    (facelet: string, pose: CubePose, scannedFaces: Map<FaceId, StickerColor[]>) => {
       const worker = solverWorker.current;
       if (!worker) {
         setState((s) => ({
@@ -105,7 +105,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
       clearSolveTimeout();
       const id = ++requestId.current;
-      worker.postMessage({ type: 'solve', facelet, id });
+      worker.postMessage({
+        type: 'solve',
+        facelet,
+        scannedFaces: Object.fromEntries(scannedFaces) as Record<FaceId, StickerColor[]>,
+        id,
+      });
       frameProcessor.current?.syncPose(pose);
 
       solveTimeoutRef.current = setTimeout(() => {
@@ -239,6 +244,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         } else if (msg.type === 'solution') {
           if (msg.id !== requestId.current) return;
           clearSolveTimeout();
+          faceletRef.current = msg.facelet;
           solvingStartMs.current = Date.now();
           setState((s) => ({
             ...s,
@@ -445,7 +451,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             liveScanProgress: 1,
             currentPose: pose,
           }));
-          queueMicrotask(() => requestSolve(facelet, pose));
+          queueMicrotask(() => requestSolve(facelet, pose, reconciled));
         } catch (error) {
           setState((s) => ({
             ...s,
