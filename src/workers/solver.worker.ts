@@ -46,10 +46,19 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
     if (msg.type === 'solve') {
       ensureInit();
 
-      const facelet =
-        findSolvableCubeFromCaptures(msg.captures, isSolvableFacelet) ??
-        findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet) ??
-        (isSolvableFacelet(msg.facelet) ? msg.facelet : null);
+      let facelet: string | null = null;
+
+      if (isSolvableFacelet(msg.facelet)) {
+        facelet = msg.facelet;
+      }
+
+      if (!facelet) {
+        facelet = findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet);
+      }
+
+      if (!facelet) {
+        facelet = findSolvableCubeFromCaptures(msg.captures, isSolvableFacelet);
+      }
 
       if (!facelet) {
         self.postMessage({

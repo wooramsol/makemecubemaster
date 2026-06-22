@@ -151,17 +151,25 @@ export function findSolvableCubeFromCaptures(
     (a, b) => assignmentCost(captures, a) - assignmentCost(captures, b),
   );
 
-  for (const faceOrder of faceOrders) {
-    const trial = new Map<FaceId, StickerColor[]>();
-    for (let i = 0; i < 6; i++) {
-      trial.set(faceOrder[i]!, captures[i]!);
-    }
+  const tryOrders = (orders: FaceId[][]) => {
+    for (const faceOrder of orders) {
+      const trial = new Map<FaceId, StickerColor[]>();
+      for (let i = 0; i < 6; i++) {
+        trial.set(faceOrder[i]!, captures[i]!);
+      }
 
-    const facelet = findSolvableFacelet(trial, isSolvableFacelet);
-    if (facelet) {
-      return facelet;
+      const facelet = findSolvableFacelet(trial, isSolvableFacelet);
+      if (facelet) return facelet;
     }
-  }
+    return null;
+  };
 
-  return null;
+  const zeroCost = faceOrders.filter((order) => assignmentCost(captures, order) === 0);
+  const found = tryOrders(zeroCost);
+  if (found) return found;
+
+  const fallback = faceOrders
+    .filter((order) => assignmentCost(captures, order) > 0)
+    .slice(0, 24);
+  return tryOrders(fallback);
 }

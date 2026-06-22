@@ -11,6 +11,7 @@ Vision pipeline rules:
 
 1. Draw video with `drawCameraFrame()` — never flip the canvas.
 2. Store **raw** sensor-order colors from detection.
-3. Mirror face grids in `FaceColorGrid` via `mirrorFaceCellsHorizontally` when `selfieDisplayMirror` is on (default off; user can tap Flip preview).
-4. Only capture when `identifyFaceFromCenter()` identifies the center sticker.
-5. Solver orientation search (`allFaceOrientations`) handles rotation and mirror on stored raw colors.
+3. Live scan overlay (`DetectionOverlay`): `FaceColorGrid` with `orientation="mirror"`.
+4. Scanned result bar (`FaceGridMini`): `orientation="real"` (physical world, no mirror).
+5. Only capture when `identifyFaceFromCenter()` identifies the center sticker.
+6. Solver orientation search handles rotation and mirror on stored raw colors.

@@ -5,16 +5,15 @@ interface FaceGridMiniProps {
   colors: StickerColor[] | null;
   label: string;
   empty?: boolean;
-  displayMirror?: boolean;
 }
 
-export function FaceGridMini({ colors, label, empty = false, displayMirror }: FaceGridMiniProps) {
+export function FaceGridMini({ colors, label, empty = false }: FaceGridMiniProps) {
   const hasColors = colors && colors.length === 9;
 
   return (
     <div className={`face-grid-mini ${empty ? 'face-grid-mini--empty' : ''}`}>
       {hasColors ? (
-        <FaceColorGrid colors={colors} variant="mini" displayMirror={displayMirror} />
+        <FaceColorGrid colors={colors} variant="mini" orientation="real" />
       ) : (
         <div className="face-color-grid face-color-grid--mini face-color-grid--placeholder">
           {Array.from({ length: 9 }, (_, i) => (

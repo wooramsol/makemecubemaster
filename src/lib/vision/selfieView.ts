@@ -2,20 +2,6 @@ import type { FaceId, StickerColor } from '../../types';
 
 export const SELFIE_CAMERA_MODE = true;
 
-const STORAGE_KEY = 'selfieDisplayMirror';
-
-export function isSelfieDisplayMirrored(): boolean {
-  if (!SELFIE_CAMERA_MODE) return false;
-  const stored = sessionStorage.getItem(STORAGE_KEY);
-  if (stored === 'true') return true;
-  if (stored === 'false') return false;
-  return false;
-}
-
-export function setSelfieDisplayMirrored(mirrored: boolean): void {
-  sessionStorage.setItem(STORAGE_KEY, String(mirrored));
-}
-
 /** Raw camera pixels — never flip the canvas. */
 export function drawCameraFrame(
   ctx: CanvasRenderingContext2D,
@@ -37,12 +23,6 @@ export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColo
     }
   }
   return mirrored;
-}
-
-/** Apply when rendering face grids if display mirror is enabled. */
-export function mirrorFaceCellsForSelfie(colors: StickerColor[]): StickerColor[] {
-  if (!SELFIE_CAMERA_MODE || !isSelfieDisplayMirrored()) return colors;
-  return mirrorFaceCellsHorizontally(colors);
 }
 
 export function cloneFaceColorsMap(

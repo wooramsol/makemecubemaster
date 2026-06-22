@@ -15,10 +15,9 @@ interface DetectionOverlayProps {
   feedback: DetectionFeedback;
   visible: boolean;
   guideRect: GuideOverlayRect | null;
-  displayMirror?: boolean;
 }
 
-export function DetectionOverlay({ feedback, visible, guideRect, displayMirror }: DetectionOverlayProps) {
+export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOverlayProps) {
   if (!visible) return null;
 
   const showGrid = feedback.cellColors.length === 9;
@@ -44,7 +43,7 @@ export function DetectionOverlay({ feedback, visible, guideRect, displayMirror }
           <FaceColorGrid
             colors={feedback.cellColors as StickerColor[]}
             variant="overlay"
-            displayMirror={displayMirror}
+            orientation="mirror"
           />
         )}
       </div>

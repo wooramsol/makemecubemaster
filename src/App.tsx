@@ -12,7 +12,6 @@ import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
 import { APP_VERSION } from './lib/appVersion';
-import { isSelfieDisplayMirrored, setSelfieDisplayMirrored } from './lib/vision/selfieView';
 import './styles/global.css';
 
 export default function App() {
@@ -30,15 +29,6 @@ export default function App() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [selfieDisplayMirror, setSelfieDisplayMirror] = useState(isSelfieDisplayMirrored);
-
-  const toggleSelfieDisplayMirror = useCallback(() => {
-    setSelfieDisplayMirror((current) => {
-      const next = !current;
-      setSelfieDisplayMirrored(next);
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     void startWebcam();
@@ -146,15 +136,12 @@ export default function App() {
             <ScannedFacesBar
               visible={showScannedFaces}
               scannedFaces={state.scannedFaceColors}
-              displayMirror={selfieDisplayMirror}
-              onFlipPreview={toggleSelfieDisplayMirror}
             />
 
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
               guideRect={guideRect}
-              displayMirror={selfieDisplayMirror}
             />
 
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
@@ -185,8 +172,6 @@ export default function App() {
             <ScannedFacesBar
               visible={showScannedFaces}
               scannedFaces={state.scannedFaceColors}
-              displayMirror={selfieDisplayMirror}
-              onFlipPreview={toggleSelfieDisplayMirror}
             />
             <LoadingScreen overlay message="Computing…" />
           </>
@@ -204,8 +189,6 @@ export default function App() {
             <ScannedFacesBar
               visible={showScannedFaces}
               scannedFaces={state.scannedFaceColors}
-              displayMirror={selfieDisplayMirror}
-              onFlipPreview={toggleSelfieDisplayMirror}
             />
             <p>{state.error ?? webcamState.error}</p>
             <div className="error-actions">
