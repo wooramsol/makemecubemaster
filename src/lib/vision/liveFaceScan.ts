@@ -10,7 +10,8 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
   L: 'O',
 };
 
-const STABLE_FRAMES = 16;
+/** Same colors must hold this long before a face is captured */
+export const STABLE_DURATION_MS = 3000;
 const FRAME_MATCH_TOLERANCE = 2;
 const MAX_READINGS_PER_FACE = 10;
 
@@ -81,31 +82,32 @@ function finalizeFaceColors(colors: StickerColor[], faceId: FaceId): StickerColo
 export class LiveFaceAccumulator {
   private faces = new Map<FaceId, StickerColor[]>();
   private readings = new Map<FaceId, StickerColor[][]>();
-  private stableCount = 0;
+  private stableSinceMs: number | null = null;
   private lastFaceId: FaceId | null = null;
   private lastColors: StickerColor[] | null = null;
 
   reset(): void {
     this.faces.clear();
     this.readings.clear();
-    this.stableCount = 0;
+    this.stableSinceMs = null;
     this.lastFaceId = null;
     this.lastColors = null;
   }
 
-  update(colors: StickerColor[] | null): LiveScanSnapshot {
+  update(colors: StickerColor[] | null, nowMs = Date.now()): LiveScanSnapshot {
+    const stableTargetSec = STABLE_DURATION_MS / 1000;
     const empty: LiveScanSnapshot = {
       faces: this.faces,
       knownFaces: [...this.faces.keys()],
       currentFace: null,
       stableProgress: 0,
-      stableTarget: STABLE_FRAMES,
+      stableTarget: stableTargetSec,
       isComplete: this.faces.size === 6,
       newlyCaptured: null,
     };
 
     if (!colors || colors.length !== 9) {
-      this.stableCount = 0;
+      this.stableSinceMs = null;
       this.lastFaceId = null;
       this.lastColors = null;
       return empty;
@@ -113,27 +115,33 @@ export class LiveFaceAccumulator {
 
     const faceId = identifyFaceFromCenter(colors[4]!);
     if (!faceId) {
-      this.stableCount = 0;
+      this.stableSinceMs = null;
       this.lastFaceId = null;
       this.lastColors = null;
       return { ...empty, currentFace: null };
     }
 
-    if (
+    const isSameReading =
       faceId === this.lastFaceId &&
-      this.lastColors &&
-      colorsNearlyEqual(colors, this.lastColors)
-    ) {
-      this.stableCount++;
+      this.lastColors !== null &&
+      colorsNearlyEqual(colors, this.lastColors);
+
+    if (isSameReading) {
+      if (this.stableSinceMs === null) {
+        this.stableSinceMs = nowMs;
+      }
     } else {
       this.lastFaceId = faceId;
       this.lastColors = [...colors];
-      this.stableCount = 1;
+      this.stableSinceMs = nowMs;
     }
+
+    const stableMs = this.stableSinceMs !== null ? nowMs - this.stableSinceMs : 0;
+    const stableProgressSec = Math.min(stableMs, STABLE_DURATION_MS) / 1000;
 
     let newlyCaptured: FaceId | null = null;
 
-    if (this.stableCount >= STABLE_FRAMES) {
+    if (stableMs >= STABLE_DURATION_MS) {
       const history = [...(this.readings.get(faceId) ?? []), [...colors]];
       if (history.length > MAX_READINGS_PER_FACE) {
         history.shift();
@@ -149,15 +157,17 @@ export class LiveFaceAccumulator {
         newlyCaptured = resolvedFaceId;
       }
 
-      this.stableCount = 0;
+      this.stableSinceMs = null;
+      this.lastFaceId = null;
+      this.lastColors = null;
     }
 
     return {
       faces: this.faces,
       knownFaces: [...this.faces.keys()],
       currentFace: faceId,
-      stableProgress: Math.min(this.stableCount, STABLE_FRAMES),
-      stableTarget: STABLE_FRAMES,
+      stableProgress: Math.round(stableProgressSec * 10) / 10,
+      stableTarget: stableTargetSec,
       isComplete: this.faces.size === 6,
       newlyCaptured,
     };

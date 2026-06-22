@@ -32,7 +32,7 @@ export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOver
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
           {feedback.status === 'stabilizing' && (
             <span className="status-progress">
-              {feedback.stableProgress}/{feedback.stableTarget}
+              {feedback.stableProgress.toFixed(1)}/{feedback.stableTarget}s
             </span>
           )}
         </div>
