@@ -25,7 +25,7 @@ export function loadOpenCV(): Promise<void> {
       };
       check();
     };
-    script.onerror = () => reject(new Error('OpenCV.js 로드에 실패했습니다.'));
+    script.onerror = () => reject(new Error('Failed to load OpenCV.js'));
     document.head.appendChild(script);
   });
 

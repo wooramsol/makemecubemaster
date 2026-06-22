@@ -3,14 +3,16 @@ import type { CubePose, Move } from '../../types';
 import { FACE_NORMALS, isDoubleMove, isPrimeMove, moveAngle, moveFace } from '../cube/moves';
 
 const ARROW_COLOR = 0xffffff;
-const ARROW_OPACITY = 0.72;
+const TRACE_SPEED = 0.022;
 
 export class ARRenderer {
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
   private arrowGroup: THREE.Group;
+  private traceGroup: THREE.Group | null = null;
   private currentMove: Move | null = null;
+  private traceProgress = 0;
   private width = 1;
   private height = 1;
 
@@ -48,7 +50,15 @@ export class ARRenderer {
   setMove(move: Move | null): void {
     if (move === this.currentMove) return;
     this.currentMove = move;
+    this.traceProgress = 0;
     this.rebuildArrow(move);
+  }
+
+  tick(): void {
+    if (!this.currentMove) return;
+    this.traceProgress += TRACE_SPEED;
+    if (this.traceProgress > 1.05) this.traceProgress = 0;
+    this.updateTrace();
   }
 
   render(pose: CubePose | null): void {
@@ -111,17 +121,18 @@ export class ARRenderer {
     const tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
     const bitangent = new THREE.Vector3().crossVectors(normal, tangent).normalize();
 
-    const offset = normal.clone().multiplyScalar(0.51);
+    const offset = normal.clone().multiplyScalar(0.52);
     const group = new THREE.Group();
     group.position.copy(offset);
+    group.userData = { tangent, bitangent, move };
 
     const angle = moveAngle(move);
-    const arcRadius = 0.28;
-    const points: THREE.Vector3[] = [];
-    const segments = 24;
+    const arcRadius = 0.32;
+    const segments = 32;
     const start = isPrimeMove(move) ? angle : 0;
     const end = isPrimeMove(move) ? 0 : angle;
 
+    const points: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
       const t = start + ((end - start) * i) / segments;
       const p = tangent
@@ -131,39 +142,77 @@ export class ARRenderer {
       points.push(p);
     }
 
-    const curve = new THREE.CatmullRomCurve3(points);
-    const tube = new THREE.TubeGeometry(curve, segments, 0.025, 8, false);
-    const material = new THREE.MeshBasicMaterial({
-      color: ARROW_COLOR,
-      transparent: true,
-      opacity: ARROW_OPACITY,
-      depthTest: true,
-      depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(tube, material);
-    group.add(mesh);
+    group.userData.points = points;
+    group.userData.segments = segments;
 
-    const headPoint = points[points.length - 1]!;
-    const prevPoint = points[points.length - 2] ?? headPoint;
-    const dir = new THREE.Vector3().subVectors(headPoint, prevPoint).normalize();
-    const head = new THREE.Mesh(
-      new THREE.ConeGeometry(0.06, 0.14, 12),
-      material.clone(),
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.34, 0.4, 48),
+      new THREE.MeshBasicMaterial({
+        color: ARROW_COLOR,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     );
-    head.position.copy(headPoint);
-    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    group.add(head);
+    group.add(ring);
 
     if (isDoubleMove(move)) {
-      const mirror = group.clone();
+      const mirror = ring.clone();
       mirror.rotation.z = Math.PI;
       group.add(mirror);
     }
 
+    this.traceGroup = group;
     this.arrowGroup.add(group);
+    this.updateTrace();
+  }
+
+  private updateTrace(): void {
+    if (!this.traceGroup || !this.currentMove) return;
+
+    const old = this.traceGroup.getObjectByName('trace');
+    if (old) {
+      this.traceGroup.remove(old);
+      disposeObject(old);
+    }
+
+    const points = this.traceGroup.userData.points as THREE.Vector3[];
+    const segments = this.traceGroup.userData.segments as number;
+    if (!points?.length) return;
+
+    const endIdx = Math.max(2, Math.floor(segments * this.traceProgress));
+    const partial = points.slice(0, endIdx + 1);
+    if (partial.length < 2) return;
+
+    const curve = new THREE.CatmullRomCurve3(partial);
+    const tube = new THREE.TubeGeometry(curve, endIdx, 0.028, 8, false);
+    const material = new THREE.MeshBasicMaterial({
+      color: ARROW_COLOR,
+      transparent: true,
+      opacity: 0.88,
+      depthTest: true,
+      depthWrite: false,
+    });
+    const mesh = new THREE.Mesh(tube, material);
+    mesh.name = 'trace';
+    this.traceGroup.add(mesh);
+
+    const headPoint = partial[partial.length - 1]!;
+    const prevPoint = partial[partial.length - 2] ?? headPoint;
+    const dir = new THREE.Vector3().subVectors(headPoint, prevPoint).normalize();
+    const head = new THREE.Mesh(
+      new THREE.ConeGeometry(0.065, 0.15, 12),
+      material.clone(),
+    );
+    head.name = 'trace';
+    head.position.copy(headPoint);
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    this.traceGroup.add(head);
   }
 
   private clearArrow(): void {
+    this.traceGroup = null;
     while (this.arrowGroup.children.length > 0) {
       const child = this.arrowGroup.children[0]!;
       this.arrowGroup.remove(child);

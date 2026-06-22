@@ -3,7 +3,7 @@ import { createGrayMat, detectCubeCorners, detectCubeFace } from './cubeDetector
 import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
 import { RotationDetector } from './rotationDetector';
-import { measureWhiteBalanceSample } from './whiteBalance';
+import { measureColorLearnSpot } from './colorReference';
 
 export class FrameProcessor {
   private rotationDetector = new RotationDetector();
@@ -51,8 +51,12 @@ export class FrameProcessor {
     return true;
   }
 
-  getWhiteBalanceSample(frameWidth: number, frameHeight: number) {
-    return measureWhiteBalanceSample(this.processCanvas, frameWidth, frameHeight);
+  getColorLearnSample(
+    frameWidth: number,
+    frameHeight: number,
+    expected: import('../../types').StickerColor,
+  ) {
+    return measureColorLearnSpot(this.processCanvas, frameWidth, frameHeight, expected);
   }
 
   process(video: HTMLVideoElement): FrameResult {

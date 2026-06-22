@@ -59,7 +59,7 @@ export function useWebcam() {
       streamRef.current = null;
       setState({
         stream: null,
-        error: error instanceof Error ? error.message : '카메라 접근 실패',
+        error: error instanceof Error ? error.message : 'Camera access failed',
         isReady: false,
       });
     }

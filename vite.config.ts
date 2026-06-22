@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'Make Me Cube Master',
         short_name: 'Cube Master',
-        description: '웹캠으로 루빅큐브를 인식하고 AR 화살표로 해법을 안내합니다.',
+        description: "Scan a Rubik's cube and solve it with AR move hints.",
         theme_color: '#000000',
         background_color: '#000000',
         display: 'standalone',

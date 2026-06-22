@@ -1,31 +1,14 @@
 import type { DetectionFeedback, StickerColor } from '../types';
 import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
+import { COLOR_HEX } from '../lib/vision/colorReference';
 import { mirrorFaceCellsForSelfie } from '../lib/vision/selfieView';
 import { GuideFrame } from './GuideFrame';
 
-const STICKER_HEX: Record<StickerColor, string> = {
-  W: '#f5f5f5',
-  Y: '#facc15',
-  R: '#ef4444',
-  O: '#f97316',
-  G: '#22c55e',
-  B: '#3b82f6',
-};
-
-const COLOR_SHORT: Record<StickerColor, string> = {
-  R: '빨',
-  O: '주',
-  Y: '노',
-  G: '초',
-  B: '파',
-  W: '흰',
-};
-
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
-  searching: '큐브를 찾는 중...',
-  detected: '면 감지됨',
-  stabilizing: '인식 중',
-  captured: '면 저장됨!',
+  searching: '…',
+  detected: 'OK',
+  stabilizing: '…',
+  captured: '✓',
 };
 
 interface DetectionOverlayProps {
@@ -37,7 +20,6 @@ interface DetectionOverlayProps {
 export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOverlayProps) {
   if (!visible) return null;
 
-  const statusClass = feedback.status;
   const showGrid = feedback.cellColors.length === 9;
   const displayCells = showGrid ? mirrorFaceCellsForSelfie(feedback.cellColors) : [];
 
@@ -46,8 +28,7 @@ export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOver
       <GuideFrame rect={guideRect} />
 
       <div className="scan-ui-panel scan-ui-panel--compact">
-        <div className={`detection-status ${statusClass}`}>
-          <span className="status-dot" />
+        <div className={`detection-status ${feedback.status}`}>
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
           {feedback.status === 'stabilizing' && (
             <span className="status-progress">
@@ -57,13 +38,12 @@ export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOver
         </div>
 
         {showGrid && (
-          <div className="cell-grid" aria-label="칸별 인식 결과">
+          <div className="cell-grid">
             {displayCells.map((color, i) => (
               <span
                 key={i}
                 className="cell-grid-item"
-                style={{ background: STICKER_HEX[color] }}
-                title={COLOR_SHORT[color]}
+                style={{ background: COLOR_HEX[color as StickerColor] }}
               />
             ))}
           </div>

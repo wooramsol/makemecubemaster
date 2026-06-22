@@ -49,7 +49,7 @@ export interface ScannedFace {
 export type AppPhase =
   | 'loading'
   | 'camera'
-  | 'whiteBalance'
+  | 'colorLearn'
   | 'scanReady'
   | 'liveScan'
   | 'computing'

@@ -1,15 +1,9 @@
 import type { StickerColor } from '../../types';
-import {
-  isCalibratedWhitePixel,
-  isLikelyYellowPixel,
-  warmLightYellowPenalty,
-} from './colorCalibration';
-import { applyWhiteBalance, isWhiteBalanceCalibrated } from './whiteBalance';
+import { getLearnedLabRefs, isColorsCalibrated } from './colorReference';
 
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
 
-/** cubejs / 표준 큐브 기준 LAB 참조색 */
-const LAB_REFS: Record<StickerColor, [number, number, number]> = {
+const FALLBACK_LAB: Record<StickerColor, [number, number, number]> = {
   W: [95, 0, 0],
   Y: [88, -4, 82],
   R: [48, 62, 38],
@@ -17,6 +11,10 @@ const LAB_REFS: Record<StickerColor, [number, number, number]> = {
   G: [55, -48, 32],
   B: [32, 28, -52],
 };
+
+function labRefs(): Record<StickerColor, [number, number, number]> {
+  return isColorsCalibrated() ? getLearnedLabRefs() : FALLBACK_LAB;
+}
 
 function rgbToXyz(r: number, g: number, b: number): [number, number, number] {
   const sr = pivot(r / 255);
@@ -83,10 +81,11 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
 
 function classifyByLab(r: number, g: number, b: number): StickerColor {
   const lab = rgbToLab(r, g, b);
+  const refs = labRefs();
   let best: StickerColor = 'W';
   let bestDist = Infinity;
   for (const color of ALL_COLORS) {
-    const dist = labDistance(lab, LAB_REFS[color]);
+    const dist = labDistance(lab, refs[color]);
     if (dist < bestDist) {
       bestDist = dist;
       best = color;
@@ -119,27 +118,19 @@ function isWhitePixel(r: number, g: number, b: number): boolean {
 
 function scoreColor(r: number, g: number, b: number, color: StickerColor): number {
   const lab = rgbToLab(r, g, b);
-  const dist = labDistance(lab, LAB_REFS[color]);
+  const dist = labDistance(lab, labRefs()[color]);
   return 1 / (1 + dist);
 }
 
 export function classifySticker(r: number, g: number, b: number): StickerColor {
-  [r, g, b] = applyWhiteBalance(r, g, b);
   if (isGapPixel(r, g, b)) return classifyByLab(r, g, b);
 
-  if (isCalibratedWhitePixel(r, g, b)) return 'W';
+  if (isColorsCalibrated()) {
+    return classifyByLab(r, g, b);
+  }
 
   const [h, s] = rgbToHsv(r, g, b);
   const sn = s / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const chroma = max - min;
-  const brightness = (r + g + b) / 3;
-
-  if (isWhiteBalanceCalibrated()) {
-    if (brightness > 175 && chroma < 45) return 'W';
-    if (brightness > 155 && chroma < 28) return 'W';
-  }
 
   if (isWhitePixel(r, g, b)) return 'W';
 
@@ -157,7 +148,7 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
   if (g >= r + 10 && g >= b + 10 && g > 70) {
     scores.set('G', (scores.get('G') ?? 0) + 0.45);
   }
-  if (isLikelyYellowPixel(r, g, b) || (r > 95 && g > 85 && b < Math.min(r, g) - 18)) {
+  if (r > 95 && g > 85 && b < Math.min(r, g) - 18) {
     scores.set('Y', (scores.get('Y') ?? 0) + 0.55);
   }
   if (r > g + 8 && g > b + 5 && r > 110 && h >= 8 && h < 42) {
@@ -171,12 +162,6 @@ export function classifySticker(r: number, g: number, b: number): StickerColor {
     if (h >= 78 && h <= 155) scores.set('G', (scores.get('G') ?? 0) + 0.2);
     if (h >= 165 && h <= 255) scores.set('B', (scores.get('B') ?? 0) + 0.3);
   }
-
-  if (max > 175 && sn < 0.22 && !isWhitePixel(r, g, b)) {
-    scores.set('W', (scores.get('W') ?? 0) - 0.35);
-  }
-
-  scores.set('Y', (scores.get('Y') ?? 0) - warmLightYellowPenalty(r, g, b));
 
   let best: StickerColor = 'W';
   let bestScore = -Infinity;

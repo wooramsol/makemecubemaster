@@ -16,8 +16,8 @@ export function getGuideSquare(frameWidth: number, frameHeight: number) {
   };
 }
 
-/** 흰색 기준: 가이드 정중앙 작은 영역만 사용 */
-export function getWhiteBalanceSpot(guide: { x: number; y: number; size: number }) {
+/** Center spot for single-sticker color sampling */
+export function getColorSampleSpot(guide: { x: number; y: number; size: number }) {
   const spotSize = guide.size * WB_SPOT_RATIO;
   return {
     x: guide.x + (guide.size - spotSize) / 2,

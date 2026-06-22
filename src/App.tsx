@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AROverlay } from './components/AROverlay';
 import { CameraView } from './components/CameraView';
+import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
-import { WhiteBalanceOverlay } from './components/WhiteBalanceOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
@@ -14,8 +14,16 @@ import './styles/global.css';
 
 export default function App() {
   const { videoRef, setVideoRef, state: webcamState, start: startWebcam } = useWebcam();
-  const { state, currentMove, confirmWhiteBalance, startLiveScan, retryLiveScan, retryFromWhiteBalance, startTracking, stopTracking } =
-    useCubeApp(videoRef);
+  const {
+    state,
+    currentMove,
+    confirmColorLearn,
+    startLiveScan,
+    retryLiveScan,
+    retryColorLearn,
+    startTracking,
+    stopTracking,
+  } = useCubeApp(videoRef);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
@@ -78,10 +86,10 @@ export default function App() {
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
+  const showAr = state.phase === 'solving';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
-  const showAr = state.phase === 'solving';
 
   return (
     <main className="app">
@@ -98,12 +106,13 @@ export default function App() {
               active={showAr}
             />
 
-            <WhiteBalanceOverlay
-              visible={state.phase === 'whiteBalance'}
-              sample={state.whiteBalanceSample}
-              ready={state.whiteBalanceReady}
-              error={state.whiteBalanceError}
-              onConfirm={confirmWhiteBalance}
+            <ColorLearnOverlay
+              visible={state.phase === 'colorLearn'}
+              stepIndex={state.colorLearnIndex}
+              sample={state.colorLearnSample}
+              ready={state.colorLearnReady}
+              error={state.colorLearnError}
+              onConfirm={confirmColorLearn}
               guideRect={guideRect}
               spotRect={spotRect}
             />
@@ -125,33 +134,29 @@ export default function App() {
             <LiveScanOverlay
               phase={state.phase}
               knownFaces={state.knownFaces}
-              currentFace={state.currentVisibleFace}
               progress={state.liveScanProgress}
             />
 
             {state.phase === 'solving' && currentMove && (
               <div className="solving-banner">
                 <p className="solving-move">{currentMove}</p>
-                <p className="solving-hint">화살표 방향으로 면을 돌리세요</p>
               </div>
             )}
 
             {state.phase === 'solved' && (
               <div className="solved-banner">
-                <p>완료!</p>
+                <p>Done</p>
               </div>
             )}
           </>
         )}
 
-        {isComputing && (
-          <LoadingScreen overlay message="6면 인식 완료 — 해법 계산 중..." />
-        )}
+        {isComputing && <LoadingScreen overlay message="Computing…" />}
 
         {isBooting && (
           <LoadingScreen
             overlay
-            message={state.phase === 'loading' ? 'AI 엔진 로딩 중...' : '카메라 연결 중...'}
+            message={state.phase === 'loading' ? 'Loading…' : 'Camera…'}
           />
         )}
 
@@ -159,13 +164,13 @@ export default function App() {
           <div className="error-screen overlay">
             <p>{state.error ?? webcamState.error}</p>
             <div className="error-actions">
-              {state.whiteBalanceCalibrated && (
+              {state.colorsCalibrated && (
                 <button type="button" className="error-button primary" onClick={retryLiveScan}>
-                  다시 스캔
+                  Re-scan
                 </button>
               )}
-              <button type="button" className="error-button secondary" onClick={retryFromWhiteBalance}>
-                흰색 기준부터 다시
+              <button type="button" className="error-button secondary" onClick={retryColorLearn}>
+                Re-learn colors
               </button>
             </div>
           </div>

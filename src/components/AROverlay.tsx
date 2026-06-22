@@ -39,6 +39,7 @@ export function AROverlay({ pose, move, width, height, active }: AROverlayProps)
     if (!active) return;
     let raf = 0;
     const tick = () => {
+      rendererRef.current?.tick();
       rendererRef.current?.render(pose);
       raf = requestAnimationFrame(tick);
     };

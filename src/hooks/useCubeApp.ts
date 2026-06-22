@@ -13,16 +13,17 @@ import { buildFaceletFromMap } from '../lib/cube/state';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '../lib/vision/cubeColorReconcile';
+import {
+  COLOR_LEARN_ORDER,
+  calibrateLearnedColor,
+  isColorsCalibrated,
+  resetColorReferences,
+  type ColorLearnSample,
+} from '../lib/vision/colorReference';
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator } from '../lib/vision/liveFaceScan';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 import { validateFaceletString } from '../lib/vision/scanValidation';
-import {
-  calibrateWhiteBalanceFromCanvas,
-  isWhiteBalanceCalibrated,
-  resetWhiteBalance,
-  type WhiteBalanceSample,
-} from '../lib/vision/whiteBalance';
 
 export interface CubeAppState {
   phase: AppPhase;
@@ -34,10 +35,11 @@ export interface CubeAppState {
   currentPose: CubePose | null;
   solverReady: boolean;
   detectionFeedback: DetectionFeedback;
-  whiteBalanceSample: WhiteBalanceSample | null;
-  whiteBalanceReady: boolean;
-  whiteBalanceError: string | null;
-  whiteBalanceCalibrated: boolean;
+  colorLearnIndex: number;
+  colorLearnSample: ColorLearnSample | null;
+  colorLearnReady: boolean;
+  colorLearnError: string | null;
+  colorsCalibrated: boolean;
 }
 
 const initialFeedback: DetectionFeedback = {
@@ -59,10 +61,11 @@ const initialState: CubeAppState = {
   currentPose: null,
   solverReady: false,
   detectionFeedback: initialFeedback,
-  whiteBalanceSample: null,
-  whiteBalanceReady: false,
-  whiteBalanceError: null,
-  whiteBalanceCalibrated: false,
+  colorLearnIndex: 0,
+  colorLearnSample: null,
+  colorLearnReady: false,
+  colorLearnError: null,
+  colorsCalibrated: false,
 };
 
 export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
@@ -74,6 +77,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const rafRef = useRef<number>(0);
   const requestId = useRef(0);
   const phaseRef = useRef<AppPhase>('loading');
+  const colorLearnIndexRef = useRef(0);
   const solutionRef = useRef<SolutionProgress | null>(null);
   const solvingStartMs = useRef(0);
   const solveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,11 +101,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       solveTimeoutRef.current = setTimeout(() => {
         setState((s) => {
           if (s.phase !== 'computing') return s;
-          return {
-            ...s,
-            phase: 'error',
-            error: '해법 계산 시간이 초과되었습니다. 다시 시도해 주세요.',
-          };
+          return { ...s, phase: 'error', error: 'Solve timed out. Try again.' };
         });
       }, 20000);
     },
@@ -111,7 +111,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   useEffect(() => {
     phaseRef.current = state.phase;
     solutionRef.current = state.solution;
-  }, [state.phase, state.solution]);
+    colorLearnIndexRef.current = state.colorLearnIndex;
+  }, [state.phase, state.solution, state.colorLearnIndex]);
 
   const applyCompletedMove = useCallback((move: Move) => {
     const id = ++requestId.current;
@@ -238,28 +239,29 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             phase: 'error',
             error:
               msg.message.includes('Invalid') || msg.message.includes('invalid')
-                ? '인식된 큐브 상태가 올바르지 않습니다. 큐브를 돌려 다시 스캔해 주세요.'
+                ? 'Invalid cube state. Re-scan the cube.'
                 : msg.message,
           }));
         }
       };
 
       worker.postMessage({ type: 'init' });
-      resetWhiteBalance();
+      resetColorReferences();
       liveAccumulator.current.reset();
       setState((s) => ({
         ...s,
-        phase: 'whiteBalance',
-        whiteBalanceCalibrated: false,
-        whiteBalanceSample: null,
-        whiteBalanceReady: false,
-        whiteBalanceError: null,
+        phase: 'colorLearn',
+        colorLearnIndex: 0,
+        colorLearnSample: null,
+        colorLearnReady: false,
+        colorLearnError: null,
+        colorsCalibrated: false,
       }));
     } catch (error) {
       setState((s) => ({
         ...s,
         phase: 'error',
-        error: error instanceof Error ? error.message : '초기화 실패',
+        error: error instanceof Error ? error.message : 'Init failed',
       }));
     }
   }, [clearSolveTimeout]);
@@ -274,30 +276,49 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     };
   }, [init, clearSolveTimeout]);
 
-  const confirmWhiteBalance = useCallback(() => {
+  const confirmColorLearn = useCallback(() => {
     const video = videoRef.current;
     const processor = frameProcessor.current;
     if (!video || !processor || video.readyState < 2) return;
 
     if (!processor.captureFrame(video)) return;
 
+    const index = colorLearnIndexRef.current;
+    const target = COLOR_LEARN_ORDER[index];
+    if (!target) return;
+
     const canvas = processor.getFrameCanvas();
-    const result = calibrateWhiteBalanceFromCanvas(canvas, video.videoWidth, video.videoHeight);
-    if (!result) {
+    const sample = calibrateLearnedColor(
+      canvas,
+      video.videoWidth,
+      video.videoHeight,
+      target,
+    );
+    if (!sample) {
       setState((s) => ({
         ...s,
-        whiteBalanceError: '흰색 영역을 찾지 못했습니다. 흰 스티커 면을 가이드 안에 밝게 맞춰 주세요.',
+        colorLearnError: `Could not read ${target}. Center the sticker in the circle.`,
       }));
       return;
     }
 
-    enterScanReady();
+    const nextIndex = index + 1;
+    if (nextIndex >= COLOR_LEARN_ORDER.length) {
+      enterScanReady();
+      setState((s) => ({
+        ...s,
+        colorsCalibrated: true,
+        colorLearnError: null,
+      }));
+      return;
+    }
+
     setState((s) => ({
       ...s,
-      whiteBalanceSample: result.sample,
-      whiteBalanceReady: true,
-      whiteBalanceError: null,
-      whiteBalanceCalibrated: true,
+      colorLearnIndex: nextIndex,
+      colorLearnSample: null,
+      colorLearnReady: false,
+      colorLearnError: null,
     }));
   }, [videoRef, enterScanReady]);
 
@@ -313,15 +334,22 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     const result = processor.process(video);
     const phase = phaseRef.current;
 
-    if (phase === 'whiteBalance') {
+    if (phase === 'colorLearn') {
       processor.captureFrame(video);
-      const sample = processor.getWhiteBalanceSample(video.videoWidth, video.videoHeight);
-      setState((prev) => ({
-        ...prev,
-        whiteBalanceSample: sample,
-        whiteBalanceReady: sample?.ready ?? false,
-        whiteBalanceError: null,
-      }));
+      const target = COLOR_LEARN_ORDER[colorLearnIndexRef.current];
+      if (target) {
+        const sample = processor.getColorLearnSample(
+          video.videoWidth,
+          video.videoHeight,
+          target,
+        );
+        setState((prev) => ({
+          ...prev,
+          colorLearnSample: sample,
+          colorLearnReady: sample?.ready ?? false,
+          colorLearnError: null,
+        }));
+      }
       return;
     }
 
@@ -336,8 +364,13 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     if (phase === 'liveScan') {
-      if (!isWhiteBalanceCalibrated()) {
-        setState((s) => ({ ...s, phase: 'whiteBalance', whiteBalanceCalibrated: false }));
+      if (!isColorsCalibrated()) {
+        setState((s) => ({
+          ...s,
+          phase: 'colorLearn',
+          colorsCalibrated: false,
+          colorLearnIndex: 0,
+        }));
         return;
       }
 
@@ -353,14 +386,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         try {
           const reconciled = reconcileCubeFaces(snapshot.faces);
           if (!isCubeColorBalanced(reconciled)) {
-            const rawHint = formatImbalanceHint(snapshot.faces);
-            const fixedHint = formatImbalanceHint(reconciled);
-            const detail = rawHint
-              ? `색상 인식이 맞지 않습니다. (${rawHint}) 조명을 밝게 하고 흰 면 기준 보정 후 다시 스캔해 주세요.`
-              : fixedHint
-                ? `색상 인식이 맞지 않습니다. (${fixedHint}) 조명을 밝게 하고 다시 스캔해 주세요.`
-                : '색상 인식이 맞지 않습니다. 6면이 모두 다른 면인지 확인하고 다시 스캔해 주세요.';
-            setState((s) => ({ ...s, phase: 'error', error: detail }));
+            const hint = formatImbalanceHint(snapshot.faces);
+            setState((s) => ({
+              ...s,
+              phase: 'error',
+              error: hint
+                ? `Color mismatch (${hint}). Re-learn colors or re-scan.`
+                : 'Color mismatch. Scan all 6 unique faces.',
+            }));
             return;
           }
 
@@ -368,10 +401,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           const validationError = validateFaceletString(facelet);
           if (validationError) {
             const hint = formatImbalanceHint(reconciled);
-            const detail = hint
-              ? `${validationError} (${hint})`
-              : validationError;
-            setState((s) => ({ ...s, phase: 'error', error: detail }));
+            setState((s) => ({
+              ...s,
+              phase: 'error',
+              error: hint ? `${validationError} (${hint})` : validationError,
+            }));
             return;
           }
           faceletRef.current = facelet;
@@ -388,7 +422,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           setState((s) => ({
             ...s,
             phase: 'error',
-            error: error instanceof Error ? error.message : '큐브 상태 생성 실패',
+            error: error instanceof Error ? error.message : 'Failed to build cube state',
           }));
         }
         return;
@@ -447,25 +481,26 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     setState((s) => ({ ...s, solution: null }));
   }, [clearSolveTimeout, enterScanReady]);
 
-  const retryFromWhiteBalance = useCallback(() => {
+  const retryColorLearn = useCallback(() => {
     clearSolveTimeout();
     solveTriggeredRef.current = false;
     liveAccumulator.current.reset();
     lastPoseRef.current = null;
-    resetWhiteBalance();
+    resetColorReferences();
     frameProcessor.current?.disableTracking();
     setState((s) => ({
       ...s,
-      phase: 'whiteBalance',
+      phase: 'colorLearn',
       error: null,
       solution: null,
       knownFaces: [],
       currentVisibleFace: null,
       liveScanProgress: 0,
-      whiteBalanceCalibrated: false,
-      whiteBalanceSample: null,
-      whiteBalanceReady: false,
-      whiteBalanceError: null,
+      colorLearnIndex: 0,
+      colorLearnSample: null,
+      colorLearnReady: false,
+      colorLearnError: null,
+      colorsCalibrated: false,
       detectionFeedback: initialFeedback,
     }));
   }, [clearSolveTimeout]);
@@ -478,10 +513,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   return {
     state,
     currentMove,
-    confirmWhiteBalance,
+    confirmColorLearn,
     startLiveScan,
     retryLiveScan,
-    retryFromWhiteBalance,
+    retryColorLearn,
     startTracking,
     stopTracking,
   };

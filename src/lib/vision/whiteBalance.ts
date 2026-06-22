@@ -1,4 +1,4 @@
-import { getGuideSquare, getWhiteBalanceSpot } from './roi';
+import { getGuideSquare, getColorSampleSpot } from './roi';
 
 export interface WhiteBalanceGains {
   r: number;
@@ -98,7 +98,7 @@ export function measureWhiteBalanceSample(
   if (!ctx) return null;
 
   const guide = getGuideSquare(frameWidth, frameHeight);
-  const spot = getWhiteBalanceSpot(guide);
+  const spot = getColorSampleSpot(guide);
   const x0 = Math.floor(spot.x);
   const y0 = Math.floor(spot.y);
   const w = Math.floor(spot.size);

@@ -1,4 +1,4 @@
-import { getGuideSquare, getWhiteBalanceSpot } from './roi';
+import { getGuideSquare, getColorSampleSpot } from './roi';
 
 export interface GuideOverlayRect {
   left: number;
@@ -63,7 +63,7 @@ export function getWhiteSpotOverlayRect(
   }
 
   const guide = getGuideSquare(frameWidth, frameHeight);
-  const spot = getWhiteBalanceSpot(guide);
+  const spot = getColorSampleSpot(guide);
   const { scale, offsetX, offsetY } = getCoverTransform(
     frameWidth,
     frameHeight,

@@ -143,16 +143,16 @@ export function isCubeColorBalanced(faces: Map<FaceId, StickerColor[]>): boolean
 export function formatImbalanceHint(faces: Map<FaceId, StickerColor[]>): string {
   const imbalance = getStickerImbalance(faces);
   const labels: Record<StickerColor, string> = {
-    W: '흰',
-    Y: '노',
-    R: '빨',
-    O: '주',
-    G: '초',
-    B: '파',
+    W: 'W',
+    Y: 'Y',
+    R: 'R',
+    O: 'O',
+    G: 'G',
+    B: 'B',
   };
   const parts = STICKER_COLORS.filter((c) => imbalance[c] !== 0).map((c) => {
     const n = imbalance[c];
     return `${labels[c]}${n > 0 ? `+${n}` : n}`;
   });
-  return parts.length > 0 ? `색 개수 오차: ${parts.join(', ')}` : '';
+  return parts.length > 0 ? parts.join(', ') : '';
 }
