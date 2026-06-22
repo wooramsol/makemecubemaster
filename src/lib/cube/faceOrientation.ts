@@ -1,5 +1,6 @@
 import type { FaceId, StickerColor } from '../../types';
 import { buildFaceletFromMap } from './state';
+import { isFaceletColorBalanced } from './faceletValidate';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
@@ -11,6 +12,13 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
   R: 'R',
   L: 'O',
 };
+
+export interface FindSolvableOptions {
+  /** Stop searching after this timestamp (Date.now() + ms). */
+  deadlineMs?: number;
+  /** 4 = rotations only; 8 = rotations + mirror. */
+  maxOrientations?: 4 | 8;
+}
 
 /** Rotate a 3×3 face 90° clockwise in the camera/guide frame. */
 export function rotateFaceClockwise(colors: StickerColor[]): StickerColor[] {
@@ -63,31 +71,47 @@ export function allFaceOrientations(colors: StickerColor[]): StickerColor[][] {
   return orientations;
 }
 
+function orientationsFor(colors: StickerColor[], maxOrientations: 4 | 8): StickerColor[][] {
+  return maxOrientations === 4 ? allFaceRotations(colors) : allFaceOrientations(colors);
+}
+
+function isPastDeadline(deadline: number | undefined): boolean {
+  return deadline !== undefined && Date.now() >= deadline;
+}
+
 /**
- * Each scanned face may be rotated or mirrored. Try all 8^6 orientations.
+ * Each scanned face may be rotated or mirrored. Scan order does not matter —
+ * this tries orientations until a physically valid layout is found.
  */
 export function findSolvableFacelet(
   faces: Map<FaceId, StickerColor[]>,
   isSolvableFacelet: (facelet: string) => boolean,
+  options: FindSolvableOptions = {},
 ): string | null {
+  const maxOrientations = options.maxOrientations ?? 8;
+  const deadline =
+    options.deadlineMs !== undefined ? Date.now() + options.deadlineMs : undefined;
+
   const orientationsByFace = FACE_ORDER.map((faceId) => {
     const colors = faces.get(faceId);
     if (!colors || colors.length !== 9) {
       throw new Error(`Missing face data for ${faceId}`);
     }
-    return allFaceOrientations(colors);
+    return orientationsFor(colors, maxOrientations);
   });
 
   const indices = [0, 0, 0, 0, 0, 0];
 
   for (;;) {
+    if (isPastDeadline(deadline)) return null;
+
     const trial = new Map<FaceId, StickerColor[]>();
     for (let i = 0; i < FACE_ORDER.length; i++) {
       trial.set(FACE_ORDER[i]!, orientationsByFace[i]![indices[i]!]!);
     }
 
     const facelet = buildFaceletFromMap(trial);
-    if (isSolvableFacelet(facelet)) {
+    if (isFaceletColorBalanced(facelet) && isSolvableFacelet(facelet)) {
       return facelet;
     }
 
@@ -136,40 +160,46 @@ function assignmentCost(captures: StickerColor[][], faceOrder: FaceId[]): number
 }
 
 /**
- * Try every way to map 6 captured patterns onto face slots (handles wrong face IDs
- * during scan), then every rotation per face.
+ * Last resort when face IDs were mis-assigned during scan. Limited to avoid
+ * multi-minute searches on mobile.
  */
 export function findSolvableCubeFromCaptures(
   captures: StickerColor[][],
   isSolvableFacelet: (facelet: string) => boolean,
+  deadlineMs = 3000,
 ): string | null {
   if (captures.length !== 6 || captures.some((c) => c.length !== 9)) {
     return null;
   }
 
-  const faceOrders = permutations(FACE_ORDER).sort(
-    (a, b) => assignmentCost(captures, a) - assignmentCost(captures, b),
-  );
+  const deadline = Date.now() + deadlineMs;
+  const faceOrders = permutations(FACE_ORDER)
+    .sort((a, b) => assignmentCost(captures, a) - assignmentCost(captures, b))
+    .slice(0, 6);
 
-  const tryOrders = (orders: FaceId[][]) => {
-    for (const faceOrder of orders) {
-      const trial = new Map<FaceId, StickerColor[]>();
-      for (let i = 0; i < 6; i++) {
-        trial.set(faceOrder[i]!, captures[i]!);
-      }
+  for (const faceOrder of faceOrders) {
+    if (Date.now() >= deadline) return null;
 
-      const facelet = findSolvableFacelet(trial, isSolvableFacelet);
-      if (facelet) return facelet;
+    const trial = new Map<FaceId, StickerColor[]>();
+    for (let i = 0; i < 6; i++) {
+      trial.set(faceOrder[i]!, captures[i]!);
     }
-    return null;
-  };
 
-  const zeroCost = faceOrders.filter((order) => assignmentCost(captures, order) === 0);
-  const found = tryOrders(zeroCost);
-  if (found) return found;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return null;
 
-  const fallback = faceOrders
-    .filter((order) => assignmentCost(captures, order) > 0)
-    .slice(0, 24);
-  return tryOrders(fallback);
+    const facelet = findSolvableFacelet(trial, isSolvableFacelet, {
+      deadlineMs: remaining,
+      maxOrientations: 4,
+    });
+    if (facelet) return facelet;
+
+    const facelet8 = findSolvableFacelet(trial, isSolvableFacelet, {
+      deadlineMs: deadline - Date.now(),
+      maxOrientations: 8,
+    });
+    if (facelet8) return facelet8;
+  }
+
+  return null;
 }

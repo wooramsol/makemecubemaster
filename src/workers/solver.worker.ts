@@ -3,10 +3,15 @@ import {
   findSolvableCubeFromCaptures,
   findSolvableFacelet,
 } from '../lib/cube/faceOrientation';
+import { isFaceletColorBalanced } from '../lib/cube/faceletValidate';
 import { isCubePhysicallySolvable } from '../lib/cube/solvability';
 import { parseMoves } from '../lib/cube/moves';
 import type { FaceId, StickerColor } from '../types';
 import type { SolverMessage, SolverResponse } from '../lib/cube/solverClient';
+
+const SOLVED_FACELET = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
+const ORIENTATION_SEARCH_MS = 12000;
+const CAPTURE_FALLBACK_MS = 3000;
 
 let initialized = false;
 
@@ -17,7 +22,15 @@ function ensureInit(): void {
   }
 }
 
+function warmupSolver(): void {
+  ensureInit();
+  const cube = Cube.fromString(SOLVED_FACELET);
+  cube.solve();
+}
+
 function isSolvableFacelet(facelet: string): boolean {
+  if (!isFaceletColorBalanced(facelet)) return false;
+
   try {
     const cube = Cube.fromString(facelet);
     return isCubePhysicallySolvable(cube as never);
@@ -30,6 +43,35 @@ function facesFromRecord(record: Record<FaceId, StickerColor[]>): Map<FaceId, St
   return new Map(Object.entries(record) as [FaceId, StickerColor[]][]);
 }
 
+function resolveFacelet(
+  facelet: string,
+  scannedFaces: Record<FaceId, StickerColor[]>,
+  captures: StickerColor[][],
+): string | null {
+  const searchStart = Date.now();
+  const searchBudget = () => Math.max(0, ORIENTATION_SEARCH_MS - (Date.now() - searchStart));
+
+  if (isSolvableFacelet(facelet)) {
+    return facelet;
+  }
+
+  const faces = facesFromRecord(scannedFaces);
+
+  let resolved = findSolvableFacelet(faces, isSolvableFacelet, {
+    deadlineMs: searchBudget(),
+    maxOrientations: 4,
+  });
+  if (resolved) return resolved;
+
+  resolved = findSolvableFacelet(faces, isSolvableFacelet, {
+    deadlineMs: searchBudget(),
+    maxOrientations: 8,
+  });
+  if (resolved) return resolved;
+
+  return findSolvableCubeFromCaptures(captures, isSolvableFacelet, CAPTURE_FALLBACK_MS);
+}
+
 const UNSOLVABLE_MESSAGE =
   'Could not solve this cube state. Check the scanned faces above — one color may be wrong. Re-scan in steady light.';
 
@@ -38,7 +80,7 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
 
   try {
     if (msg.type === 'init') {
-      ensureInit();
+      warmupSolver();
       self.postMessage({ type: 'ready' } satisfies SolverResponse);
       return;
     }
@@ -46,19 +88,7 @@ self.onmessage = (event: MessageEvent<SolverMessage>) => {
     if (msg.type === 'solve') {
       ensureInit();
 
-      let facelet: string | null = null;
-
-      if (isSolvableFacelet(msg.facelet)) {
-        facelet = msg.facelet;
-      }
-
-      if (!facelet) {
-        facelet = findSolvableFacelet(facesFromRecord(msg.scannedFaces), isSolvableFacelet);
-      }
-
-      if (!facelet) {
-        facelet = findSolvableCubeFromCaptures(msg.captures, isSolvableFacelet);
-      }
+      const facelet = resolveFacelet(msg.facelet, msg.scannedFaces, msg.captures);
 
       if (!facelet) {
         self.postMessage({

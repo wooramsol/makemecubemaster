@@ -138,10 +138,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             ...s,
             phase: 'error',
             error:
-              'Solve timed out. Colors may have been misread — re-scan in steady light.',
+              'Solve timed out. Scan order and direction do not matter — try again in steady light.',
           };
         });
-      }, 45000);
+      }, 60000);
     },
     [clearSolveTimeout],
   );
