@@ -4,8 +4,8 @@ import type { FaceId, StickerColor } from '../../types';
 export const SELFIE_CAMERA_MODE = true;
 
 /**
- * Draw the raw camera frame (no horizontal flip). Selfie preview mirroring is
- * applied only when converting sampled face cells — see normalizeSelfieFaceColors.
+ * Draw the raw camera frame (no horizontal flip). Mirror for the selfie preview
+ * is applied in UI components via mirrorFaceCellsForSelfie.
  */
 export function drawCameraFrame(
   ctx: CanvasRenderingContext2D,
@@ -30,10 +30,10 @@ export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColo
 }
 
 /**
- * Convert a face grid sampled from the raw camera canvas into the same
- * left/right orientation as the mirrored video preview (CSS scaleX(-1)).
+ * Mirror a 3×3 face grid for selfie preview display (CSS scaleX(-1) on video).
+ * Vision pipeline keeps raw camera frame order; apply this only in UI components.
  */
-export function normalizeSelfieFaceColors(colors: StickerColor[]): StickerColor[] {
+export function mirrorFaceCellsForSelfie(colors: StickerColor[]): StickerColor[] {
   return mirrorFaceCellsHorizontally(colors);
 }
 

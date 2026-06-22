@@ -7,7 +7,6 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { getGuideSquare, guideToCorners, translateCorners } from './roi';
-import { normalizeSelfieFaceColors, SELFIE_CAMERA_MODE } from './selfieView';
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
   const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -162,18 +161,15 @@ export function detectCubeFace(
   frameHeight: number,
 ): DetectedFace | null {
   const guide = getGuideSquare(frameWidth, frameHeight);
-  let colors = sampleGuideRegionColors(sourceCanvas, guide);
-  if (SELFIE_CAMERA_MODE) {
-    colors = normalizeSelfieFaceColors(colors);
-  }
+  const colors = sampleGuideRegionColors(sourceCanvas, guide);
   const variance = measureColorVariance(sourceCanvas, guide);
 
   if (!isRegionCubeLike(colors, variance)) {
     return null;
   }
 
-  // Selfie mode: sample the fixed center guide grid, then normalizeSelfieFaceColors
-  // so cell order matches the mirrored preview. OpenCV corners are pose-only.
+  // Selfie mode: sample the fixed center guide on the raw camera canvas.
+  // UI mirrors cell grids to match the CSS-mirrored video preview.
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
   const pose = estimatePoseFromCorners(corners ?? guideToCorners(guide), frameWidth, frameHeight);
   pose.confidence = corners ? 0.85 : 0.7;

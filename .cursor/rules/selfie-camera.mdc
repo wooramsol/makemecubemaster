@@ -10,8 +10,8 @@ This app always uses the **front (user-facing) camera** with a **mirrored previe
 Vision pipeline rules:
 
 1. Draw video to the processing canvas with `drawCameraFrame()` — **no** canvas flip.
-2. After `sampleGuideRegionColors`, call `normalizeSelfieFaceColors()` once so cell order matches the mirrored preview.
-3. Sample face colors from the **fixed center guide grid** — do not use OpenCV perspective warp for colors (it can flip left/right on some faces).
-4. Do **not** mirror face cell arrays again in UI — pipeline output already matches the preview.
+2. Sample face colors from the **fixed center guide grid** on the raw frame — do not use OpenCV perspective warp for colors.
+3. Store raw frame cell order in state and send that to the solver (orientation search includes mirror).
+4. Mirror face grids **only in UI** via `mirrorFaceCellsForSelfie()` in `FaceGridMini` and `DetectionOverlay`.
 5. `facingMode` must stay `user` in `useWebcam.ts`.
 6. AR overlay stays mirrored to match the preview.

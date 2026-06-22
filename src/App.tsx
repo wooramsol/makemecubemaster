@@ -93,6 +93,7 @@ export default function App() {
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
   const showScannedFaces =
     state.phase === 'liveScan' ||
+    state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
   return (
@@ -164,7 +165,15 @@ export default function App() {
           </>
         )}
 
-        {isComputing && <LoadingScreen overlay message="Computing…" />}
+        {isComputing && (
+          <>
+            <ScannedFacesBar
+              visible={showScannedFaces}
+              scannedFaces={state.scannedFaceColors}
+            />
+            <LoadingScreen overlay message="Computing…" />
+          </>
+        )}
 
         {isBooting && (
           <LoadingScreen
