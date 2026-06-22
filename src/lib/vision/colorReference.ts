@@ -91,6 +91,13 @@ function median(values: number[]): number {
     : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
+function dominantChannel(r: number, g: number, b: number): StickerColor {
+  if (Math.max(r, g, b) - Math.min(r, g, b) < 28) return 'W';
+  if (r >= g && r >= b) return g > r * 0.92 ? 'O' : 'R';
+  if (g >= r && g >= b) return 'G';
+  return 'B';
+}
+
 function isPlausibleForColor(
   r: number,
   g: number,
@@ -98,26 +105,45 @@ function isPlausibleForColor(
   expected: StickerColor,
 ): boolean {
   const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const chroma = max - min;
-  if (max < 60) return false;
+  if (max < 45) return false;
+
+  const brightness = (r + g + b) / 3;
+  const chroma = max - Math.min(r, g, b);
 
   switch (expected) {
     case 'W':
-      return chroma < 45 && (r + g + b) / 3 > 120;
+      return chroma < 55 && brightness > 95;
     case 'Y':
-      return r > 100 && g > 80 && b < r - 15;
+      return r > 75 && g > 65 && brightness > 80;
     case 'R':
-      return r > g + 10 && r > b + 10;
+      return r > 65 && r >= b;
     case 'O':
-      return r > g && g > b && r > 90;
+      return r > 70 && g > 55 && r >= b - 5;
     case 'G':
-      return g > r + 8 && g > b + 8;
+      // Warm light pulls green toward yellow — allow g ≈ r if g leads
+      return g > 45 && g >= r - 12 && g >= b - 5;
     case 'B':
-      return b > r + 8 && b > g + 5;
+      return b > 40 && b >= r - 8 && b >= g - 15;
     default:
       return true;
   }
+}
+
+function medianMatchesExpected(
+  r: number,
+  g: number,
+  b: number,
+  expected: StickerColor,
+): boolean {
+  if (expected === 'W') {
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+    return chroma < 60;
+  }
+  if (expected === 'Y') return r > 70 && g > 60;
+  const dom = dominantChannel(r, g, b);
+  if (expected === 'O') return dom === 'O' || dom === 'R' || dom === 'Y';
+  if (expected === 'R') return dom === 'R' || dom === 'O';
+  return dom === expected;
 }
 
 export function measureColorLearnSpot(
@@ -141,30 +167,46 @@ export function measureColorLearnSpot(
   const rs: number[] = [];
   const gs: number[] = [];
   const bs: number[] = [];
+  const allRs: number[] = [];
+  const allGs: number[] = [];
+  const allBs: number[] = [];
 
   for (let i = 0; i < data.length; i += 8) {
     const r = data[i]!;
     const g = data[i + 1]!;
     const b = data[i + 2]!;
-    if (!isPlausibleForColor(r, g, b, expected)) continue;
-    rs.push(r);
-    gs.push(g);
-    bs.push(b);
+    const max = Math.max(r, g, b);
+    if (max < 40) continue;
+
+    allRs.push(r);
+    allGs.push(g);
+    allBs.push(b);
+
+    if (isPlausibleForColor(r, g, b, expected)) {
+      rs.push(r);
+      gs.push(g);
+      bs.push(b);
+    }
   }
 
-  if (rs.length < 6) return null;
+  const useRs = rs.length >= 4 ? rs : allRs;
+  const useGs = rs.length >= 4 ? gs : allGs;
+  const useBs = rs.length >= 4 ? bs : allBs;
 
-  const r = median(rs);
-  const g = median(gs);
-  const b = median(bs);
+  if (useRs.length < 4) return null;
+
+  const r = median(useRs);
+  const g = median(useGs);
+  const b = median(useBs);
   const lab = rgbToLab(r, g, b);
+  const pixelCount = useRs.length;
 
   return {
     r,
     g,
     b,
     lab,
-    ready: rs.length >= 12,
+    ready: pixelCount >= 6 && medianMatchesExpected(r, g, b, expected),
   };
 }
 
