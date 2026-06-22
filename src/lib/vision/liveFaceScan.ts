@@ -1,4 +1,4 @@
-import { identifyFaceFromCenter } from '../cube/colors';
+import { ALL_FACES, identifyFaceFromCenter } from '../cube/colors';
 import type { FaceId, StickerColor } from '../../types';
 
 const FACE_CENTER: Record<FaceId, StickerColor> = {
@@ -10,12 +10,15 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
   L: 'O',
 };
 
+/** Periphery cells only — center is used for face ID and may jitter */
+const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+
 /** Same face must stay in view this long before capture */
 export const STABLE_DURATION_MS = 2000;
 const MAX_READINGS_PER_FACE = 10;
 
-/** How many of 9 cells must match to treat two readings as the same physical face */
-const SAME_FACE_CELL_MATCHES = 7;
+/** Periphery cells that must match to treat two readings as the same physical face */
+const SAME_FACE_PERIPHERY_MATCHES = 7;
 /** Allow a little jitter while the stability timer runs */
 const STABILITY_JITTER_MATCHES = 6;
 
@@ -31,6 +34,14 @@ export interface LiveScanSnapshot {
   needsNewFace: boolean;
 }
 
+function countMatchingPeriphery(a: StickerColor[], b: StickerColor[]): number {
+  let matches = 0;
+  for (const i of PERIPHERY_INDICES) {
+    if (a[i] === b[i]) matches++;
+  }
+  return matches;
+}
+
 function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
   let matches = 0;
   for (let i = 0; i < 9; i++) {
@@ -40,7 +51,7 @@ function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
 }
 
 function matchesStoredFace(live: StickerColor[], stored: StickerColor[]): boolean {
-  return countMatchingCells(live, stored) >= SAME_FACE_CELL_MATCHES;
+  return countMatchingPeriphery(live, stored) >= SAME_FACE_PERIPHERY_MATCHES;
 }
 
 function findStoredMatch(
@@ -49,6 +60,13 @@ function findStoredMatch(
 ): FaceId | null {
   for (const [id, stored] of faces) {
     if (matchesStoredFace(colors, stored)) return id;
+  }
+  return null;
+}
+
+function firstUnusedFace(faces: Map<FaceId, StickerColor[]>): FaceId | null {
+  for (const faceId of ALL_FACES) {
+    if (!faces.has(faceId)) return faceId;
   }
   return null;
 }
@@ -78,22 +96,18 @@ function pickFaceIdForCapture(
   voted: StickerColor[],
   faces: Map<FaceId, StickerColor[]>,
 ): FaceId | null {
-  const fromCenter = identifyFaceFromCenter(voted[4]!);
-  if (!fromCenter) {
+  if (findStoredMatch(voted, faces)) {
     return null;
   }
 
-  if (!faces.has(fromCenter)) {
+  const fromCenter = identifyFaceFromCenter(voted[4]!);
+  if (fromCenter && !faces.has(fromCenter)) {
     return fromCenter;
   }
 
-  const stored = faces.get(fromCenter)!;
-  if (matchesStoredFace(voted, stored)) {
-    return null;
-  }
-
-  // Center color disagrees with a stored face — wait for a clearer reading.
-  return null;
+  // Center misread or slot taken — pattern is new, assign next free face.
+  // Face orientation is corrected later before solve.
+  return firstUnusedFace(faces);
 }
 
 function finalizeFaceColors(colors: StickerColor[], faceId: FaceId): StickerColor[] {
@@ -138,7 +152,6 @@ export class LiveFaceAccumulator {
     const centerFaceId = identifyFaceFromCenter(colors[4]!);
     const storedMatch = findStoredMatch(colors, this.faces);
 
-    // Compare full 9-cell pattern, not center color alone
     if (storedMatch) {
       this.stableSinceMs = null;
       this.stabilityAnchor = null;
