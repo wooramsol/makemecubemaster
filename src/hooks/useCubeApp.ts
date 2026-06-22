@@ -11,6 +11,8 @@ import type {
   StickerColor,
 } from '../types';
 import { buildFaceletFromMap } from '../lib/cube/state';
+import { moveFace } from '../lib/cube/moves';
+import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '../lib/vision/cubeColorReconcile';
@@ -67,6 +69,8 @@ const initialSolvingFeedback: SolvingFeedback = {
   tracking: 'searching',
   rotationProgress: 0,
   wrongMove: null,
+  visibleFace: null,
+  faceMatchesMove: false,
 };
 
 const initialState: CubeAppState = {
@@ -101,6 +105,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const colorLearnIndexRef = useRef(0);
   const solutionRef = useRef<SolutionProgress | null>(null);
   const solvingStartMs = useRef(0);
+  const stepReadyMs = useRef(0);
   const solveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPoseRef = useRef<CubePose | null>(null);
   const solveTriggeredRef = useRef(false);
@@ -198,6 +203,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         solvingFeedback: { ...initialSolvingFeedback, tracking: 'locked' },
       };
     });
+    stepReadyMs.current = Date.now();
   }, []);
 
   const buildFeedback = useCallback(
@@ -292,6 +298,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           clearSolveTimeout();
           faceletRef.current = msg.facelet;
           solvingStartMs.current = Date.now();
+          stepReadyMs.current = Date.now();
           setState((s) => ({
             ...s,
             phase: msg.moves.length === 0 ? 'solved' : 'solving',
@@ -301,6 +308,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.enableTracking();
+            if (lastPoseRef.current) {
+              frameProcessor.current?.syncPose(lastPoseRef.current);
+            }
             syncExpectedMove(msg.moves[0] ?? null);
           }
         } else if (msg.type === 'facelet') {
@@ -543,13 +553,23 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     syncExpectedMove(expected ?? null);
 
+    const visibleFace = result.detectedFace?.colors[4]
+      ? identifyFaceFromCenter(result.detectedFace.colors[4]!)
+      : null;
+    const moveFaceId = expected ? moveFace(expected) : null;
+    const faceMatchesMove = Boolean(
+      visibleFace && moveFaceId && visibleFace === moveFaceId,
+    );
+
     let tracking: SolvingFeedback['tracking'] = 'searching';
     if (!result.pose) {
       trackingLostFrames.current++;
       tracking = trackingLostFrames.current > 12 ? 'lost' : 'searching';
+    } else if (result.pose.confidence < 0.55 || processor.isTrackingLost()) {
+      tracking = 'searching';
     } else {
       trackingLostFrames.current = 0;
-      tracking = processor.isTrackingLost() ? 'searching' : 'locked';
+      tracking = 'locked';
     }
 
     setState((s) => ({
@@ -558,11 +578,17 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         tracking,
         rotationProgress: result.rotationProgress,
         wrongMove: result.wrongMove,
+        visibleFace,
+        faceMatchesMove,
       },
     }));
 
     if (!result.rotationMove) return;
-    if (Date.now() - solvingStartMs.current < 800) return;
+    if (Date.now() - solvingStartMs.current < 2_000) return;
+    if (Date.now() - stepReadyMs.current < 1_800) return;
+    if (tracking !== 'locked') return;
+    if (result.rotationProgress < 0.78) return;
+    if (!faceMatchesMove) return;
 
     if (solution && expected && result.rotationMove === expected) {
       applyCompletedMove(result.rotationMove);
@@ -570,6 +596,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       const nextMove = solution.moves[solution.currentIndex + 1] ?? null;
       syncExpectedMove(nextMove);
       trackingLostFrames.current = 0;
+      stepReadyMs.current = Date.now();
     }
   }, [videoRef, applyCompletedMove, buildFeedback, requestSolve, syncExpectedMove]);
 
@@ -630,6 +657,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (pose) frameProcessor.current?.syncPose(pose);
     syncExpectedMove(nextMove);
     trackingLostFrames.current = 0;
+    stepReadyMs.current = Date.now();
   }, [applyCompletedMove, syncExpectedMove]);
 
   const currentMove =

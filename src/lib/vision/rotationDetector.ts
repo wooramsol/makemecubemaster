@@ -2,9 +2,12 @@ import type { Move } from '../../types';
 import { MOVE_AXES, moveAngle, moveFace } from '../cube/moves';
 import { identityMatrix, multiplyMatrices, rotationMatrixFromAxisAngle } from '../cube/state';
 
-const ROTATION_THRESHOLD = 0.65;
-const STABLE_FRAMES = 4;
-const WRONG_MOVE_STABLE_FRAMES = 6;
+const ROTATION_THRESHOLD = 0.9;
+const STABLE_FRAMES = 12;
+const WRONG_MOVE_STABLE_FRAMES = 10;
+const MIN_IDLE_ANGLE = 0.28;
+const MIN_COMPLETE_ANGLE_RATIO = 0.82;
+const MIN_COMPLETE_PROGRESS = 0.8;
 
 const ALL_MOVES: Move[] = [
   'R',
@@ -90,6 +93,16 @@ export class RotationDetector {
     }
 
     const delta = multiplyMatrices(transpose3x3(rotationMatrix), this.state.lastMatrix);
+    const deltaAngle = rotationMagnitude(delta);
+
+    if (deltaAngle < MIN_IDLE_ANGLE) {
+      this.state.pendingMove = null;
+      this.state.stableCount = 0;
+      this.state.wrongMove = null;
+      this.state.wrongStableCount = 0;
+      return { completedMove: null, progress: 0, wrongMove: null };
+    }
+
     const progress = this.expectedMove
       ? computeProgressTowardMove(delta, this.expectedMove)
       : 0;
@@ -98,6 +111,16 @@ export class RotationDetector {
     const move = matrixToMove(delta, candidates);
 
     if (move) {
+      const axis = getMoveAxis(move);
+      const turned = Math.abs(rotationAngleAboutAxis(delta, axis));
+      const required = Math.abs(moveAngle(move)) * MIN_COMPLETE_ANGLE_RATIO;
+
+      if (turned < required || progress < MIN_COMPLETE_PROGRESS) {
+        this.state.pendingMove = null;
+        this.state.stableCount = 0;
+        return { completedMove: null, progress, wrongMove: null };
+      }
+
       if (this.state.pendingMove === move) {
         this.state.stableCount++;
         if (this.state.stableCount >= STABLE_FRAMES) {
@@ -136,15 +159,19 @@ export class RotationDetector {
       }
       this.state.pendingMove = null;
       this.state.stableCount = 0;
-      this.state.lastMatrix = lerpMatrix(this.state.lastMatrix, rotationMatrix, 0.15);
     } else {
       this.state.pendingMove = null;
       this.state.stableCount = 0;
-      this.state.lastMatrix = lerpMatrix(this.state.lastMatrix, rotationMatrix, 0.15);
     }
 
     return { completedMove: null, progress, wrongMove: null };
   }
+}
+
+function rotationMagnitude(matrix: number[]): number {
+  const trace = matrix[0]! + matrix[4]! + matrix[8]!;
+  const cosAngle = Math.max(-1, Math.min(1, (trace - 1) / 2));
+  return Math.acos(cosAngle);
 }
 
 function getMoveAxis(move: Move): [number, number, number] {
@@ -157,9 +184,7 @@ function getMoveAxis(move: Move): [number, number, number] {
 }
 
 function rotationAngleAboutAxis(matrix: number[], axis: [number, number, number]): number {
-  const trace = matrix[0]! + matrix[4]! + matrix[8]!;
-  const cosAngle = Math.max(-1, Math.min(1, (trace - 1) / 2));
-  const angle = Math.acos(cosAngle);
+  const angle = rotationMagnitude(matrix);
   const sinAngle = Math.sin(angle);
   if (Math.abs(sinAngle) < 1e-5) return 0;
 
@@ -186,10 +211,6 @@ function computeProgressTowardMove(delta: number[], move: Move): number {
 
 function transpose3x3(m: number[]): number[] {
   return [m[0]!, m[3]!, m[6]!, m[1]!, m[4]!, m[7]!, m[2]!, m[5]!, m[8]!];
-}
-
-function lerpMatrix(a: number[], b: number[], t: number): number[] {
-  return a.map((v, i) => v * (1 - t) + b[i]! * t);
 }
 
 function matrixToMove(delta: number[], candidates: Move[]): Move | null {

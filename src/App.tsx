@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AROverlay } from './components/AROverlay';
+import { FaceArrowOverlay } from './components/FaceArrowOverlay';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
@@ -109,13 +109,16 @@ export default function App() {
 
         {!isBooting && !hasError && (
           <>
-            <AROverlay
+            <FaceArrowOverlay
               pose={state.currentPose}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
-              width={dimensions.width}
-              height={dimensions.height}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
               active={showAr}
+              faceMatchesMove={state.solvingFeedback.faceMatchesMove}
             />
 
             <ColorLearnOverlay

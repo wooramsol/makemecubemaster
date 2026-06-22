@@ -1,4 +1,4 @@
-import type { Move, SolvingFeedback, SolvingTrackingStatus } from '../types';
+import type { FaceId, Move, SolvingFeedback, SolvingTrackingStatus } from '../types';
 import { moveFace } from '../lib/cube/moves';
 
 interface SolvingOverlayProps {
@@ -25,11 +25,24 @@ function moveDescription(move: Move): string {
   return `Turn ${label} clockwise`;
 }
 
-function trackingHint(status: SolvingTrackingStatus, progress: number): string {
+function faceLabel(face: FaceId): string {
+  return FACE_LABELS[face] ?? face;
+}
+
+function trackingHint(
+  status: SolvingTrackingStatus,
+  progress: number,
+  faceMatchesMove: boolean,
+  currentMove: Move,
+): string {
+  if (!faceMatchesMove) {
+    const target = faceLabel(moveFace(currentMove));
+    return `Show the ${target} face to the camera`;
+  }
   if (status === 'lost') return 'Cube lost — hold it steady in view';
-  if (status === 'searching') return 'Point camera at the cube';
-  if (progress > 0.12) return 'Keep turning…';
-  return 'Follow the white arrow on the cube';
+  if (status === 'searching') return 'Center the cube in the guide';
+  if (progress > 0.15) return 'Keep turning…';
+  return 'Follow the arrow on the cube face';
 }
 
 export function SolvingOverlay({
@@ -40,10 +53,10 @@ export function SolvingOverlay({
 }: SolvingOverlayProps) {
   if (!visible) return null;
 
-  const { tracking, rotationProgress, wrongMove } = feedback;
+  const { tracking, rotationProgress, wrongMove, faceMatchesMove } = feedback;
   const hint = wrongMove
     ? `Wrong move (${wrongMove}) — try ${currentMove}`
-    : trackingHint(tracking, rotationProgress);
+    : trackingHint(tracking, rotationProgress, faceMatchesMove, currentMove);
 
   return (
     <div className="solving-overlay" aria-live="polite">
@@ -51,7 +64,7 @@ export function SolvingOverlay({
         <p className="solving-move">{currentMove}</p>
         <p className="solving-description">{moveDescription(currentMove)}</p>
         <p className={`solving-hint${wrongMove ? ' solving-hint--wrong' : ''}`}>{hint}</p>
-        {tracking === 'locked' && (
+        {tracking === 'locked' && faceMatchesMove && (
           <div className="solving-progress" aria-hidden="true">
             <div
               className="solving-progress-fill"

@@ -84,6 +84,8 @@ export interface SolvingFeedback {
   tracking: SolvingTrackingStatus;
   rotationProgress: number;
   wrongMove: Move | null;
+  visibleFace: FaceId | null;
+  faceMatchesMove: boolean;
 }
 
 export interface FrameResult {
