@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SolvingAROverlay } from './components/SolvingAROverlay';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import { SolvingOverlay } from './components/SolvingOverlay';
+import {
+  colorsForMove,
+  SolvingGuideOverlay,
+} from './components/SolvingGuideOverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -71,7 +73,6 @@ export default function App() {
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
-  const showAr = state.phase === 'solving';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -80,10 +81,15 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
+  const solvingFaceColors =
+    currentMove && state.phase === 'solving'
+      ? colorsForMove(currentMove, state.scannedFaceColors)
+      : [];
+
   return (
     <main className="app">
       <div
-        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}`}
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${state.phase === 'solving' ? ' viewport--solving' : ''}`}
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
@@ -98,19 +104,6 @@ export default function App() {
               viewportHeight={viewportSize.height}
               colorLearnSpot={state.phase === 'colorLearn'}
               spotColor={COLOR_HEX[colorLearnTarget]}
-            />
-
-            <SolvingAROverlay
-              pose={state.currentPose}
-              move={currentMove}
-              rotationProgress={state.solvingFeedback.rotationProgress}
-              visibleFaceColors={state.solvingFeedback.visibleFaceColors}
-              scannedFaceColors={state.scannedFaceColors}
-              frameWidth={dimensions.width}
-              frameHeight={dimensions.height}
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-              active={showAr}
             />
 
             <ColorLearnOverlay
@@ -147,10 +140,12 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
-            <SolvingOverlay
+            <SolvingGuideOverlay
               visible={state.phase === 'solving' && Boolean(currentMove)}
-              currentMove={currentMove!}
-              feedback={state.solvingFeedback}
+              move={currentMove!}
+              faceColors={solvingFaceColors}
+              rotationProgress={state.solvingFeedback.rotationProgress}
+              wrongMove={state.solvingFeedback.wrongMove}
               onSkip={skipCurrentMove}
             />
 

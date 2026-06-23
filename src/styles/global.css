@@ -1000,3 +1000,129 @@ body,
 .solving-skip:active {
   background: rgba(255, 255, 255, 0.15);
 }
+
+/* ── Static solving guide (fixed face + rotation arrow) ── */
+.viewport--solving::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.solving-guide-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.solving-guide-card {
+  position: relative;
+  width: min(84vw, 312px);
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(12, 12, 16, 0.88);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.solving-guide-card--wrong {
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.55),
+    0 0 0 2px rgba(255, 107, 107, 0.65);
+}
+
+.face-color-grid--solving {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.solving-face-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.solving-guide-arrow {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  width: calc(100% - 28px);
+  height: auto;
+  aspect-ratio: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.solving-guide-track {
+  stroke: rgba(255, 255, 255, 0.18);
+}
+
+.solving-guide-active {
+  stroke: #facc15;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.55));
+}
+
+.solving-guide-active--wrong {
+  stroke: #ff6b6b;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.5));
+}
+
+.solving-guide-head {
+  fill: #facc15;
+}
+
+.solving-guide-head--wrong {
+  fill: #ff6b6b;
+}
+
+.solving-guide-double {
+  fill: rgba(255, 255, 255, 0.9);
+  font-size: 32px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.65);
+  stroke-width: 4px;
+}
+
+.solving-guide-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.solving-guide-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #facc15, #fde047);
+  transition: width 0.1s linear;
+}
+
+.solving-guide-card--wrong .solving-guide-progress-fill {
+  background: linear-gradient(90deg, #ff6b6b, #ff8a80);
+}

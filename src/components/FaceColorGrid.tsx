@@ -7,7 +7,7 @@ export type FaceGridOrientation = 'mirror' | 'real';
 interface FaceColorGridProps {
   colors: StickerColor[];
   cellClassName?: string;
-  variant?: 'mini' | 'overlay';
+  variant?: 'mini' | 'overlay' | 'solving';
   /** mirror = selfie preview; real = physical world (stored sensor order). */
   orientation?: FaceGridOrientation;
 }
@@ -19,7 +19,12 @@ export function FaceColorGrid({
   orientation = 'real',
 }: FaceColorGridProps) {
   const resolvedCellClass =
-    cellClassName ?? (variant === 'mini' ? 'face-grid-mini-cell' : 'cell-grid-item');
+    cellClassName ??
+    (variant === 'mini'
+      ? 'face-grid-mini-cell'
+      : variant === 'solving'
+        ? 'solving-face-cell'
+        : 'cell-grid-item');
   const displayColors =
     orientation === 'mirror' ? mirrorFaceCellsHorizontally(colors) : colors;
 

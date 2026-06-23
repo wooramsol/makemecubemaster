@@ -595,7 +595,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (Date.now() - stepReadyMs.current < 1_800) return;
     if (tracking !== 'locked') return;
     if (result.rotationProgress < 0.78) return;
-    if (!faceMatchesMove) return;
 
     if (solution && expected && result.rotationMove === expected) {
       applyCompletedMove(result.rotationMove);
