@@ -15,8 +15,21 @@ const CENTER_COLOR_TO_FACE: Record<StickerColor, FaceId> = {
   B: 'B',
 };
 
+const FACE_CENTER_COLOR: Record<FaceId, StickerColor> = {
+  U: 'W',
+  D: 'Y',
+  F: 'G',
+  R: 'R',
+  L: 'O',
+  B: 'B',
+};
+
 export function identifyFaceFromCenter(center: StickerColor): FaceId | null {
   return CENTER_COLOR_TO_FACE[center] ?? null;
+}
+
+export function getFaceCenterColor(faceId: FaceId): StickerColor {
+  return FACE_CENTER_COLOR[faceId];
 }
 
 const FACE_NUMBER: Record<FaceId, number> = {

@@ -1,5 +1,7 @@
-import type { FaceId, Move, SolvingFeedback, SolvingTrackingStatus } from '../types';
-import { moveFace } from '../lib/cube/moves';
+import type { Move, SolvingFeedback, StickerColor } from '../types';
+import { getFaceCenterColor } from '../lib/cube/colors';
+import { isDoubleMove, isPrimeMove, moveFace } from '../lib/cube/moves';
+import { COLOR_HEX, COLOR_LABELS } from '../lib/vision/colorReference';
 
 interface SolvingOverlayProps {
   visible: boolean;
@@ -8,41 +10,26 @@ interface SolvingOverlayProps {
   onSkip?: () => void;
 }
 
-const FACE_LABELS: Record<string, string> = {
-  U: 'Top',
-  D: 'Bottom',
-  F: 'Front',
-  B: 'Back',
-  L: 'Left',
-  R: 'Right',
-};
-
-function moveDescription(move: Move): string {
-  const face = moveFace(move);
-  const label = FACE_LABELS[face] ?? face;
-  if (move.endsWith('2')) return `Turn ${label} 180°`;
-  if (move.endsWith("'")) return `Turn ${label} counter-clockwise`;
-  return `Turn ${label} clockwise`;
-}
-
-function faceLabel(face: FaceId): string {
-  return FACE_LABELS[face] ?? face;
+function rotationLabel(move: Move): string {
+  if (isDoubleMove(move)) return 'Turn 180°';
+  if (isPrimeMove(move)) return 'Turn counter-clockwise';
+  return 'Turn clockwise';
 }
 
 function trackingHint(
-  status: SolvingTrackingStatus,
-  progress: number,
-  faceMatchesMove: boolean,
-  currentMove: Move,
+  feedback: SolvingFeedback,
+  targetCenter: StickerColor,
 ): string {
+  const { tracking, rotationProgress, wrongMove, faceMatchesMove } = feedback;
+
+  if (wrongMove) return 'Wrong direction — follow the arrow on the cube';
   if (!faceMatchesMove) {
-    const target = faceLabel(moveFace(currentMove));
-    return `Turn the ${target} face — 3D arrow shows on the cube`;
+    return `Show the ${COLOR_LABELS[targetCenter]} center to the camera`;
   }
-  if (status === 'lost') return 'Cube lost — hold it steady in view';
-  if (status === 'searching') return 'Center the cube in the guide';
-  if (progress > 0.15) return 'Keep turning…';
-  return 'Follow the highlighted face and arrow';
+  if (tracking === 'lost') return 'Cube lost — hold it steady in view';
+  if (tracking === 'searching') return 'Center the cube in the guide';
+  if (rotationProgress > 0.15) return 'Keep turning…';
+  return 'Follow the arrow on the cube';
 }
 
 export function SolvingOverlay({
@@ -54,15 +41,21 @@ export function SolvingOverlay({
   if (!visible) return null;
 
   const { tracking, rotationProgress, wrongMove, faceMatchesMove } = feedback;
-  const hint = wrongMove
-    ? `Wrong move (${wrongMove}) — try ${currentMove}`
-    : trackingHint(tracking, rotationProgress, faceMatchesMove, currentMove);
+  const targetFace = moveFace(currentMove);
+  const targetCenter = getFaceCenterColor(targetFace);
+  const hint = trackingHint(feedback, targetCenter);
 
   return (
     <div className="solving-overlay" aria-live="polite">
       <div className="solving-banner">
-        <p className="solving-move">{currentMove}</p>
-        <p className="solving-description">{moveDescription(currentMove)}</p>
+        <div className="solving-visual-hint">
+          <span
+            className="solving-center-swatch"
+            style={{ background: COLOR_HEX[targetCenter] }}
+            aria-hidden="true"
+          />
+          <p className="solving-rotation">{rotationLabel(currentMove)}</p>
+        </div>
         <p className={`solving-hint${wrongMove ? ' solving-hint--wrong' : ''}`}>{hint}</p>
         {tracking === 'locked' && faceMatchesMove && (
           <div className="solving-progress" aria-hidden="true">

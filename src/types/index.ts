@@ -91,6 +91,7 @@ export interface SolvingFeedback {
   wrongMove: Move | null;
   visibleFace: FaceId | null;
   faceMatchesMove: boolean;
+  liveFaceColors: StickerColor[] | null;
 }
 
 export interface FrameResult {
