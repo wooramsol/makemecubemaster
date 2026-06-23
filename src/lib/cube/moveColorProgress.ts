@@ -310,12 +310,18 @@ function evaluateOneFace(
 
     const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
     const isDouble = changed.length >= 6;
-    const matchRatio = isDouble ? 0.5 : 0.58;
+    const minChanged = Math.max(1, Math.ceil(changed.length * (isDouble ? 0.45 : 0.5)));
+    const minAfterPeriph = 3;
+    const strongChanged = Math.ceil(changed.length * (isDouble ? 0.55 : 0.58));
     const completed =
       (tracker.sawPreMoveAlignment || beforePeriph >= 4) &&
-      changedMatch >= Math.ceil(changed.length * matchRatio) &&
-      afterPeriph >= 4 &&
-      (isDouble || changedMatch >= Math.ceil(changed.length * 0.7) || afterPeriph > beforePeriph);
+      changedMatch >= minChanged &&
+      afterPeriph >= minAfterPeriph &&
+      (isDouble
+        ? progress >= 0.45
+        : progress >= 0.62 ||
+          changedMatch >= strongChanged ||
+          afterPeriph > beforePeriph);
 
     if (completed || progress > best.progress) {
       best = {
