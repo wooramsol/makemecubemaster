@@ -111,6 +111,8 @@ export function SolvingMoveHint({
     statusText = 'Repositioning detected — turn one layer only, not the whole cube';
   } else if (wrong) {
     statusText = 'Wrong turn — follow the arrow direction';
+  } else if (rotationProgress >= 0.9) {
+    statusText = `Turn recognized — hold steady (${progressPct}%)`;
   } else if (rotationProgress > 0.12) {
     statusText = `Good — keep turning (${progressPct}%)`;
   } else if (scanPct >= 45) {

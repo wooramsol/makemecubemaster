@@ -133,6 +133,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const trackingLostFrames = useRef(0);
   const expectedMoveRef = useRef<Move | null>(null);
   const colorCompleteStableRef = useRef(0);
+  const progressHighStableRef = useRef(0);
   const moveColorTrackerRef = useRef(createMoveColorTrackerState());
   const recentDetectionsRef = useRef<StickerColor[][]>([]);
   const recentFaceDetectionsRef = useRef<Partial<Record<FaceId, StickerColor[][]>>>({});
@@ -244,6 +245,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     });
     stepReadyMs.current = Date.now();
     colorCompleteStableRef.current = 0;
+    progressHighStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
     recentDetectionsRef.current = [];
     recentFaceDetectionsRef.current = {};
@@ -361,6 +363,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             }
             syncExpectedMove(msg.moves[0] ?? null);
             colorCompleteStableRef.current = 0;
+            progressHighStableRef.current = 0;
             resetMoveColorTracker(moveColorTrackerRef.current);
             recentDetectionsRef.current = [];
             recentFaceDetectionsRef.current = {};
@@ -665,6 +668,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           )
         : null;
 
+    const colorProgress = colorEval?.progress ?? 0;
+    const turnActive =
+      moveColorTrackerRef.current.sawPreMoveAlignment || colorProgress > 0.18;
+    const scanFacelet =
+      turnActive && expected && faceletRef.current
+        ? applyMoveToFacelet(faceletRef.current, expected)
+        : faceletRef.current;
+
     const scanFaceId =
       moveFaceId &&
       (stableVisibleFaceColors[moveFaceId] || turnEvalColors[moveFaceId])
@@ -674,8 +685,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       scanFaceId &&
       (stableVisibleFaceColors[scanFaceId] ?? turnEvalColors[scanFaceId]);
     const scanMatchRaw =
-      scanFaceId && faceletRef.current && scanColors?.length === 9
-        ? matchFaceToFacelet(faceletRef.current, scanFaceId, scanColors)
+      scanFaceId && scanFacelet && scanColors?.length === 9
+        ? matchFaceToFacelet(scanFacelet, scanFaceId, scanColors)
         : 0;
 
     const recentScan = recentScanMatchRef.current;
@@ -695,14 +706,13 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     scanMatchSmootherRef.current = smoothScan;
     const scanMatch = smoothScan;
 
-    const colorProgress = colorEval?.progress ?? 0;
-
     if (colorEval?.rejectedWholeCube && colorProgress < 0.2) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
       if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
       recentFaceDetectionsRef.current = {};
       colorCompleteStableRef.current = 0;
+      progressHighStableRef.current = 0;
       if (result.pose) frameProcessor.current?.syncPose(result.pose);
     } else if (
       moveColorTrackerRef.current.sawPreMoveAlignment &&
@@ -713,8 +723,19 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     const poseRotationProgress = result.rotationProgress;
     const handMotionDetected = Boolean(colorEval?.rejectedWholeCube && colorProgress < 0.2);
-    const rotationProgress = colorProgress;
-    const moveComplete = Boolean(colorEval?.completed);
+    const highTurnProgress =
+      moveColorTrackerRef.current.sawPreMoveAlignment && colorProgress >= 0.65;
+    if (highTurnProgress) {
+      progressHighStableRef.current++;
+    } else {
+      progressHighStableRef.current = 0;
+    }
+    const moveComplete =
+      Boolean(colorEval?.completed) ||
+      (highTurnProgress && progressHighStableRef.current >= 3);
+    const rotationProgress = moveComplete
+      ? Math.max(colorProgress, 0.95)
+      : colorProgress;
 
     let tracking: SolvingFeedback['tracking'] = 'searching';
     if (result.pose && (visibleFaces.length >= 2 || result.detectedFace)) {
@@ -756,8 +777,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           matchScore: 0,
         };
       }
-      const matchScore = faceletRef.current
-        ? matchFaceToFacelet(faceletRef.current, faceId, colors)
+      const matchScore = scanFacelet
+        ? matchFaceToFacelet(scanFacelet, faceId, colors)
         : 0;
       const status =
         matchScore >= 0.65 ? ('locked' as const) : ('scanning' as const);
@@ -798,6 +819,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       syncExpectedMove(nextMove);
       trackingLostFrames.current = 0;
       colorCompleteStableRef.current = 0;
+      progressHighStableRef.current = 0;
       resetMoveColorTracker(moveColorTrackerRef.current);
       recentFaceDetectionsRef.current = {};
       stepReadyMs.current = Date.now();
@@ -862,6 +884,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     syncExpectedMove(nextMove);
     trackingLostFrames.current = 0;
     colorCompleteStableRef.current = 0;
+    progressHighStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
     recentFaceDetectionsRef.current = {};
     scanMatchSmootherRef.current = 0;
