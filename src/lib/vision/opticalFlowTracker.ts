@@ -18,6 +18,12 @@ export class OpticalFlowTracker {
     this.lostFrames = 0;
   }
 
+  /** Pre-load corners from scan/solve start without resetting on first frame. */
+  seed(corners: [Point2D, Point2D, Point2D, Point2D]): void {
+    this.trackedCorners = corners;
+    this.lostFrames = 0;
+  }
+
   update(
     gray: import('../../types/opencv').OpenCVMat,
     detectedCorners: [Point2D, Point2D, Point2D, Point2D] | null,
@@ -32,8 +38,13 @@ export class OpticalFlowTracker {
       return detectedCorners;
     }
 
-    if (!this.prevGray || !this.trackedCorners) {
+    if (!this.trackedCorners) {
       return null;
+    }
+
+    if (!this.prevGray) {
+      this.prevGray = gray.clone();
+      return this.trackedCorners;
     }
 
     const prevPts = cv.matFromArray(4, 1, cv.CV_32FC2, flattenCorners(this.trackedCorners));

@@ -7,7 +7,8 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { identifyFaceFromCenter } from '../cube/colors';
-import { getGuideSquare, guideToCorners, translateCorners } from './roi';
+import { getGuideSquare, guideToCorners, translateCorners, SOLVING_GUIDE_SIZE_RATIO, GUIDE_SIZE_RATIO } from './roi';
+import { sampleColorsFromQuad } from './quadColorSampler';
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
   const d = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -157,6 +158,21 @@ export function detectCubeCorners(
   return guided?.corners ?? null;
 }
 
+const SOLVING_CORNER_RATIOS = [0.72, SOLVING_GUIDE_SIZE_RATIO, 0.42, GUIDE_SIZE_RATIO, 0.85];
+
+/** 풀이 단계 — 여러 스케일 + 전체 프레임에서 코너 검출 */
+export function detectSolvingCorners(
+  sourceCanvas: HTMLCanvasElement,
+  frameWidth: number,
+  frameHeight: number,
+): [Point2D, Point2D, Point2D, Point2D] | null {
+  for (const ratio of SOLVING_CORNER_RATIOS) {
+    const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight, ratio);
+    if (corners) return corners;
+  }
+  return tryOpenCVDetect(sourceCanvas, frameWidth, frameHeight);
+}
+
 export function detectCubeFace(
   sourceCanvas: HTMLCanvasElement,
   frameWidth: number,
@@ -189,6 +205,26 @@ export function detectCubeFace(
     hintFace,
   );
   pose.confidence = corners ? 0.85 : 0.7;
+
+  return { colors, pose };
+}
+
+/** 풀이 단계 — 실제 코너 쿼드에서 색 샘플링 (가이드 워프 대신) */
+export function detectSolvingFace(
+  sourceCanvas: HTMLCanvasElement,
+  frameWidth: number,
+  frameHeight: number,
+): DetectedFace | null {
+  const corners = detectSolvingCorners(sourceCanvas, frameWidth, frameHeight);
+  if (!corners) return null;
+
+  const colors = sampleColorsFromQuad(sourceCanvas, frameWidth, frameHeight, corners);
+  if (!colors || colors.length !== 9) return null;
+
+  const hintFace = colors[4] ? identifyFaceFromCenter(colors[4]) : null;
+  const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight, hintFace);
+  pose.confidence = 0.8;
+  if (hintFace) pose.visibleFace = hintFace;
 
   return { colors, pose };
 }

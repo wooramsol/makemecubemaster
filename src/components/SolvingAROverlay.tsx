@@ -28,10 +28,20 @@ export function SolvingAROverlay({
   const poseRef = useRef(pose);
   const progressRef = useRef(rotationProgress);
   const moveRef = useRef(move);
+  const heldPoseRef = useRef<CubePose | null>(null);
+  const lostFramesRef = useRef(0);
 
   poseRef.current = pose;
   progressRef.current = rotationProgress;
   moveRef.current = move;
+
+  if (pose) {
+    heldPoseRef.current = pose;
+    lostFramesRef.current = 0;
+  } else if (heldPoseRef.current) {
+    lostFramesRef.current++;
+    if (lostFramesRef.current > 90) heldPoseRef.current = null;
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -52,7 +62,7 @@ export function SolvingAROverlay({
     const tick = () => {
       const ctx = canvas.getContext('2d');
       const currentMove = moveRef.current;
-      const currentPose = poseRef.current;
+      const currentPose = poseRef.current ?? heldPoseRef.current;
       if (ctx && viewportWidth && viewportHeight) {
         const dpr = Math.min(window.devicePixelRatio, 2);
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

@@ -348,9 +348,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.setSolvingScanMode(true);
-            frameProcessor.current?.disableTracking();
             const pose = lastPoseRef.current;
-            if (pose) frameProcessor.current?.seedSolvingPose(pose);
+            if (pose) {
+              frameProcessor.current?.enableSolvingTracking(pose);
+            }
             syncExpectedMove(msg.moves[0] ?? null);
             colorCompleteStableRef.current = 0;
             resetMoveColorTracker(moveColorTrackerRef.current);

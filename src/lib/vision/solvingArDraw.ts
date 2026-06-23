@@ -2,6 +2,38 @@ import type { CubePose, FaceId, Move } from '../../types';
 import { drawCubeRotationArrow, mapFramePointToScreen } from './faceArrow';
 import { pickArrowCorners } from './poseAlign';
 
+function strokeTrackedQuad(
+  ctx: CanvasRenderingContext2D,
+  corners: [import('../../types').Point2D, import('../../types').Point2D, import('../../types').Point2D, import('../../types').Point2D],
+  frameWidth: number,
+  frameHeight: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): void {
+  const [tl, tr, br, bl] = corners.map((p) =>
+    mapFramePointToScreen(p, frameWidth, frameHeight, viewportWidth, viewportHeight),
+  ) as typeof corners;
+
+  const edge = Math.min(
+    Math.hypot(tr.x - tl.x, tr.y - tl.y),
+    Math.hypot(bl.x - tl.x, bl.y - tl.y),
+  );
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(tl.x, tl.y);
+  ctx.lineTo(tr.x, tr.y);
+  ctx.lineTo(br.x, br.y);
+  ctx.lineTo(bl.x, bl.y);
+  ctx.closePath();
+  ctx.strokeStyle = 'rgba(0, 255, 180, 0.9)';
+  ctx.lineWidth = Math.max(2, edge * 0.035);
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 4;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function strokeFaceOutline(
   ctx: CanvasRenderingContext2D,
   corners: [import('../../types').Point2D, import('../../types').Point2D, import('../../types').Point2D, import('../../types').Point2D],
@@ -48,6 +80,15 @@ export function drawSolvingAR(
 ): void {
   if (!frameWidth || !frameHeight || !viewportWidth || !viewportHeight) return;
   if (!move || !moveFaceId) return;
+
+  strokeTrackedQuad(
+    ctx,
+    pose.corners,
+    frameWidth,
+    frameHeight,
+    viewportWidth,
+    viewportHeight,
+  );
 
   const arrowCorners = pickArrowCorners(pose, moveFaceId, frameWidth, frameHeight);
   strokeFaceOutline(
