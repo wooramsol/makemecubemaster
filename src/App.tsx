@@ -1,20 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppTitle } from './components/AppTitle';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import { SolvingGuideOverlay } from './components/SolvingGuideOverlay';
-import { SolvingScanZone } from './components/SolvingScanZone';
-import { colorsForMoveFromFacelet } from './lib/cube/moveColorProgress';
+import { SolvingMoveHint } from './components/SolvingMoveHint';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
-import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
-import { APP_VERSION } from './lib/appVersion';
 import './styles/global.css';
 
 export default function App() {
@@ -72,6 +69,7 @@ export default function App() {
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
+  const isSolving = state.phase === 'solving';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -80,18 +78,14 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const solvingFaceColors =
-    currentMove && state.phase === 'solving' && state.solvingFacelet
-      ? colorsForMoveFromFacelet(currentMove, state.solvingFacelet)
-      : [];
-
   return (
     <main className="app">
       <div
-        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${state.phase === 'solving' ? ' viewport--solving' : ''}`}
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}`}
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
+        <AppTitle />
 
         {!isBooting && !hasError && (
           <>
@@ -128,9 +122,12 @@ export default function App() {
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
             />
 
-            <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
             <LiveScanOverlay
               phase={state.phase}
               knownFaces={state.knownFaces}
@@ -139,23 +136,24 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
-            <SolvingScanZone
-              visible={state.phase === 'solving'}
-              frameWidth={dimensions.width}
-              frameHeight={dimensions.height}
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-              tracking={state.solvingFeedback.tracking}
-              rotationProgress={state.solvingFeedback.rotationProgress}
-            />
-
-            <SolvingGuideOverlay
-              visible={state.phase === 'solving' && Boolean(currentMove)}
-              move={currentMove!}
-              faceColors={solvingFaceColors}
-              wrongMove={state.solvingFeedback.wrongMove}
-              onSkip={skipCurrentMove}
-            />
+            {isSolving && currentMove && (
+              <SolvingMoveHint
+                visible
+                move={currentMove}
+                facelet={state.solvingFacelet}
+                rotationProgress={state.solvingFeedback.rotationProgress}
+                scanMatch={state.solvingFeedback.scanMatch}
+                handMotionDetected={state.solvingFeedback.handMotionDetected}
+                wrongMove={state.solvingFeedback.wrongMove}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                frameWidth={dimensions.width}
+                frameHeight={dimensions.height}
+                viewportWidth={viewportSize.width}
+                viewportHeight={viewportSize.height}
+                onSkip={skipCurrentMove}
+              />
+            )}
 
             {state.phase === 'solved' && (
               <div className="solved-banner">
@@ -202,9 +200,6 @@ export default function App() {
           </div>
         )}
       </div>
-      <p className="app-version" aria-hidden="true">
-        v{APP_VERSION}
-      </p>
     </main>
   );
 }

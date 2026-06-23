@@ -7,6 +7,7 @@ import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 const PERIPHERY = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+const ALL_CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 const FACELET_TO_STICKER: Record<string, StickerColor> = {
   U: 'W',
@@ -26,8 +27,8 @@ export interface MoveColorEvaluation {
 }
 
 export interface MoveColorTrackerState {
-  orientationLock: number | null;
-  lockMissFrames: number;
+  orientationLocks: Partial<Record<FaceId, number>>;
+  lockMissFrames: Partial<Record<FaceId, number>>;
   /** Face toward camera when this step aligned — detects whole-cube reorientation */
   stepAnchorFace: FaceId | null;
   /** Saw a stable pre-move reading this step */
@@ -36,16 +37,16 @@ export interface MoveColorTrackerState {
 
 export function createMoveColorTrackerState(): MoveColorTrackerState {
   return {
-    orientationLock: null,
-    lockMissFrames: 0,
+    orientationLocks: {},
+    lockMissFrames: {},
     stepAnchorFace: null,
     sawPreMoveAlignment: false,
   };
 }
 
 export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
-  tracker.orientationLock = null;
-  tracker.lockMissFrames = 0;
+  tracker.orientationLocks = {};
+  tracker.lockMissFrames = {};
   tracker.stepAnchorFace = null;
   tracker.sawPreMoveAlignment = false;
 }
@@ -59,6 +60,40 @@ function faceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
 export function colorsForMoveFromFacelet(move: Move, facelet: string): StickerColor[] {
   if (!facelet || facelet.length !== 54) return [];
   return faceletFaceColors(facelet, moveFace(move));
+}
+
+export function getFaceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
+  if (!facelet || facelet.length !== 54) return [];
+  return faceletFaceColors(facelet, faceId);
+}
+
+export function faceletColorsForFaces(
+  facelet: string,
+  faceIds: FaceId[],
+): Partial<Record<FaceId, StickerColor[]>> {
+  const result: Partial<Record<FaceId, StickerColor[]>> = {};
+  for (const faceId of faceIds) {
+    const colors = getFaceletFaceColors(facelet, faceId);
+    if (colors.length === 9) result[faceId] = colors;
+  }
+  return result;
+}
+
+/** 0–1 score: how well detected colors match virtual cube face (periphery stickers). */
+export function matchFaceToFacelet(
+  facelet: string,
+  faceId: FaceId,
+  detected: StickerColor[],
+): number {
+  if (!facelet || facelet.length !== 54 || detected.length !== 9) return 0;
+  const expected = faceletFaceColors(facelet, faceId);
+  const refs = [expected, mirrorFaceCellsHorizontally(expected)];
+  let best = 0;
+  for (const ref of refs) {
+    const pick = bestOrientationForReference(detected, ref, PERIPHERY);
+    best = Math.max(best, pick.matches / PERIPHERY.length);
+  }
+  return best;
 }
 
 export function applyMoveToFacelet(facelet: string, move: Move): string {
@@ -225,15 +260,23 @@ function evaluateOneFace(
   let best: FaceEvalResult = { progress: 0, completed: false, rejectedWholeCube: false };
 
   for (const ref of refs) {
+    const beforePick = bestOrientationForReference(detected, ref.before, PERIPHERY);
+    const afterPick = bestOrientationForReference(detected, ref.after, ALL_CELLS);
+
     let oriented: StickerColor[];
-    if (tracker.orientationLock !== null) {
-      oriented = orientByIndex(detected, tracker.orientationLock);
+    if (tracker.sawPreMoveAlignment) {
+      // After turn starts, align grid to post-move layout (not pre-move lock).
+      oriented =
+        afterPick.matches >= beforePick.matches ? afterPick.oriented : beforePick.oriented;
+      tracker.orientationLocks[faceId] =
+        afterPick.matches >= beforePick.matches ? afterPick.index : beforePick.index;
+    } else if (tracker.orientationLocks[faceId] !== undefined) {
+      oriented = orientByIndex(detected, tracker.orientationLocks[faceId]!);
     } else {
-      const pick = bestOrientationForReference(detected, ref.before, PERIPHERY);
-      oriented = pick.oriented;
-      if (pick.matches >= 6) {
-        tracker.orientationLock = pick.index;
-        tracker.lockMissFrames = 0;
+      oriented = beforePick.oriented;
+      if (beforePick.matches >= 5) {
+        tracker.orientationLocks[faceId] = beforePick.index;
+        tracker.lockMissFrames[faceId] = 0;
       }
     }
 
@@ -241,7 +284,7 @@ function evaluateOneFace(
     const changedMatch = countMatchingAtIndices(oriented, ref.after, changed);
     const progress = changedMatch / changed.length;
 
-    if (beforePeriph >= 6) {
+    if (beforePeriph >= 5) {
       tracker.sawPreMoveAlignment = true;
     }
 
@@ -253,19 +296,26 @@ function evaluateOneFace(
       unchanged,
     );
 
-    if (!layerSignature) {
-      if (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) {
+    const turning = tracker.sawPreMoveAlignment || progress > 0.15;
+
+    if (!layerSignature && !turning) {
+      if (
+        (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) &&
+        progress < 0.2
+      ) {
         best = { progress: 0, completed: false, rejectedWholeCube: true };
       }
       continue;
     }
 
     const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
+    const isDouble = changed.length >= 6;
+    const matchRatio = isDouble ? 0.5 : 0.58;
     const completed =
-      tracker.sawPreMoveAlignment &&
-      changedMatch >= Math.ceil(changed.length * 0.65) &&
-      afterPeriph > beforePeriph &&
-      afterPeriph >= 5;
+      (tracker.sawPreMoveAlignment || beforePeriph >= 4) &&
+      changedMatch >= Math.ceil(changed.length * matchRatio) &&
+      afterPeriph >= 4 &&
+      (isDouble || changedMatch >= Math.ceil(changed.length * 0.7) || afterPeriph > beforePeriph);
 
     if (completed || progress > best.progress) {
       best = {
@@ -275,15 +325,15 @@ function evaluateOneFace(
       };
     }
 
-    if (tracker.orientationLock !== null) {
+    if (tracker.orientationLocks[faceId] !== undefined && !tracker.sawPreMoveAlignment) {
       if (beforePeriph < 4) {
-        tracker.lockMissFrames++;
-        if (tracker.lockMissFrames > 8) {
-          tracker.orientationLock = null;
-          tracker.lockMissFrames = 0;
+        tracker.lockMissFrames[faceId] = (tracker.lockMissFrames[faceId] ?? 0) + 1;
+        if ((tracker.lockMissFrames[faceId] ?? 0) > 8) {
+          delete tracker.orientationLocks[faceId];
+          delete tracker.lockMissFrames[faceId];
         }
       } else {
-        tracker.lockMissFrames = 0;
+        tracker.lockMissFrames[faceId] = 0;
       }
     }
   }
@@ -354,6 +404,87 @@ export function evaluateMoveColorProgress(
         progress: result.progress,
         completed: result.completed,
         visibleFace: detectedFace,
+        comparisonFace: faceId,
+        rejectedWholeCube: false,
+      };
+      if (result.completed) break;
+    }
+  }
+
+  return best;
+}
+
+/** Evaluate all visible faces against the virtual cube — best progress wins. */
+export function evaluateThreeFaceMoveProgress(
+  facelet: string,
+  move: Move,
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>,
+  primaryVisibleFace: FaceId | null,
+  tracker: MoveColorTrackerState,
+): MoveColorEvaluation {
+  if (!facelet || facelet.length !== 54) {
+    return {
+      progress: 0,
+      completed: false,
+      visibleFace: primaryVisibleFace,
+      comparisonFace: null,
+      rejectedWholeCube: false,
+    };
+  }
+
+  if (primaryVisibleFace) {
+    if (tracker.stepAnchorFace === null) {
+      tracker.stepAnchorFace = primaryVisibleFace;
+    } else if (
+      primaryVisibleFace !== tracker.stepAnchorFace &&
+      !tracker.sawPreMoveAlignment
+    ) {
+      return {
+        progress: 0,
+        completed: false,
+        visibleFace: primaryVisibleFace,
+        comparisonFace: null,
+        rejectedWholeCube: true,
+      };
+    }
+  }
+
+  const affected = ALL_FACES.filter((f) => faceChangesFromMove(facelet, move, f) > 0);
+  const moveFaceId = moveFace(move);
+  const visibleIds = Object.keys(visibleFaceColors) as FaceId[];
+  const facesToTry = [
+    ...visibleIds.filter((f) => affected.includes(f)),
+    moveFaceId,
+    ...affected.filter((f) => f !== moveFaceId && !visibleIds.includes(f)),
+  ].filter((f, i, arr) => affected.includes(f) && arr.indexOf(f) === i);
+
+  let best: MoveColorEvaluation = {
+    progress: 0,
+    completed: false,
+    visibleFace: primaryVisibleFace,
+    comparisonFace: null,
+    rejectedWholeCube: false,
+  };
+
+  for (const faceId of facesToTry) {
+    const detected = visibleFaceColors[faceId];
+    if (!detected || detected.length !== 9) continue;
+
+    const result = evaluateOneFace(facelet, move, faceId, detected, tracker);
+    if (result.rejectedWholeCube) {
+      return {
+        progress: 0,
+        completed: false,
+        visibleFace: primaryVisibleFace,
+        comparisonFace: faceId,
+        rejectedWholeCube: true,
+      };
+    }
+    if (result.completed || result.progress > best.progress) {
+      best = {
+        progress: result.progress,
+        completed: result.completed,
+        visibleFace: primaryVisibleFace,
         comparisonFace: faceId,
         rejectedWholeCube: false,
       };

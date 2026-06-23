@@ -7,8 +7,11 @@ import { PoseSmoother } from './poseSmoother';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
 import { sampleVisibleFaceColors } from './multiFaceSampler';
+import { getVisibleFaces } from './visibleFaces';
+import { alignPoseToTrackedQuad } from './poseAlign';
+import { sampleColorsFromQuad } from './quadColorSampler';
 import { drawCameraFrame } from './selfieView';
-import { SOLVING_GUIDE_SIZE_RATIO } from './roi';
+import { GUIDE_SIZE_RATIO } from './roi';
 
 const LOST_TRACKING_THRESHOLD = 30;
 
@@ -31,6 +34,9 @@ export class FrameProcessor {
   private lastColors: StickerColor[] | null = null;
   private expectedMove: Move | null = null;
   private solvingScanMode = false;
+  private lastSolvingPose: CubePose | null = null;
+  private solvingLostFrames = 0;
+  private solvingReseedPending = false;
 
   constructor() {
     this.processCanvas = document.createElement('canvas');
@@ -56,10 +62,31 @@ export class FrameProcessor {
 
   setSolvingScanMode(on: boolean): void {
     this.solvingScanMode = on;
+    if (!on) {
+      this.lastSolvingPose = null;
+      this.solvingLostFrames = 0;
+    }
+  }
+
+  /** Seed pose + optical flow when entering solve — keeps AR on the physical cube. */
+  enableSolvingTracking(pose: CubePose): void {
+    this.lastSolvingPose = pose;
+    this.solvingLostFrames = 0;
+    this.lastColors = null;
+    this.poseSmoother.reset();
+    this.poseSmoother.update(pose);
+    this.rotationDetector.sync(pose.rotationMatrix);
+    this.flowTracker.seed(pose.corners);
+    this.solvingReseedPending = true;
+  }
+
+  /** @deprecated use enableSolvingTracking */
+  seedSolvingPose(pose: CubePose): void {
+    this.enableSolvingTracking(pose);
   }
 
   private guideRatio(): number | undefined {
-    return this.solvingScanMode ? SOLVING_GUIDE_SIZE_RATIO : undefined;
+    return this.solvingScanMode ? GUIDE_SIZE_RATIO : undefined;
   }
 
   setExpectedMove(move: Move | null): void {
@@ -107,13 +134,131 @@ export class FrameProcessor {
     drawCameraFrame(this.processCtx, video, width, height);
 
     try {
+      if (this.solvingScanMode) {
+        return this.processSolving(width, height);
+      }
       if (this.trackingEnabled) {
-        return this.processWithTracking(width, height);
+        const tracked = this.processWithTracking(width, height);
+        return tracked;
       }
       return this.processDetectionOnly(width, height);
     } catch {
       return { ...EMPTY_RESULT };
     }
+  }
+
+  private processSolving(width: number, height: number): FrameResult {
+    if (this.solvingReseedPending) {
+      const fresh = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
+      if (fresh) this.flowTracker.seed(fresh.pose.corners);
+      this.solvingReseedPending = false;
+    }
+
+    const guideFace = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
+    const guideCorners = guideFace?.pose.corners ?? null;
+    const gray = createGrayMat(this.processCanvas);
+    const detectedCorners =
+      guideCorners ?? detectCubeCorners(this.processCanvas, width, height, GUIDE_SIZE_RATIO);
+    const corners = this.flowTracker.update(gray, detectedCorners);
+    gray.delete();
+
+    if (corners) {
+      const quadColors =
+        guideFace?.colors ??
+        sampleColorsFromQuad(this.processCanvas, width, height, corners);
+      const hintFace = quadColors?.[4]
+        ? identifyFaceFromCenter(quadColors[4])
+        : guideFace?.pose.visibleFace ?? this.lastSolvingPose?.visibleFace ?? null;
+
+      let pose = guideFace
+        ? this.poseSmoother.update({ ...guideFace.pose, corners })
+        : estimatePoseFromCorners(corners, width, height, hintFace);
+      if (hintFace) pose = { ...pose, visibleFace: hintFace };
+      if (!pose.visibleFace) {
+        const visible = getVisibleFaces(pose);
+        if (visible[0]) pose = { ...pose, visibleFace: visible[0] };
+      }
+      const lostFrames = this.flowTracker.getLostFrames();
+      pose.confidence = guideFace ? 0.88 : Math.max(0.45, 0.85 - lostFrames * 0.012);
+      pose = this.poseSmoother.update(pose);
+      pose = alignPoseToTrackedQuad(pose, width, height);
+
+      if (quadColors) this.lastColors = quadColors;
+      this.lastSolvingPose = pose;
+      this.solvingLostFrames = 0;
+
+      const aligned = alignPoseToTrackedQuad(pose, width, height);
+      const visibleFaceColors = sampleVisibleFaceColors(
+        this.processCanvas,
+        aligned,
+        width,
+        height,
+      );
+      if (quadColors && pose.visibleFace) {
+        visibleFaceColors[pose.visibleFace] = quadColors;
+      }
+      const rotation = this.rotationDetector.update(pose.rotationMatrix);
+      const detectedFace: DetectedFace | null = quadColors
+        ? { colors: quadColors, pose: aligned }
+        : this.lastColors
+          ? { colors: this.lastColors, pose: aligned }
+          : null;
+
+      return {
+        pose: aligned,
+        detectedFace,
+        rotationMove: rotation.completedMove,
+        rotationProgress: rotation.progress,
+        wrongMove: rotation.wrongMove,
+        visibleFaceColors,
+      };
+    }
+
+    const fallbackFace = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
+    if (fallbackFace) {
+      this.lastColors = fallbackFace.colors;
+      let pose = this.poseSmoother.update(fallbackFace.pose);
+      pose = alignPoseToTrackedQuad(pose, width, height);
+      this.flowTracker.seed(pose.corners);
+      this.lastSolvingPose = pose;
+      this.solvingLostFrames = 0;
+
+      const aligned = alignPoseToTrackedQuad(pose, width, height);
+      const visibleFaceColors = sampleVisibleFaceColors(
+        this.processCanvas,
+        aligned,
+        width,
+        height,
+      );
+      const rotation = this.rotationDetector.update(pose.rotationMatrix);
+
+      return {
+        pose: aligned,
+        detectedFace: fallbackFace,
+        rotationMove: rotation.completedMove,
+        rotationProgress: rotation.progress,
+        wrongMove: rotation.wrongMove,
+        visibleFaceColors,
+      };
+    }
+
+    if (this.lastSolvingPose) {
+      this.solvingLostFrames++;
+      if (this.solvingLostFrames <= 90) {
+        const rotation = this.rotationDetector.update(this.lastSolvingPose.rotationMatrix);
+        return {
+          pose: this.lastSolvingPose,
+          detectedFace: null,
+          rotationMove: rotation.completedMove,
+          rotationProgress: rotation.progress,
+          wrongMove: rotation.wrongMove,
+          visibleFaceColors: {},
+        };
+      }
+      this.lastSolvingPose = null;
+    }
+
+    return { ...EMPTY_RESULT };
   }
 
   private processDetectionOnly(width: number, height: number): FrameResult {
@@ -141,7 +286,12 @@ export class FrameProcessor {
   }
 
   private processWithTracking(width: number, height: number): FrameResult {
-    const detectedCorners = detectCubeCorners(this.processCanvas, width, height);
+    const detectedCorners = detectCubeCorners(
+      this.processCanvas,
+      width,
+      height,
+      this.guideRatio(),
+    );
     const gray = createGrayMat(this.processCanvas);
     const corners = this.flowTracker.update(gray, detectedCorners);
     gray.delete();

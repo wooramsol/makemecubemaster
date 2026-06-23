@@ -1,4 +1,5 @@
 import type { CubePose, FaceId, StickerColor } from '../../types';
+import { alignPoseToTrackedQuad } from './poseAlign';
 import { projectFaceCorners } from './projectFace';
 import { sampleColorsFromQuad } from './quadColorSampler';
 import { getVisibleFaces } from './visibleFaces';
@@ -10,10 +11,11 @@ export function sampleVisibleFaceColors(
   frameHeight: number,
 ): Partial<Record<FaceId, StickerColor[]>> {
   const result: Partial<Record<FaceId, StickerColor[]>> = {};
-  const visible = getVisibleFaces(pose);
+  const aligned = alignPoseToTrackedQuad(pose, frameWidth, frameHeight);
+  const visible = getVisibleFaces(aligned);
 
   for (const faceId of visible) {
-    const corners = projectFaceCorners(faceId, pose, frameWidth, frameHeight);
+    const corners = projectFaceCorners(faceId, aligned, frameWidth, frameHeight);
     if (!corners) continue;
     const colors = sampleColorsFromQuad(sourceCanvas, frameWidth, frameHeight, corners);
     if (colors?.length === 9) {

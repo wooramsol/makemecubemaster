@@ -1,4 +1,4 @@
-import { getGuideSquare, getColorSampleSpot, SOLVING_GUIDE_SIZE_RATIO } from './roi';
+import { getGuideSquare, getColorSampleSpot } from './roi';
 import { SELFIE_CAMERA_MODE } from './selfieView';
 
 export interface GuideOverlayRect {
@@ -83,31 +83,35 @@ export function getGuideOverlayRect(
   );
 }
 
-/** 풀이 단계 중앙 스캔 영역 (카메라 프레임 → 화면 좌표) */
+/** 풀이 단계 — 면 스캔과 동일한 가이드 영역 사용 */
 export function getSolvingScanOverlayRect(
   frameWidth: number,
   frameHeight: number,
   containerWidth: number,
   containerHeight: number,
 ): GuideOverlayRect | null {
-  if (!frameWidth || !frameHeight || !containerWidth || !containerHeight) {
-    return null;
-  }
-
-  const guide = getGuideSquare(frameWidth, frameHeight, SOLVING_GUIDE_SIZE_RATIO);
-  return mapFrameRectToViewport(
-    guide.x,
-    guide.y,
-    guide.size,
-    guide.size,
-    frameWidth,
-    frameHeight,
-    containerWidth,
-    containerHeight,
-  );
+  return getGuideOverlayRect(frameWidth, frameHeight, containerWidth, containerHeight);
 }
 
-/** 흰색 기준 중앙 스팟 (화면 좌표) */
+/** Place a side panel to the right of the guide frame, vertically centered. */
+export function getPanelBesideGuideStyle(
+  guideRect: GuideOverlayRect,
+  viewportWidth: number,
+  panelMaxWidth = 220,
+  gap = 12,
+): { left: string; top: string; transform: string; maxWidth: string } {
+  const width = Math.min(panelMaxWidth, Math.max(140, viewportWidth * 0.38));
+  const left = Math.min(guideRect.left + guideRect.width + gap, viewportWidth - width - 8);
+  const top = guideRect.top + guideRect.height / 2;
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    transform: 'translateY(-50%)',
+    maxWidth: `${width}px`,
+  };
+}
+
+/** White-balance spot (viewport coordinates) */
 export function getWhiteSpotOverlayRect(
   frameWidth: number,
   frameHeight: number,

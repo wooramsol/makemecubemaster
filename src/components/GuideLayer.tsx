@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import type { AppPhase } from '../types';
-import { getGuideOverlayRect, getWhiteSpotOverlayRect } from '../lib/vision/guideOverlay';
+import {
+  getGuideOverlayRect,
+  getSolvingScanOverlayRect,
+  getWhiteSpotOverlayRect,
+} from '../lib/vision/guideOverlay';
 import { GuideOverlay } from './GuideOverlay';
 
 interface GuideLayerProps {
@@ -14,22 +18,31 @@ interface GuideLayerProps {
 }
 
 function useGuideRects(
+  phase: AppPhase,
   frameWidth: number,
   frameHeight: number,
   viewportWidth: number,
   viewportHeight: number,
 ) {
-  return useMemo(
-    () => ({
-      guideRect: getGuideOverlayRect(frameWidth, frameHeight, viewportWidth, viewportHeight),
+  return useMemo(() => {
+    const guideRect =
+      phase === 'solving'
+        ? getSolvingScanOverlayRect(frameWidth, frameHeight, viewportWidth, viewportHeight)
+        : getGuideOverlayRect(frameWidth, frameHeight, viewportWidth, viewportHeight);
+    return {
+      guideRect,
       spotRect: getWhiteSpotOverlayRect(frameWidth, frameHeight, viewportWidth, viewportHeight),
-    }),
-    [frameWidth, frameHeight, viewportWidth, viewportHeight],
-  );
+    };
+  }, [phase, frameWidth, frameHeight, viewportWidth, viewportHeight]);
 }
 
 function shouldShowGuide(phase: AppPhase): boolean {
-  return phase === 'colorLearn' || phase === 'scanReady' || phase === 'liveScan';
+  return (
+    phase === 'colorLearn' ||
+    phase === 'scanReady' ||
+    phase === 'liveScan' ||
+    phase === 'solving'
+  );
 }
 
 export function GuideLayer({
@@ -42,6 +55,7 @@ export function GuideLayer({
   spotColor = '#ffffff',
 }: GuideLayerProps) {
   const { guideRect, spotRect } = useGuideRects(
+    phase,
     frameWidth,
     frameHeight,
     viewportWidth,

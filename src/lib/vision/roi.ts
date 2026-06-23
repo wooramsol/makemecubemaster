@@ -3,8 +3,8 @@ import type { Point2D } from '../../types';
 /** 화면 중앙 정사각형 가이드 비율 (카메라 프레임 대비) */
 export const GUIDE_SIZE_RATIO = 0.3;
 
-/** 풀이 단계 — UI 오버레이와 맞춘 더 큰 샘플 영역 */
-export const SOLVING_GUIDE_SIZE_RATIO = 0.52;
+/** @deprecated Use GUIDE_SIZE_RATIO — solving now shares the live-scan guide. */
+export const SOLVING_GUIDE_SIZE_RATIO = GUIDE_SIZE_RATIO;
 
 /** 흰색 기준용 중앙 스팟 (가이드 대비 한 변 비율) — 옆 색 번짐 회피 */
 export const WB_SPOT_RATIO = 0.22;
