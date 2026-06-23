@@ -41,6 +41,7 @@ export function SolvingFaceStatusPanel({
         <span className="solving-face-status-summary">
           {lockedCount}/{total} 인식됨
           {scanningCount > 0 ? ` · ${scanningCount} 스캔 중` : ''}
+          {tracking === 'lost' ? ' · 큐브를 중앙에 맞춰주세요' : ''}
         </span>
         {onSkip && (
           <button type="button" className="solving-face-status-skip" onClick={onSkip}>

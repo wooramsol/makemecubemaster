@@ -30,10 +30,20 @@ export function SolvingCubeAROverlay({
   const poseRef = useRef(pose);
   const moveRef = useRef(move);
   const progressRef = useRef(rotationProgress);
+  const heldPoseRef = useRef<CubePose | null>(null);
+  const lostFramesRef = useRef(0);
 
   poseRef.current = pose;
   moveRef.current = move;
   progressRef.current = rotationProgress;
+
+  if (pose) {
+    heldPoseRef.current = pose;
+    lostFramesRef.current = 0;
+  } else if (heldPoseRef.current) {
+    lostFramesRef.current++;
+    if (lostFramesRef.current > 120) heldPoseRef.current = null;
+  }
 
   const coverRect = useMemo(() => {
     if (!frameWidth || !frameHeight || !viewportWidth || !viewportHeight) {
@@ -83,7 +93,7 @@ export function SolvingCubeAROverlay({
     if (!active) return;
     let raf = 0;
     const tick = () => {
-      const currentPose = poseRef.current;
+      const currentPose = poseRef.current ?? heldPoseRef.current;
       if (currentPose && frameWidth && frameHeight) {
         const aligned = alignPoseToTrackedQuad(currentPose, frameWidth, frameHeight);
         rendererRef.current?.render(aligned, true);

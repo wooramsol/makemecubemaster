@@ -135,7 +135,7 @@ export default function App() {
             />
 
             <SolvingCubeAROverlay
-              active={isSolving && Boolean(currentMove && state.currentPose)}
+              active={isSolving && Boolean(currentMove)}
               pose={state.currentPose}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}

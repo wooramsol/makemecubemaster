@@ -344,12 +344,13 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             detectionFeedback: initialFeedback,
             solvingFeedback: initialSolvingFeedback,
             solvingFacelet: msg.facelet,
+            currentPose: lastPoseRef.current ?? s.currentPose,
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.setSolvingScanMode(true);
-            frameProcessor.current?.enableTracking();
+            frameProcessor.current?.disableTracking();
             const pose = lastPoseRef.current;
-            if (pose) frameProcessor.current?.syncPose(pose);
+            if (pose) frameProcessor.current?.seedSolvingPose(pose);
             syncExpectedMove(msg.moves[0] ?? null);
             colorCompleteStableRef.current = 0;
             resetMoveColorTracker(moveColorTrackerRef.current);
@@ -610,7 +611,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     const visibleFaces = result.pose
       ? getVisibleFaces(result.pose)
-      : (Object.keys(result.visibleFaceColors) as FaceId[]);
+      : [];
 
     for (const faceId of visibleFaces) {
       const colors = result.visibleFaceColors[faceId];
@@ -657,12 +658,15 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     const poseMoveComplete = Boolean(expected && result.rotationMove === expected);
 
     let tracking: SolvingFeedback['tracking'] = 'searching';
-    if ((result.pose && visibleFaces.length >= 2) || Object.keys(stableVisibleFaceColors).length >= 2) {
+    if (result.pose && (visibleFaces.length >= 2 || result.detectedFace)) {
       tracking = 'locked';
       trackingLostFrames.current = 0;
-    } else if (!result.pose && Object.keys(stableVisibleFaceColors).length === 0) {
+    } else if (result.pose) {
+      tracking = 'searching';
+      trackingLostFrames.current = 0;
+    } else if (Object.keys(stableVisibleFaceColors).length === 0) {
       trackingLostFrames.current++;
-      tracking = trackingLostFrames.current > 8 ? 'lost' : 'searching';
+      tracking = trackingLostFrames.current > 12 ? 'lost' : 'searching';
     } else {
       tracking = 'searching';
     }
@@ -673,6 +677,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     } else {
       colorCompleteStableRef.current = 0;
     }
+
+    const hasPose = Boolean(result.pose);
 
     const faceScanInfos: FaceScanInfo[] = (
       visibleFaces.length >= 3
@@ -686,7 +692,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       const stable = stableVisibleFaceColors[faceId];
       const colors = stable ?? raw;
       if (!colors || colors.length !== 9) {
-        return { faceId, status: 'missing' as const, matchScore: 0 };
+        return {
+          faceId,
+          status: hasPose ? ('scanning' as const) : ('missing' as const),
+          matchScore: 0,
+        };
       }
       const matchScore = faceletRef.current
         ? matchFaceToFacelet(faceletRef.current, faceId, colors)
@@ -695,6 +705,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         matchScore >= 0.65 ? ('locked' as const) : ('scanning' as const);
       return { faceId, status, matchScore };
     });
+
+    if (result.pose) lastPoseRef.current = result.pose;
 
     setState((s) => ({
       ...s,
