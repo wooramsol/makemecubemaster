@@ -459,10 +459,10 @@ body,
 
 .scan-ui-panel {
   position: absolute;
-  left: auto;
-  right: max(10px, env(safe-area-inset-right));
-  top: 50%;
-  transform: translateY(-52%);
+  left: 50%;
+  right: auto;
+  top: max(calc(var(--scanned-bar-height) + 14px), calc(env(safe-area-inset-top) + 64px));
+  transform: translateX(-50%);
   width: auto;
   max-width: min(40vw, 120px);
   display: flex;
@@ -1011,6 +1011,139 @@ body,
 
 .solving-skip:active {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Solving move hint (top center) ── */
+.solving-move-hint {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  width: min(72vw, 220px);
+  pointer-events: none;
+}
+
+.solving-move-hint-card {
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  background: rgba(12, 12, 16, 0.48);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.solving-move-hint-card--wrong {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.38),
+    0 0 0 2px rgba(255, 107, 107, 0.55);
+}
+
+.solving-move-hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.solving-move-hint-step {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  letter-spacing: 0.03em;
+}
+
+.solving-move-hint-move {
+  flex: 1;
+  font-size: 18px;
+  font-weight: 800;
+  color: #facc15;
+  letter-spacing: 0.06em;
+}
+
+.solving-move-hint-skip {
+  pointer-events: auto;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.solving-move-hint-stage {
+  position: relative;
+  width: 100%;
+}
+
+.solving-move-hint-badge {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.solving-move-hint-badge--wrong {
+  background: rgba(80, 0, 0, 0.42);
+}
+
+.solving-move-hint-symbol {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+  color: #facc15;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+}
+
+.solving-move-hint-badge--wrong .solving-move-hint-symbol {
+  color: #ff8a80;
+}
+
+.solving-move-hint-turns {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.solving-move-hint-direction {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.solving-move-hint-progress {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.solving-move-hint-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #34d399, #facc15);
+  transition: width 0.12s ease-out;
+}
+
+.solving-move-hint-status {
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 /* ── Static solving guide (fixed face + rotation arrow) ── */

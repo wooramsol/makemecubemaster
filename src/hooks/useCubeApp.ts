@@ -87,6 +87,7 @@ const initialSolvingFeedback: SolvingFeedback = {
   visibleFaces: [],
   stableVisibleFaceColors: {},
   poseRotationProgress: 0,
+  handMotionDetected: false,
   faceScanInfos: [],
 };
 
@@ -614,7 +615,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       ? getVisibleFaces(result.pose)
       : [];
 
-    for (const faceId of visibleFaces) {
+    const sampledFaceIds = new Set<FaceId>([
+      ...visibleFaces,
+      ...(Object.keys(result.visibleFaceColors) as FaceId[]),
+    ]);
+
+    for (const faceId of sampledFaceIds) {
       const colors = result.visibleFaceColors[faceId];
       if (!colors || colors.length !== 9) continue;
       if (!recentFaceDetectionsRef.current[faceId]) {
@@ -627,7 +633,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     const stableVisibleFaceColors: Partial<Record<FaceId, StickerColor[]>> = {};
-    for (const faceId of visibleFaces) {
+    for (const faceId of sampledFaceIds) {
       const readings = recentFaceDetectionsRef.current[faceId];
       if (!readings?.length) continue;
       const stable = majorityVoteFaceColors(readings);
@@ -651,12 +657,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
       recentFaceDetectionsRef.current = {};
       colorCompleteStableRef.current = 0;
+      if (result.pose) frameProcessor.current?.syncPose(result.pose);
     }
 
     const poseRotationProgress = result.rotationProgress;
     const colorProgress = colorEval?.progress ?? 0;
-    const rotationProgress = Math.max(colorProgress, poseRotationProgress);
-    const poseMoveComplete = Boolean(expected && result.rotationMove === expected);
+    const handMotionDetected = Boolean(colorEval?.rejectedWholeCube);
+    const rotationProgress = colorProgress;
+    const moveComplete = Boolean(colorEval?.completed);
 
     let tracking: SolvingFeedback['tracking'] = 'searching';
     if (result.pose && (visibleFaces.length >= 2 || result.detectedFace)) {
@@ -672,7 +680,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       tracking = 'searching';
     }
 
-    const moveComplete = Boolean(colorEval?.completed || poseMoveComplete);
     if (moveComplete) {
       colorCompleteStableRef.current++;
     } else {
@@ -723,6 +730,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         visibleFaces,
         stableVisibleFaceColors,
         poseRotationProgress,
+        handMotionDetected,
         faceScanInfos,
       },
     }));

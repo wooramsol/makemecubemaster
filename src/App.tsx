@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FaceId } from './types';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import { SolvingAROverlay } from './components/SolvingAROverlay';
-import { SolvingCubeAROverlay } from './components/SolvingCubeAROverlay';
-import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
+import { SolvingMoveHint } from './components/SolvingMoveHint';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
-import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
@@ -74,13 +70,6 @@ export default function App() {
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
   const isSolving = state.phase === 'solving';
-  const liveFaceColors = {
-    ...state.solvingFeedback.visibleFaceColors,
-    ...state.solvingFeedback.stableVisibleFaceColors,
-  };
-  const recognizedFaceIds = state.solvingFeedback.faceScanInfos
-    .filter((f) => f.status !== 'missing')
-    .map((f) => f.faceId as FaceId);
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -134,7 +123,6 @@ export default function App() {
               visible={state.phase === 'liveScan'}
             />
 
-            <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
             <LiveScanOverlay
               phase={state.phase}
               knownFaces={state.knownFaces}
@@ -143,37 +131,19 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
-            <SolvingCubeAROverlay
-              active={isSolving && Boolean(currentMove)}
-              pose={state.currentPose}
-              move={currentMove}
+            {isSolving && currentMove && (
+              <SolvingMoveHint
+                visible
+                move={currentMove}
+              facelet={state.solvingFacelet}
               rotationProgress={state.solvingFeedback.rotationProgress}
-              liveFaceColors={liveFaceColors}
-              scannedFaceColors={state.scannedFaceColors}
-              frameWidth={dimensions.width}
-              frameHeight={dimensions.height}
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-            />
-
-            <SolvingAROverlay
-              active={isSolving && Boolean(currentMove)}
-              pose={state.currentPose}
-              move={currentMove}
-              rotationProgress={state.solvingFeedback.rotationProgress}
-              recognizedFaces={recognizedFaceIds}
-              frameWidth={dimensions.width}
-              frameHeight={dimensions.height}
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-            />
-
-            <SolvingFaceStatusPanel
-              visible={isSolving && Boolean(currentMove)}
-              tracking={state.solvingFeedback.tracking}
-              faceScanInfos={state.solvingFeedback.faceScanInfos}
+              handMotionDetected={state.solvingFeedback.handMotionDetected}
+              wrongMove={state.solvingFeedback.wrongMove}
+              currentStep={currentStep}
+              totalSteps={totalSteps}
               onSkip={skipCurrentMove}
-            />
+              />
+            )}
 
             {state.phase === 'solved' && (
               <div className="solved-banner">
