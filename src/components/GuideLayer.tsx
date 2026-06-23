@@ -5,7 +5,6 @@ import { GuideOverlay } from './GuideOverlay';
 
 interface GuideLayerProps {
   phase: AppPhase;
-  trackingLocked: boolean;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -29,18 +28,12 @@ function useGuideRects(
   );
 }
 
-function shouldShowGuide(phase: AppPhase, trackingLocked: boolean): boolean {
-  return (
-    phase === 'colorLearn' ||
-    phase === 'scanReady' ||
-    phase === 'liveScan' ||
-    (phase === 'solving' && !trackingLocked)
-  );
+function shouldShowGuide(phase: AppPhase): boolean {
+  return phase === 'colorLearn' || phase === 'scanReady' || phase === 'liveScan';
 }
 
 export function GuideLayer({
   phase,
-  trackingLocked,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -60,7 +53,7 @@ export function GuideLayer({
       rect={guideRect}
       viewportWidth={viewportWidth}
       viewportHeight={viewportHeight}
-      visible={shouldShowGuide(phase, trackingLocked)}
+      visible={shouldShowGuide(phase)}
       showSpot={colorLearnSpot}
       spotRect={spotRect}
       spotColor={spotColor}

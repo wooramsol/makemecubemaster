@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { CubeAROverlay } from './components/CubeAROverlay';
+import { SolvingAROverlay } from './components/SolvingAROverlay';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
@@ -92,7 +92,6 @@ export default function App() {
           <>
             <GuideLayer
               phase={state.phase}
-              trackingLocked={state.solvingFeedback.tracking === 'locked'}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}
@@ -101,11 +100,10 @@ export default function App() {
               spotColor={COLOR_HEX[colorLearnTarget]}
             />
 
-            <CubeAROverlay
+            <SolvingAROverlay
               pose={state.currentPose}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
-              faceMatchesMove={state.solvingFeedback.faceMatchesMove}
               visibleFaceColors={state.solvingFeedback.visibleFaceColors}
               scannedFaceColors={state.scannedFaceColors}
               frameWidth={dimensions.width}

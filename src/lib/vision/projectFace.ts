@@ -30,6 +30,20 @@ function projectPoint(
   return { x: (fx * x) / z + cx, y: (fy * y) / z + cy };
 }
 
+export function projectCubePoint(
+  point: [number, number, number],
+  pose: CubePose,
+  frameWidth: number,
+  frameHeight: number,
+): Point2D | null {
+  const { fx, fy, cx, cy } = getCameraIntrinsics(frameWidth, frameHeight);
+  const camFx = pose.cameraFx ?? fx;
+  const camFy = pose.cameraFy ?? fy;
+  const camCx = pose.cameraCx ?? cx;
+  const camCy = pose.cameraCy ?? cy;
+  return projectPoint(point, pose.rotationMatrix, pose.translation, camFx, camFy, camCx, camCy);
+}
+
 /** Project a cube face quad into camera frame coordinates (TL, TR, BR, BL). */
 export function projectFaceCorners(
   faceId: FaceId,

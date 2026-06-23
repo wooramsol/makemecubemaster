@@ -27,7 +27,7 @@ function trackingHint(
     return `Show the ${COLOR_LABELS[targetCenter]} center to the camera`;
   }
   if (tracking === 'lost') return 'Cube lost — hold it steady in view';
-  if (tracking === 'searching') return 'Center the cube in the guide';
+  if (tracking === 'searching') return 'Hold the cube steady — follow the yellow arrow';
   if (rotationProgress > 0.15) return 'Keep turning…';
   return 'Follow the arrow on the cube';
 }
