@@ -1044,11 +1044,6 @@ body,
   width: 100%;
 }
 
-.solving-guide-stage .face-color-grid--solving {
-  width: 68%;
-  margin: 0 auto;
-}
-
 .solving-guide-card--wrong {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.4),
@@ -1077,52 +1072,55 @@ body,
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.solving-guide-arrow {
+.solving-guide-stage .face-color-grid--solving {
+  width: 100%;
+  margin: 0;
+}
+
+.solving-guide-rotation-badge {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   pointer-events: none;
-  overflow: visible;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
-.solving-guide-arrow-mirror {
-  transform: scaleX(-1);
-  transform-origin: center;
-  transform-box: fill-box;
+.solving-guide-rotation-badge--wrong {
+  background: rgba(80, 0, 0, 0.42);
 }
 
-.solving-guide-outer-track {
-  stroke: rgba(255, 255, 255, 0.28);
-  stroke-width: 12;
+.solving-guide-rotation-symbol {
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  color: #facc15;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
 }
 
-.solving-guide-outer-active {
-  stroke: #facc15;
-  stroke-width: 16;
-  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.75));
+.solving-guide-rotation-badge--wrong .solving-guide-rotation-symbol {
+  color: #ff8a80;
 }
 
-.solving-guide-outer-active--wrong {
-  stroke: #ff6b6b;
-  filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.7));
-}
-
-.solving-guide-outer-head {
-  fill: #facc15;
-}
-
-.solving-guide-outer-head--wrong {
-  fill: #ff6b6b;
-}
-
-.solving-guide-symbol {
-  fill: rgba(255, 255, 255, 0.95);
-  font-size: 36px;
+.solving-guide-rotation-turns {
+  font-size: 18px;
   font-weight: 700;
-  paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.6);
-  stroke-width: 5px;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+.solving-guide-rotation-direction {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .viewport--solving .solving-skip {

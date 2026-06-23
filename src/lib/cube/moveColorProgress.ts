@@ -1,5 +1,6 @@
 import Cube from 'cubejs';
 import type { FaceId, Move, StickerColor } from '../../types';
+import { ALL_FACES } from './colors';
 import { moveFace } from './moves';
 import { allFaceRotations } from './faceOrientation';
 import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
@@ -20,16 +21,21 @@ export interface MoveColorEvaluation {
   progress: number;
   completed: boolean;
   visibleFace: FaceId | null;
-  orientedColors: StickerColor[] | null;
-  orientationLock: number | null;
+  comparisonFace: FaceId | null;
 }
 
 export interface MoveColorTrackerState {
   orientationLock: number | null;
+  lockMissFrames: number;
 }
 
 export function createMoveColorTrackerState(): MoveColorTrackerState {
-  return { orientationLock: null };
+  return { orientationLock: null, lockMissFrames: 0 };
+}
+
+export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
+  tracker.orientationLock = null;
+  tracker.lockMissFrames = 0;
 }
 
 function faceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
@@ -49,20 +55,41 @@ export function applyMoveToFacelet(facelet: string, move: Move): string {
   return cube.asString();
 }
 
-function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
-  let matches = 0;
+export function majorityVoteFaceColors(readings: StickerColor[][]): StickerColor[] | null {
+  if (readings.length === 0) return null;
+  const result: StickerColor[] = [];
   for (let i = 0; i < 9; i++) {
-    if (a[i] === b[i]) matches++;
+    const counts = new Map<StickerColor, number>();
+    for (const reading of readings) {
+      const c = reading[i]!;
+      counts.set(c, (counts.get(c) ?? 0) + 1);
+    }
+    let best: StickerColor = readings[0]![i]!;
+    let bestCount = 0;
+    for (const [color, count] of counts) {
+      if (count > bestCount) {
+        bestCount = count;
+        best = color;
+      }
+    }
+    result.push(best);
   }
-  return matches;
+  return result;
 }
 
-function countMatchingPeriphery(a: StickerColor[], b: StickerColor[]): number {
-  let matches = 0;
-  for (const i of PERIPHERY) {
-    if (a[i] === b[i]) matches++;
+function changedIndices(before: StickerColor[], after: StickerColor[]): number[] {
+  const idx: number[] = [];
+  for (let i = 0; i < 9; i++) {
+    if (before[i] !== after[i]) idx.push(i);
   }
-  return matches;
+  return idx;
+}
+
+function faceChangesFromMove(facelet: string, move: Move, faceId: FaceId): number {
+  return changedIndices(
+    faceletFaceColors(facelet, faceId),
+    faceletFaceColors(applyMoveToFacelet(facelet, move), faceId),
+  ).length;
 }
 
 function enumerateOrientations(colors: StickerColor[]): StickerColor[][] {
@@ -80,17 +107,25 @@ function enumerateOrientations(colors: StickerColor[]): StickerColor[][] {
 }
 
 function orientByIndex(colors: StickerColor[], index: number): StickerColor[] {
-  const orientations = enumerateOrientations(colors);
-  return orientations[index] ?? colors;
+  return enumerateOrientations(colors)[index] ?? colors;
 }
 
-function bestOrientationIndex(
+function countMatchingAtIndices(a: StickerColor[], b: StickerColor[], indices: readonly number[]): number {
+  let matches = 0;
+  for (const i of indices) {
+    if (a[i] === b[i]) matches++;
+  }
+  return matches;
+}
+
+function bestOrientationForReference(
   detected: StickerColor[],
   reference: StickerColor[],
+  indices: readonly number[],
 ): { index: number; matches: number; oriented: StickerColor[] } {
   let best = { index: 0, matches: 0, oriented: detected };
   enumerateOrientations(detected).forEach((oriented, index) => {
-    const matches = countMatchingCells(oriented, reference);
+    const matches = countMatchingAtIndices(oriented, reference, indices);
     if (matches > best.matches) {
       best = { index, matches, oriented };
     }
@@ -98,76 +133,67 @@ function bestOrientationIndex(
   return best;
 }
 
-function scoreAgainstReferences(
+interface FaceEvalResult {
+  progress: number;
+  completed: boolean;
+}
+
+function evaluateOneFace(
+  facelet: string,
+  move: Move,
+  faceId: FaceId,
   detected: StickerColor[],
-  before: StickerColor[],
-  after: StickerColor[],
-  lockIndex: number | null,
-): {
-  oriented: StickerColor[];
-  beforeMatches: number;
-  afterMatches: number;
-  peripheryAfter: number;
-  orientationLock: number | null;
-} {
-  const references = [
+  tracker: MoveColorTrackerState,
+): FaceEvalResult {
+  const before = faceletFaceColors(facelet, faceId);
+  const after = faceletFaceColors(applyMoveToFacelet(facelet, move), faceId);
+  const changed = changedIndices(before, after);
+  if (changed.length === 0) return { progress: 0, completed: false };
+
+  const refs = [
     { before, after },
-    {
-      before: mirrorFaceCellsHorizontally(before),
-      after: mirrorFaceCellsHorizontally(after),
-    },
+    { before: mirrorFaceCellsHorizontally(before), after: mirrorFaceCellsHorizontally(after) },
   ];
 
-  let best = {
-    oriented: detected,
-    beforeMatches: 0,
-    afterMatches: 0,
-    peripheryAfter: 0,
-    orientationLock: lockIndex,
-  };
+  let best: FaceEvalResult = { progress: 0, completed: false };
 
-  if (lockIndex !== null) {
-    const oriented = orientByIndex(detected, lockIndex);
-    const beforeMatches = Math.max(
-      countMatchingCells(oriented, references[0]!.before),
-      countMatchingCells(oriented, references[1]!.before),
-    );
-    const afterMatches = Math.max(
-      countMatchingCells(oriented, references[0]!.after),
-      countMatchingCells(oriented, references[1]!.after),
-    );
-    const peripheryAfter = Math.max(
-      countMatchingPeriphery(oriented, references[0]!.after),
-      countMatchingPeriphery(oriented, references[1]!.after),
-    );
-    return {
-      oriented,
-      beforeMatches,
-      afterMatches,
-      peripheryAfter,
-      orientationLock: lockIndex,
-    };
-  }
+  for (const ref of refs) {
+    let oriented: StickerColor[];
+    if (tracker.orientationLock !== null) {
+      oriented = orientByIndex(detected, tracker.orientationLock);
+    } else {
+      const pick = bestOrientationForReference(detected, ref.before, PERIPHERY);
+      oriented = pick.oriented;
+      if (pick.matches >= 5) {
+        tracker.orientationLock = pick.index;
+        tracker.lockMissFrames = 0;
+      }
+    }
 
-  for (const ref of references) {
-    const pick = bestOrientationIndex(detected, ref.before);
-    const oriented = pick.oriented;
-    const beforeMatches = pick.matches;
-    const afterMatches = countMatchingCells(oriented, ref.after);
-    const peripheryAfter = countMatchingPeriphery(oriented, ref.after);
-    const better =
-      afterMatches > best.afterMatches ||
-      (afterMatches === best.afterMatches && beforeMatches > best.beforeMatches);
-    if (better) {
-      let orientationLock: number | null = null;
-      if (beforeMatches >= 5) orientationLock = pick.index;
-      best = {
-        oriented,
-        beforeMatches,
-        afterMatches,
-        peripheryAfter,
-        orientationLock,
-      };
+    const beforePeriph = countMatchingAtIndices(oriented, ref.before, PERIPHERY);
+    const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
+    const changedMatch = countMatchingAtIndices(oriented, ref.after, changed);
+    const progress = changedMatch / changed.length;
+
+    const completed =
+      changedMatch >= Math.ceil(changed.length * 0.58) &&
+      afterPeriph >= 5 &&
+      afterPeriph > beforePeriph;
+
+    if (completed || progress > best.progress) {
+      best = { progress: completed ? 1 : progress, completed };
+    }
+
+    if (tracker.orientationLock !== null) {
+      if (beforePeriph < 4) {
+        tracker.lockMissFrames++;
+        if (tracker.lockMissFrames > 8) {
+          tracker.orientationLock = null;
+          tracker.lockMissFrames = 0;
+        }
+      } else {
+        tracker.lockMissFrames = 0;
+      }
     }
   }
 
@@ -186,61 +212,37 @@ export function evaluateMoveColorProgress(
       progress: 0,
       completed: false,
       visibleFace: detectedFace,
-      orientedColors: null,
-      orientationLock: tracker.orientationLock,
+      comparisonFace: null,
     };
   }
 
-  const comparisonFace = moveFace(move);
-  const before = faceletFaceColors(facelet, comparisonFace);
-  const after = faceletFaceColors(applyMoveToFacelet(facelet, move), comparisonFace);
-  const score = scoreAgainstReferences(
-    detectedColors,
-    before,
-    after,
-    tracker.orientationLock,
-  );
+  const affected = ALL_FACES.filter((f) => faceChangesFromMove(facelet, move, f) > 0);
+  const moveFaceId = moveFace(move);
+  const facesToTry =
+    detectedFace && affected.includes(detectedFace)
+      ? [detectedFace, moveFaceId]
+      : [moveFaceId, ...affected.filter((f) => f !== moveFaceId)];
 
-  if (score.orientationLock !== null && tracker.orientationLock === null) {
-    tracker.orientationLock = score.orientationLock;
-  }
-
-  const { oriented, beforeMatches, afterMatches, peripheryAfter } = score;
-
-  const completed =
-    peripheryAfter >= 5 &&
-    afterMatches >= 5 &&
-    (afterMatches > beforeMatches + 1 || (afterMatches >= 7 && beforeMatches <= 4));
-
-  let progress = 0;
-  if (completed) {
-    progress = 1;
-  } else if (beforeMatches >= 4) {
-    let changedCells = 0;
-    let matchedTowardTarget = 0;
-    for (let i = 0; i < 9; i++) {
-      if (before[i] !== after[i]) {
-        changedCells++;
-        if (oriented[i] === after[i]) matchedTowardTarget++;
-      }
-    }
-    progress =
-      changedCells > 0
-        ? Math.min(1, matchedTowardTarget / changedCells)
-        : Math.min(1, afterMatches / 9);
-  } else if (afterMatches > beforeMatches) {
-    progress = Math.min(1, afterMatches / 9);
-  }
-
-  return {
-    progress,
-    completed,
+  let best: MoveColorEvaluation = {
+    progress: 0,
+    completed: false,
     visibleFace: detectedFace,
-    orientedColors: oriented,
-    orientationLock: tracker.orientationLock,
+    comparisonFace: null,
   };
-}
 
-export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
-  tracker.orientationLock = null;
+  for (const faceId of facesToTry) {
+    if (!affected.includes(faceId)) continue;
+    const result = evaluateOneFace(facelet, move, faceId, detectedColors, tracker);
+    if (result.completed || result.progress > best.progress) {
+      best = {
+        progress: result.progress,
+        completed: result.completed,
+        visibleFace: detectedFace,
+        comparisonFace: faceId,
+      };
+      if (result.completed) break;
+    }
+  }
+
+  return best;
 }

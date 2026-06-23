@@ -17,6 +17,7 @@ import {
   applyMoveToFacelet,
   createMoveColorTrackerState,
   resetMoveColorTracker,
+  majorityVoteFaceColors,
 } from '../lib/cube/moveColorProgress';
 import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
@@ -123,6 +124,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const expectedMoveRef = useRef<Move | null>(null);
   const colorCompleteStableRef = useRef(0);
   const moveColorTrackerRef = useRef(createMoveColorTrackerState());
+  const recentDetectionsRef = useRef<StickerColor[][]>([]);
 
   const syncExpectedMove = useCallback((move: Move | null) => {
     if (move === expectedMoveRef.current) return;
@@ -230,6 +232,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     stepReadyMs.current = Date.now();
     colorCompleteStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
+    recentDetectionsRef.current = [];
   }, []);
 
   const buildFeedback = useCallback(
@@ -339,6 +342,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             syncExpectedMove(msg.moves[0] ?? null);
             colorCompleteStableRef.current = 0;
             resetMoveColorTracker(moveColorTrackerRef.current);
+            recentDetectionsRef.current = [];
           }
         } else if (msg.type === 'facelet') {
           if (msg.id !== requestId.current) return;
@@ -592,12 +596,22 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       visibleFace && moveFaceId && visibleFace === moveFaceId,
     );
 
+    const rawColors = result.detectedFace?.colors ?? null;
+    if (rawColors) {
+      recentDetectionsRef.current.push([...rawColors]);
+      if (recentDetectionsRef.current.length > 8) {
+        recentDetectionsRef.current.shift();
+      }
+    }
+    const stableColors =
+      majorityVoteFaceColors(recentDetectionsRef.current) ?? rawColors;
+
     const colorEval =
       expected && faceletRef.current
         ? evaluateMoveColorProgress(
             faceletRef.current,
             expected,
-            result.detectedFace?.colors ?? null,
+            stableColors,
             visibleFace,
             moveColorTrackerRef.current,
           )
@@ -638,7 +652,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (!expected) return;
     if (Date.now() - solvingStartMs.current < 400) return;
     if (Date.now() - stepReadyMs.current < 300) return;
-    if (!colorEval?.completed || colorCompleteStableRef.current < 2) return;
+    if (!colorEval?.completed || colorCompleteStableRef.current < 1) return;
 
     if (solution) {
       applyCompletedMove(expected);
@@ -647,6 +661,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       trackingLostFrames.current = 0;
       colorCompleteStableRef.current = 0;
       resetMoveColorTracker(moveColorTrackerRef.current);
+      recentDetectionsRef.current = [];
       stepReadyMs.current = Date.now();
     }
   }, [videoRef, applyCompletedMove, buildFeedback, requestSolve, syncExpectedMove]);
@@ -710,6 +725,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     trackingLostFrames.current = 0;
     colorCompleteStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
+    recentDetectionsRef.current = [];
     stepReadyMs.current = Date.now();
   }, [applyCompletedMove, syncExpectedMove]);
 

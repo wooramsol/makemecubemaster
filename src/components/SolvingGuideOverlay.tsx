@@ -1,13 +1,6 @@
 import type { Move, StickerColor } from '../types';
+import { getMoveRotationDisplay } from '../lib/cube/moveRotationDisplay';
 import { FaceColorGrid } from './FaceColorGrid';
-import {
-  buildRotationGuide,
-  rotationSymbolLabel,
-} from '../lib/ui/staticFaceArrow';
-
-const GRID_SIZE = 200;
-const GRID_PAD = 36;
-const VIEW_SIZE = GRID_SIZE + GRID_PAD * 2;
 
 interface SolvingGuideOverlayProps {
   visible: boolean;
@@ -26,9 +19,8 @@ export function SolvingGuideOverlay({
 }: SolvingGuideOverlayProps) {
   if (!visible) return null;
 
-  const guide = buildRotationGuide(VIEW_SIZE, GRID_PAD, GRID_SIZE, move, true);
+  const display = getMoveRotationDisplay(move, true);
   const wrong = Boolean(wrongMove);
-  const symbol = rotationSymbolLabel(guide.symbol);
 
   return (
     <div className="solving-guide-overlay" aria-hidden="true">
@@ -39,45 +31,13 @@ export function SolvingGuideOverlay({
       )}
 
       <div className={`solving-guide-card${wrong ? ' solving-guide-card--wrong' : ''}`}>
-        <p className="solving-guide-dir-label">
-          {guide.symbol === 'double' ? '180° turn' : guide.symbol === 'cw' ? 'Clockwise' : 'Counter-clockwise'}
-        </p>
         <div className="solving-guide-stage">
           <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
-          <svg
-            className="solving-guide-arrow"
-            viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`}
-            aria-hidden="true"
-          >
-            <g className="solving-guide-arrow-mirror">
-              <path
-                d={guide.trackPath}
-                className="solving-guide-outer-track"
-                fill="none"
-                strokeLinecap="round"
-              />
-              <path
-                d={guide.trackPath}
-                className={`solving-guide-outer-active${wrong ? ' solving-guide-outer-active--wrong' : ''}`}
-                fill="none"
-                strokeLinecap="round"
-              />
-              <polygon
-                className={`solving-guide-outer-head${wrong ? ' solving-guide-outer-head--wrong' : ''}`}
-                points="0,-14 24,0 0,14"
-                transform={`translate(${guide.headX} ${guide.headY}) rotate(${(guide.headAngle * 180) / Math.PI})`}
-              />
-            </g>
-            <text
-              x={VIEW_SIZE / 2}
-              y={VIEW_SIZE / 2 + 6}
-              className="solving-guide-symbol"
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {symbol}
-            </text>
-          </svg>
+          <div className={`solving-guide-rotation-badge${wrong ? ' solving-guide-rotation-badge--wrong' : ''}`}>
+            <span className="solving-guide-rotation-symbol">{display.symbol}</span>
+            <span className="solving-guide-rotation-turns">{display.turns}</span>
+            <span className="solving-guide-rotation-direction">{display.direction}</span>
+          </div>
         </div>
       </div>
     </div>

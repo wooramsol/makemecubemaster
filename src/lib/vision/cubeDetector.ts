@@ -170,7 +170,13 @@ export function detectCubeFace(
 
   const cubeLike = isRegionCubeLike(colors, variance);
   const centerOk = Boolean(colors[4] && identifyFaceFromCenter(colors[4]));
-  if (!cubeLike && !(relaxed && centerOk && colors.length === 9)) {
+  const uniqueColors = new Set(colors).size;
+  const relaxedOk =
+    relaxed &&
+    colors.length === 9 &&
+    (centerOk || uniqueColors >= 3) &&
+    variance >= 40;
+  if (!cubeLike && !relaxedOk) {
     return null;
   }
 
