@@ -1,5 +1,6 @@
 import type { CubePose, FaceId, Point2D } from '../../types';
 import { projectFaceCorners } from './projectFace';
+import { getVisibleFaces } from './visibleFaces';
 
 function quadEdgeLength(corners: [Point2D, Point2D, Point2D, Point2D]): number {
   const [tl, tr, br, bl] = corners;
@@ -17,25 +18,33 @@ export function alignPoseToTrackedQuad(
   frameWidth: number,
   frameHeight: number,
 ): CubePose {
-  const faceId = pose.visibleFace;
-  if (!faceId) return pose;
-
-  const projected = projectFaceCorners(faceId, pose, frameWidth, frameHeight);
-  if (!projected) return pose;
+  const candidates: FaceId[] = pose.visibleFace
+    ? [pose.visibleFace, ...getVisibleFaces(pose).filter((f) => f !== pose.visibleFace)]
+    : getVisibleFaces(pose);
 
   const detectedSize = quadEdgeLength(pose.corners);
-  const projectedSize = quadEdgeLength(projected);
-  if (projectedSize < 8 || detectedSize < 8) return pose;
+  if (detectedSize < 8) return pose;
 
-  const scale = detectedSize / projectedSize;
-  if (scale < 0.25 || scale > 4) return pose;
+  for (const faceId of candidates) {
+    const projected = projectFaceCorners(faceId, pose, frameWidth, frameHeight);
+    if (!projected) continue;
 
-  const t = pose.translation;
-  return {
-    ...pose,
-    translation: [t[0] / scale, t[1] / scale, t[2] / scale],
-    size: pose.size * scale,
-  };
+    const projectedSize = quadEdgeLength(projected);
+    if (projectedSize < 8) continue;
+
+    const scale = detectedSize / projectedSize;
+    if (scale < 0.25 || scale > 4) continue;
+
+    const t = pose.translation;
+    return {
+      ...pose,
+      visibleFace: faceId,
+      translation: [t[0] / scale, t[1] / scale, t[2] / scale],
+      size: pose.size * scale,
+    };
+  }
+
+  return pose;
 }
 
 export function pickArrowCorners(

@@ -46,22 +46,22 @@ export function getFaceNumber(faceId: FaceId): number {
 }
 
 export function getFaceLabel(faceId: FaceId): string {
-  return `면 ${FACE_NUMBER[faceId]}`;
+  return `Face ${FACE_NUMBER[faceId]}`;
 }
 
 export function getFaceScanHint(faceId: FaceId): string {
   const n = FACE_NUMBER[faceId];
   if (n === 1) {
-    return '섞인 큐브 그대로 — 아무 면부터 가이드 안에 맞추세요';
+    return 'Scrambled cube — align any face in the guide';
   }
-  return `면 ${n} — 아직 스캔 안 한 다른 면을 보여주세요`;
+  return `Face ${n} — show a different unscanned face`;
 }
 
 export const FACE_LABELS: Record<FaceId, string> = {
-  U: '면 1',
-  D: '면 6',
-  F: '면 2',
-  B: '면 4',
-  R: '면 3',
-  L: '면 5',
+  U: 'Face 1',
+  D: 'Face 6',
+  F: 'Face 2',
+  B: 'Face 4',
+  R: 'Face 3',
+  L: 'Face 5',
 };

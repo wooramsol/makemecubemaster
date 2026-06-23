@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { FaceId } from './types';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
@@ -6,6 +7,7 @@ import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingAROverlay } from './components/SolvingAROverlay';
+import { SolvingCubeAROverlay } from './components/SolvingCubeAROverlay';
 import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
@@ -72,6 +74,13 @@ export default function App() {
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
   const isSolving = state.phase === 'solving';
+  const liveFaceColors = {
+    ...state.solvingFeedback.visibleFaceColors,
+    ...state.solvingFeedback.stableVisibleFaceColors,
+  };
+  const recognizedFaceIds = state.solvingFeedback.faceScanInfos
+    .filter((f) => f.status !== 'missing')
+    .map((f) => f.faceId as FaceId);
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -134,11 +143,25 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
+            <SolvingCubeAROverlay
+              active={isSolving && Boolean(currentMove)}
+              pose={state.currentPose}
+              move={currentMove}
+              rotationProgress={state.solvingFeedback.rotationProgress}
+              liveFaceColors={liveFaceColors}
+              scannedFaceColors={state.scannedFaceColors}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
+            />
+
             <SolvingAROverlay
               active={isSolving && Boolean(currentMove)}
               pose={state.currentPose}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
+              recognizedFaces={recognizedFaceIds}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}

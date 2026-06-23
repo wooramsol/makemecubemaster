@@ -71,7 +71,7 @@ body,
   height: 100%;
   pointer-events: none;
   visibility: hidden;
-  z-index: 13;
+  z-index: 16;
   transform: scaleX(-1);
 }
 

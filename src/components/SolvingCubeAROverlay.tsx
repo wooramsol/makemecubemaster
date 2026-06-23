@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { CubePose, Move } from '../types';
+import type { CubePose, FaceId, Move, StickerColor } from '../types';
 import { CubeARRenderer } from '../lib/three/cubeArRenderer';
 import { getCoverTransform } from '../lib/vision/guideOverlay';
 import { alignPoseToTrackedQuad } from '../lib/vision/poseAlign';
@@ -8,6 +8,8 @@ interface SolvingCubeAROverlayProps {
   pose: CubePose | null;
   move: Move | null;
   rotationProgress: number;
+  liveFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -19,6 +21,8 @@ export function SolvingCubeAROverlay({
   pose,
   move,
   rotationProgress,
+  liveFaceColors,
+  scannedFaceColors,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -30,19 +34,23 @@ export function SolvingCubeAROverlay({
   const poseRef = useRef(pose);
   const moveRef = useRef(move);
   const progressRef = useRef(rotationProgress);
+  const liveColorsRef = useRef(liveFaceColors);
+  const scannedColorsRef = useRef(scannedFaceColors);
   const heldPoseRef = useRef<CubePose | null>(null);
   const lostFramesRef = useRef(0);
 
   poseRef.current = pose;
   moveRef.current = move;
   progressRef.current = rotationProgress;
+  liveColorsRef.current = liveFaceColors;
+  scannedColorsRef.current = scannedFaceColors;
 
   if (pose) {
     heldPoseRef.current = pose;
     lostFramesRef.current = 0;
   } else if (heldPoseRef.current) {
     lostFramesRef.current++;
-    if (lostFramesRef.current > 120) heldPoseRef.current = null;
+    if (lostFramesRef.current > 90) heldPoseRef.current = null;
   }
 
   const coverRect = useMemo(() => {
@@ -67,7 +75,7 @@ export function SolvingCubeAROverlay({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const renderer = new CubeARRenderer(canvas, { guideMode: true });
+    const renderer = new CubeARRenderer(canvas, { mode: 'solving' });
     rendererRef.current = renderer;
 
     return () => {
@@ -94,11 +102,13 @@ export function SolvingCubeAROverlay({
     let raf = 0;
     const tick = () => {
       const currentPose = poseRef.current ?? heldPoseRef.current;
-      if (currentPose && frameWidth && frameHeight) {
+      const renderer = rendererRef.current;
+      if (currentPose && frameWidth && frameHeight && renderer) {
         const aligned = alignPoseToTrackedQuad(currentPose, frameWidth, frameHeight);
-        rendererRef.current?.render(aligned, true);
+        renderer.setFaceColors(liveColorsRef.current, scannedColorsRef.current);
+        renderer.render(aligned, true);
       } else {
-        rendererRef.current?.render(null);
+        renderer?.render(null);
       }
       raf = requestAnimationFrame(tick);
     };

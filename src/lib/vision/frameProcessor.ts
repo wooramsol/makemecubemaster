@@ -7,6 +7,7 @@ import { PoseSmoother } from './poseSmoother';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
 import { sampleVisibleFaceColors } from './multiFaceSampler';
+import { getVisibleFaces } from './visibleFaces';
 import { alignPoseToTrackedQuad } from './poseAlign';
 import { sampleColorsFromQuad } from './quadColorSampler';
 import { drawCameraFrame } from './selfieView';
@@ -35,6 +36,7 @@ export class FrameProcessor {
   private solvingScanMode = false;
   private lastSolvingPose: CubePose | null = null;
   private solvingLostFrames = 0;
+  private solvingReseedPending = false;
 
   constructor() {
     this.processCanvas = document.createElement('canvas');
@@ -75,6 +77,7 @@ export class FrameProcessor {
     this.poseSmoother.update(pose);
     this.rotationDetector.sync(pose.rotationMatrix);
     this.flowTracker.seed(pose.corners);
+    this.solvingReseedPending = true;
   }
 
   /** @deprecated use enableSolvingTracking */
@@ -145,6 +148,12 @@ export class FrameProcessor {
   }
 
   private processSolving(width: number, height: number): FrameResult {
+    if (this.solvingReseedPending) {
+      const fresh = detectSolvingCorners(this.processCanvas, width, height);
+      if (fresh) this.flowTracker.seed(fresh);
+      this.solvingReseedPending = false;
+    }
+
     const detectedCorners = detectSolvingCorners(this.processCanvas, width, height);
     const gray = createGrayMat(this.processCanvas);
     const corners = this.flowTracker.update(gray, detectedCorners);
@@ -158,9 +167,14 @@ export class FrameProcessor {
 
       let pose = estimatePoseFromCorners(corners, width, height, hintFace);
       if (hintFace) pose = { ...pose, visibleFace: hintFace };
+      if (!pose.visibleFace) {
+        const visible = getVisibleFaces(pose);
+        if (visible[0]) pose = { ...pose, visibleFace: visible[0] };
+      }
       const lostFrames = this.flowTracker.getLostFrames();
       pose.confidence = detectedCorners ? 0.85 : Math.max(0.4, 0.85 - lostFrames * 0.012);
       pose = this.poseSmoother.update(pose);
+      pose = alignPoseToTrackedQuad(pose, width, height);
 
       if (quadColors) this.lastColors = quadColors;
       this.lastSolvingPose = pose;
@@ -181,7 +195,7 @@ export class FrameProcessor {
           : null;
 
       return {
-        pose,
+        pose: aligned,
         detectedFace,
         rotationMove: rotation.completedMove,
         rotationProgress: rotation.progress,
@@ -194,6 +208,7 @@ export class FrameProcessor {
     if (fallbackFace) {
       this.lastColors = fallbackFace.colors;
       let pose = this.poseSmoother.update(fallbackFace.pose);
+      pose = alignPoseToTrackedQuad(pose, width, height);
       this.flowTracker.seed(pose.corners);
       this.lastSolvingPose = pose;
       this.solvingLostFrames = 0;
@@ -208,7 +223,7 @@ export class FrameProcessor {
       const rotation = this.rotationDetector.update(pose.rotationMatrix);
 
       return {
-        pose,
+        pose: aligned,
         detectedFace: fallbackFace,
         rotationMove: rotation.completedMove,
         rotationProgress: rotation.progress,

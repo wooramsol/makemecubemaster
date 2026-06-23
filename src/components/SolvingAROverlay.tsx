@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { CubePose, Move } from '../types';
+import type { CubePose, FaceId, Move } from '../types';
 import { moveFace } from '../lib/cube/moves';
 import { drawSolvingAR } from '../lib/vision/solvingArDraw';
 
@@ -7,6 +7,7 @@ interface SolvingAROverlayProps {
   pose: CubePose | null;
   move: Move | null;
   rotationProgress: number;
+  recognizedFaces: FaceId[];
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -18,6 +19,7 @@ export function SolvingAROverlay({
   pose,
   move,
   rotationProgress,
+  recognizedFaces,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -28,12 +30,14 @@ export function SolvingAROverlay({
   const poseRef = useRef(pose);
   const progressRef = useRef(rotationProgress);
   const moveRef = useRef(move);
+  const recognizedRef = useRef(recognizedFaces);
   const heldPoseRef = useRef<CubePose | null>(null);
   const lostFramesRef = useRef(0);
 
   poseRef.current = pose;
   progressRef.current = rotationProgress;
   moveRef.current = move;
+  recognizedRef.current = recognizedFaces;
 
   if (pose) {
     heldPoseRef.current = pose;
@@ -74,6 +78,7 @@ export function SolvingAROverlay({
             currentMove,
             progressRef.current,
             moveFace(currentMove),
+            recognizedRef.current,
             frameWidth,
             frameHeight,
             viewportWidth,
@@ -85,7 +90,7 @@ export function SolvingAROverlay({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active, frameWidth, frameHeight, viewportWidth, viewportHeight]);
+  }, [active, frameWidth, frameHeight, viewportWidth, viewportHeight, recognizedFaces]);
 
   return (
     <canvas
