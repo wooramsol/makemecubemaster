@@ -5,10 +5,8 @@ import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import {
-  colorsForMove,
-  SolvingGuideOverlay,
-} from './components/SolvingGuideOverlay';
+import { SolvingGuideOverlay } from './components/SolvingGuideOverlay';
+import { colorsForMoveFromFacelet } from './lib/cube/moveColorProgress';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -81,13 +79,10 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const solvingFaceColors = (() => {
-    if (!currentMove || state.phase !== 'solving') return [];
-    const base = colorsForMove(currentMove, state.scannedFaceColors);
-    const live = state.solvingFeedback.liveFaceColors;
-    if (live?.length === 9) return live;
-    return base;
-  })();
+  const solvingFaceColors =
+    currentMove && state.phase === 'solving' && state.solvingFacelet
+      ? colorsForMoveFromFacelet(currentMove, state.solvingFacelet)
+      : [];
 
   return (
     <main className="app">
@@ -147,7 +142,6 @@ export default function App() {
               visible={state.phase === 'solving' && Boolean(currentMove)}
               move={currentMove!}
               faceColors={solvingFaceColors}
-              rotationProgress={state.solvingFeedback.rotationProgress}
               wrongMove={state.solvingFeedback.wrongMove}
               onSkip={skipCurrentMove}
             />

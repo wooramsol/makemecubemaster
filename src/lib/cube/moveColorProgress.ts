@@ -28,7 +28,13 @@ function faceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
   return [...slice].map((ch) => FACELET_TO_STICKER[ch]!);
 }
 
-function faceletAfterMove(facelet: string, move: Move): string {
+/** Current sticker colors for the face being turned (from virtual cube state). */
+export function colorsForMoveFromFacelet(move: Move, facelet: string): StickerColor[] {
+  if (!facelet || facelet.length !== 54) return [];
+  return faceletFaceColors(facelet, moveFace(move));
+}
+
+export function applyMoveToFacelet(facelet: string, move: Move): string {
   const cube = Cube.fromString(facelet);
   cube.move(move);
   return cube.asString();
@@ -62,7 +68,7 @@ function bestOrientedMatch(
 
 function faceChangesFromMove(facelet: string, move: Move, faceId: FaceId): number {
   const before = faceletFaceColors(facelet, faceId);
-  const after = faceletFaceColors(faceletAfterMove(facelet, move), faceId);
+  const after = faceletFaceColors(applyMoveToFacelet(facelet, move), faceId);
   let changes = 0;
   for (let i = 0; i < 9; i++) {
     if (before[i] !== after[i]) changes++;
@@ -103,7 +109,7 @@ export function evaluateMoveColorProgress(
   }
 
   const before = faceletFaceColors(facelet, comparisonFace);
-  const after = faceletFaceColors(faceletAfterMove(facelet, move), comparisonFace);
+  const after = faceletFaceColors(applyMoveToFacelet(facelet, move), comparisonFace);
   const { oriented, matches: beforeMatches } = bestOrientedMatch(detectedColors, before);
 
   if (beforeMatches < 6) {

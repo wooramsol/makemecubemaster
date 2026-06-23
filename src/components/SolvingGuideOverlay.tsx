@@ -1,6 +1,4 @@
 import type { Move, StickerColor } from '../types';
-import { getFaceCenterColor } from '../lib/cube/colors';
-import { moveFace } from '../lib/cube/moves';
 import { FaceColorGrid } from './FaceColorGrid';
 import {
   buildFaceArcPaths,
@@ -13,7 +11,6 @@ interface SolvingGuideOverlayProps {
   visible: boolean;
   move: Move;
   faceColors: StickerColor[];
-  rotationProgress: number;
   wrongMove: Move | null;
   onSkip?: () => void;
 }
@@ -22,13 +19,12 @@ export function SolvingGuideOverlay({
   visible,
   move,
   faceColors,
-  rotationProgress,
   wrongMove,
   onSkip,
 }: SolvingGuideOverlayProps) {
   if (!visible) return null;
 
-  const arc = buildFaceArcPaths(GUIDE_SIZE, move, rotationProgress, true);
+  const arc = buildFaceArcPaths(GUIDE_SIZE, move, 1, true);
   const doubleLabel = doubleMoveLabel(move);
   const wrong = Boolean(wrongMove);
 
@@ -80,24 +76,7 @@ export function SolvingGuideOverlay({
             </text>
           )}
         </svg>
-        <div className="solving-guide-progress" aria-hidden="true">
-          <div
-            className="solving-guide-progress-fill"
-            style={{ width: `${Math.round(rotationProgress * 100)}%` }}
-          />
-        </div>
       </div>
     </div>
   );
-}
-
-export function colorsForMove(
-  move: Move,
-  scanned: Partial<Record<import('../types').FaceId, StickerColor[]>>,
-): StickerColor[] {
-  const face = moveFace(move);
-  const colors = scanned[face];
-  if (colors?.length === 9) return colors;
-  const center = getFaceCenterColor(face);
-  return Array.from({ length: 9 }, () => center);
 }

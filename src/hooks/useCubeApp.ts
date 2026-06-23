@@ -12,7 +12,7 @@ import type {
 } from '../types';
 import { buildFaceletFromMap } from '../lib/cube/state';
 import { moveFace } from '../lib/cube/moves';
-import { evaluateMoveColorProgress } from '../lib/cube/moveColorProgress';
+import { evaluateMoveColorProgress, applyMoveToFacelet } from '../lib/cube/moveColorProgress';
 import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
@@ -55,6 +55,7 @@ export interface CubeAppState {
   colorsCalibrated: boolean;
   liveScanNeedsClearerCenter: boolean;
   solvingFeedback: SolvingFeedback;
+  solvingFacelet: string;
 }
 
 const initialFeedback: DetectionFeedback = {
@@ -94,6 +95,7 @@ const initialState: CubeAppState = {
   colorsCalibrated: false,
   liveScanNeedsClearerCenter: false,
   solvingFeedback: initialSolvingFeedback,
+  solvingFacelet: '',
 };
 
 export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
@@ -179,13 +181,18 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, [state.phase, state.solution, state.colorLearnIndex]);
 
   const applyCompletedMove = useCallback((move: Move) => {
+    const prevFacelet = faceletRef.current;
+    const nextFacelet = applyMoveToFacelet(prevFacelet, move);
     const id = ++requestId.current;
+
     solverWorker.current?.postMessage({
       type: 'apply',
       move,
-      facelet: faceletRef.current,
+      facelet: prevFacelet,
       id,
     });
+
+    faceletRef.current = nextFacelet;
 
     setState((prev) => {
       if (!prev.solution) return prev;
@@ -199,12 +206,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           phase: 'solved',
           solution: { ...prev.solution, currentIndex: nextIndex },
           solvingFeedback: initialSolvingFeedback,
+          solvingFacelet: nextFacelet,
         };
       }
       return {
         ...prev,
         solution: { ...prev.solution, currentIndex: nextIndex },
-        solvingFeedback: { ...initialSolvingFeedback, tracking: 'locked' },
+        solvingFeedback: initialSolvingFeedback,
+        solvingFacelet: nextFacelet,
       };
     });
     stepReadyMs.current = Date.now();
@@ -310,6 +319,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             solution: { moves: msg.moves, currentIndex: 0 },
             detectionFeedback: initialFeedback,
             solvingFeedback: initialSolvingFeedback,
+            solvingFacelet: msg.facelet,
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.disableTracking();
@@ -319,6 +329,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         } else if (msg.type === 'facelet') {
           if (msg.id !== requestId.current) return;
           faceletRef.current = msg.facelet;
+          setState((s) => ({ ...s, solvingFacelet: msg.facelet }));
         } else if (msg.type === 'error') {
           if (msg.id !== undefined && msg.id !== requestId.current) return;
           clearSolveTimeout();
