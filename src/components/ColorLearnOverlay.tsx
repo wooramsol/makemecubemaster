@@ -47,7 +47,7 @@ export function ColorLearnOverlay({
         )}
 
         <button type="button" className="capture-button" disabled={!ready} onClick={onConfirm}>
-          {ready ? 'Captured…' : 'Hold steady…'}
+          {ready ? 'Confirm' : 'Hold steady…'}
         </button>
         {error && <p className="color-learn-error">{error}</p>}
       </div>

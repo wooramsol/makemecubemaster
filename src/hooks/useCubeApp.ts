@@ -113,9 +113,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const solveTriggeredRef = useRef(false);
   const trackingLostFrames = useRef(0);
   const expectedMoveRef = useRef<Move | null>(null);
-  const colorLearnStableFrames = useRef(0);
-  const colorLearnAutoLocked = useRef(false);
-  const confirmColorLearnRef = useRef<() => void>(() => {});
 
   const syncExpectedMove = useCallback((move: Move | null) => {
     if (move === expectedMoveRef.current) return;
@@ -419,10 +416,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }));
   }, [videoRef, beginLiveScan]);
 
-  useEffect(() => {
-    confirmColorLearnRef.current = confirmColorLearn;
-  }, [confirmColorLearn]);
-
   const startLiveScan = useCallback(() => {
     beginLiveScan();
   }, [beginLiveScan]);
@@ -444,24 +437,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           video.videoHeight,
           target,
         );
-        const ready = sample?.ready ?? false;
-        if (ready) {
-          colorLearnStableFrames.current += 1;
-          if (colorLearnStableFrames.current >= 12 && !colorLearnAutoLocked.current) {
-            colorLearnAutoLocked.current = true;
-            colorLearnStableFrames.current = 0;
-            confirmColorLearnRef.current();
-            queueMicrotask(() => {
-              colorLearnAutoLocked.current = false;
-            });
-          }
-        } else {
-          colorLearnStableFrames.current = 0;
-        }
         setState((prev) => ({
           ...prev,
           colorLearnSample: sample,
-          colorLearnReady: ready,
+          colorLearnReady: sample?.ready ?? false,
           colorLearnError: null,
         }));
       }
