@@ -22,20 +22,32 @@ export interface MoveColorEvaluation {
   completed: boolean;
   visibleFace: FaceId | null;
   comparisonFace: FaceId | null;
+  rejectedWholeCube: boolean;
 }
 
 export interface MoveColorTrackerState {
   orientationLock: number | null;
   lockMissFrames: number;
+  /** Face toward camera when this step aligned — detects whole-cube reorientation */
+  stepAnchorFace: FaceId | null;
+  /** Saw a stable pre-move reading this step */
+  sawPreMoveAlignment: boolean;
 }
 
 export function createMoveColorTrackerState(): MoveColorTrackerState {
-  return { orientationLock: null, lockMissFrames: 0 };
+  return {
+    orientationLock: null,
+    lockMissFrames: 0,
+    stepAnchorFace: null,
+    sawPreMoveAlignment: false,
+  };
 }
 
 export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
   tracker.orientationLock = null;
   tracker.lockMissFrames = 0;
+  tracker.stepAnchorFace = null;
+  tracker.sawPreMoveAlignment = false;
 }
 
 function faceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
@@ -85,6 +97,14 @@ function changedIndices(before: StickerColor[], after: StickerColor[]): number[]
   return idx;
 }
 
+function unchangedIndices(before: StickerColor[], after: StickerColor[]): number[] {
+  const idx: number[] = [];
+  for (let i = 0; i < 9; i++) {
+    if (before[i] === after[i]) idx.push(i);
+  }
+  return idx;
+}
+
 function faceChangesFromMove(facelet: string, move: Move, faceId: FaceId): number {
   return changedIndices(
     faceletFaceColors(facelet, faceId),
@@ -110,7 +130,11 @@ function orientByIndex(colors: StickerColor[], index: number): StickerColor[] {
   return enumerateOrientations(colors)[index] ?? colors;
 }
 
-function countMatchingAtIndices(a: StickerColor[], b: StickerColor[], indices: readonly number[]): number {
+function countMatchingAtIndices(
+  a: StickerColor[],
+  b: StickerColor[],
+  indices: readonly number[],
+): number {
   let matches = 0;
   for (const i of indices) {
     if (a[i] === b[i]) matches++;
@@ -133,9 +157,51 @@ function bestOrientationForReference(
   return best;
 }
 
+/** Same stickers on face but permuted — typical of whole-cube spin, not a layer turn */
+function looksLikeWholeFaceSpin(oriented: StickerColor[], before: StickerColor[]): boolean {
+  const a = [...oriented].sort().join('');
+  const b = [...before].sort().join('');
+  if (a !== b) return false;
+  const samePosition = PERIPHERY.filter((i) => oriented[i] === before[i]).length;
+  return samePosition <= 2;
+}
+
+/**
+ * Layer turn: stickers that should not move stay at the same grid cell.
+ * Whole-cube rotation permutes the whole face — breaks this constraint.
+ */
+function passesLayerTurnSignature(
+  oriented: StickerColor[],
+  before: StickerColor[],
+  after: StickerColor[],
+  changed: number[],
+  unchanged: number[],
+): boolean {
+  if (unchanged.length > 0) {
+    const held = countMatchingAtIndices(oriented, before, unchanged);
+    const need = unchanged.length === 1 ? 1 : Math.ceil(unchanged.length * 0.9);
+    if (held < need) return false;
+  }
+
+  if (unchanged.length >= 4) {
+    const peripheryDrift = PERIPHERY.filter((i) => oriented[i] !== before[i]).length;
+    if (peripheryDrift > changed.length + 1) return false;
+  }
+
+  const changedMatch = countMatchingAtIndices(oriented, after, changed);
+  if (changedMatch < Math.ceil(changed.length * 0.65)) return false;
+
+  if (looksLikeWholeFaceSpin(oriented, before) && changedMatch < changed.length) {
+    return false;
+  }
+
+  return true;
+}
+
 interface FaceEvalResult {
   progress: number;
   completed: boolean;
+  rejectedWholeCube: boolean;
 }
 
 function evaluateOneFace(
@@ -148,14 +214,15 @@ function evaluateOneFace(
   const before = faceletFaceColors(facelet, faceId);
   const after = faceletFaceColors(applyMoveToFacelet(facelet, move), faceId);
   const changed = changedIndices(before, after);
-  if (changed.length === 0) return { progress: 0, completed: false };
+  const unchanged = unchangedIndices(before, after);
+  if (changed.length === 0) return { progress: 0, completed: false, rejectedWholeCube: false };
 
   const refs = [
     { before, after },
     { before: mirrorFaceCellsHorizontally(before), after: mirrorFaceCellsHorizontally(after) },
   ];
 
-  let best: FaceEvalResult = { progress: 0, completed: false };
+  let best: FaceEvalResult = { progress: 0, completed: false, rejectedWholeCube: false };
 
   for (const ref of refs) {
     let oriented: StickerColor[];
@@ -164,24 +231,48 @@ function evaluateOneFace(
     } else {
       const pick = bestOrientationForReference(detected, ref.before, PERIPHERY);
       oriented = pick.oriented;
-      if (pick.matches >= 5) {
+      if (pick.matches >= 6) {
         tracker.orientationLock = pick.index;
         tracker.lockMissFrames = 0;
       }
     }
 
     const beforePeriph = countMatchingAtIndices(oriented, ref.before, PERIPHERY);
-    const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
     const changedMatch = countMatchingAtIndices(oriented, ref.after, changed);
     const progress = changedMatch / changed.length;
 
+    if (beforePeriph >= 6) {
+      tracker.sawPreMoveAlignment = true;
+    }
+
+    const layerSignature = passesLayerTurnSignature(
+      oriented,
+      ref.before,
+      ref.after,
+      changed,
+      unchanged,
+    );
+
+    if (!layerSignature) {
+      if (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) {
+        best = { progress: 0, completed: false, rejectedWholeCube: true };
+      }
+      continue;
+    }
+
+    const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
     const completed =
-      changedMatch >= Math.ceil(changed.length * 0.58) &&
-      afterPeriph >= 5 &&
-      afterPeriph > beforePeriph;
+      tracker.sawPreMoveAlignment &&
+      changedMatch >= Math.ceil(changed.length * 0.65) &&
+      afterPeriph > beforePeriph &&
+      afterPeriph >= 5;
 
     if (completed || progress > best.progress) {
-      best = { progress: completed ? 1 : progress, completed };
+      best = {
+        progress: completed ? 1 : progress,
+        completed,
+        rejectedWholeCube: false,
+      };
     }
 
     if (tracker.orientationLock !== null) {
@@ -213,7 +304,25 @@ export function evaluateMoveColorProgress(
       completed: false,
       visibleFace: detectedFace,
       comparisonFace: null,
+      rejectedWholeCube: false,
     };
+  }
+
+  if (detectedFace) {
+    if (tracker.stepAnchorFace === null) {
+      tracker.stepAnchorFace = detectedFace;
+    } else if (
+      detectedFace !== tracker.stepAnchorFace &&
+      !tracker.sawPreMoveAlignment
+    ) {
+      return {
+        progress: 0,
+        completed: false,
+        visibleFace: detectedFace,
+        comparisonFace: null,
+        rejectedWholeCube: true,
+      };
+    }
   }
 
   const affected = ALL_FACES.filter((f) => faceChangesFromMove(facelet, move, f) > 0);
@@ -228,17 +337,25 @@ export function evaluateMoveColorProgress(
     completed: false,
     visibleFace: detectedFace,
     comparisonFace: null,
+    rejectedWholeCube: false,
   };
 
   for (const faceId of facesToTry) {
     if (!affected.includes(faceId)) continue;
     const result = evaluateOneFace(facelet, move, faceId, detectedColors, tracker);
+    if (result.rejectedWholeCube) {
+      best.rejectedWholeCube = true;
+      best.progress = 0;
+      best.completed = false;
+      break;
+    }
     if (result.completed || result.progress > best.progress) {
       best = {
         progress: result.progress,
         completed: result.completed,
         visibleFace: detectedFace,
         comparisonFace: faceId,
+        rejectedWholeCube: false,
       };
       if (result.completed) break;
     }

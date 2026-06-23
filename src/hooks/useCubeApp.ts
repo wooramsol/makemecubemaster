@@ -617,6 +617,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           )
         : null;
 
+    if (colorEval?.rejectedWholeCube) {
+      moveColorTrackerRef.current.orientationLock = null;
+      moveColorTrackerRef.current.sawPreMoveAlignment = false;
+      if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
+      recentDetectionsRef.current = [];
+      colorCompleteStableRef.current = 0;
+    }
+
     const rotationProgress = colorEval ? colorEval.progress : result.rotationProgress;
 
     let tracking: SolvingFeedback['tracking'] = 'searching';
@@ -652,7 +660,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (!expected) return;
     if (Date.now() - solvingStartMs.current < 400) return;
     if (Date.now() - stepReadyMs.current < 300) return;
-    if (!colorEval?.completed || colorCompleteStableRef.current < 1) return;
+    if (!colorEval?.completed || colorCompleteStableRef.current < 2) return;
 
     if (solution) {
       applyCompletedMove(expected);
