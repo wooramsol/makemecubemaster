@@ -1,9 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Move } from '../types';
 import { getFaceLayerName } from '../lib/cube/faceLayerNames';
 import { colorsForMoveFromFacelet } from '../lib/cube/moveColorProgress';
 import { getMoveRotationDisplay } from '../lib/cube/moveRotationDisplay';
 import { isDoubleMove, moveFace } from '../lib/cube/moves';
+import {
+  getPanelBesideGuideStyle,
+  getSolvingScanOverlayRect,
+} from '../lib/vision/guideOverlay';
 import { drawGridRotationHint } from '../lib/vision/gridRotationArrow';
 import { FaceColorGrid } from './FaceColorGrid';
 
@@ -17,6 +21,10 @@ interface SolvingMoveHintProps {
   wrongMove: Move | null;
   currentStep: number;
   totalSteps: number;
+  frameWidth: number;
+  frameHeight: number;
+  viewportWidth: number;
+  viewportHeight: number;
   onSkip?: () => void;
 }
 
@@ -30,10 +38,25 @@ export function SolvingMoveHint({
   wrongMove,
   currentStep,
   totalSteps,
+  frameWidth,
+  frameHeight,
+  viewportWidth,
+  viewportHeight,
   onSkip,
 }: SolvingMoveHintProps) {
   const arrowRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  const panelStyle = useMemo(() => {
+    const guideRect = getSolvingScanOverlayRect(
+      frameWidth,
+      frameHeight,
+      viewportWidth,
+      viewportHeight,
+    );
+    if (!guideRect || !viewportWidth) return undefined;
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, 220);
+  }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   const faceId = moveFace(move);
   const faceColors = colorsForMoveFromFacelet(move, facelet);
@@ -95,7 +118,7 @@ export function SolvingMoveHint({
   }
 
   return (
-    <div className="solving-move-hint" aria-live="polite">
+    <div className="solving-move-hint" style={panelStyle} aria-live="polite">
       <div className={`solving-move-hint-card${wrong ? ' solving-move-hint-card--wrong' : ''}`}>
         <div className="solving-move-hint-header">
           <span className="solving-move-hint-step">

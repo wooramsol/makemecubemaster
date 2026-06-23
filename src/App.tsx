@@ -147,6 +147,10 @@ export default function App() {
                 wrongMove={state.solvingFeedback.wrongMove}
                 currentStep={currentStep}
                 totalSteps={totalSteps}
+                frameWidth={dimensions.width}
+                frameHeight={dimensions.height}
+                viewportWidth={viewportSize.width}
+                viewportHeight={viewportSize.height}
                 onSkip={skipCurrentMove}
               />
             )}

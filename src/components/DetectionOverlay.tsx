@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { DetectionFeedback, StickerColor } from '../types';
-import { getGuideOverlayRect } from '../lib/vision/guideOverlay';
+import { getGuideOverlayRect, getPanelBesideGuideStyle } from '../lib/vision/guideOverlay';
 import { FaceColorGrid } from './FaceColorGrid';
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
@@ -28,27 +28,16 @@ export function DetectionOverlay({
   viewportWidth,
   viewportHeight,
 }: DetectionOverlayProps) {
-  const guideRect = useMemo(
-    () => getGuideOverlayRect(frameWidth, frameHeight, viewportWidth, viewportHeight),
-    [frameWidth, frameHeight, viewportWidth, viewportHeight],
-  );
-
   const panelStyle = useMemo(() => {
-    if (!guideRect || !viewportWidth) return undefined;
-    const gap = 12;
-    const panelWidth = Math.min(120, viewportWidth * 0.34);
-    const left = Math.min(
-      guideRect.left + guideRect.width + gap,
-      viewportWidth - panelWidth - 8,
+    const guideRect = getGuideOverlayRect(
+      frameWidth,
+      frameHeight,
+      viewportWidth,
+      viewportHeight,
     );
-    const top = guideRect.top + guideRect.height / 2;
-    return {
-      left: `${left}px`,
-      top: `${top}px`,
-      transform: 'translateY(-50%)',
-      maxWidth: `${panelWidth}px`,
-    } as React.CSSProperties;
-  }, [guideRect, viewportWidth]);
+    if (!guideRect || !viewportWidth) return undefined;
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, 120);
+  }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   if (!visible) return null;
 

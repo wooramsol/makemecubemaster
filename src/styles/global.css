@@ -1030,11 +1030,8 @@ body,
 /* ── Solving move hint (top center) ── */
 .solving-move-hint {
   position: absolute;
-  top: calc(max(8px, env(safe-area-inset-top)) + var(--app-title-height) + 4px);
-  left: 50%;
-  transform: translateX(-50%);
   z-index: 14;
-  width: min(72vw, 220px);
+  width: min(38vw, 220px);
   pointer-events: none;
 }
 
