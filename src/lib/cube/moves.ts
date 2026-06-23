@@ -39,6 +39,16 @@ export function isDoubleMove(move: Move): boolean {
   return move.endsWith('2');
 }
 
+/** Signed rotation axis matching RotationDetector / cubejs notation. */
+export function getMoveAxis(move: Move): [number, number, number] {
+  const face = moveFace(move);
+  let axis: [number, number, number] = [...MOVE_AXES[face]];
+  if (face === 'L' || face === 'D' || face === 'B') {
+    axis = [-axis[0], -axis[1], -axis[2]];
+  }
+  return axis;
+}
+
 export function parseMoves(algorithm: string): Move[] {
   return algorithm
     .trim()

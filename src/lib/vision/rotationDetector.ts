@@ -1,5 +1,5 @@
 import type { Move } from '../../types';
-import { MOVE_AXES, moveAngle, moveFace } from '../cube/moves';
+import { getMoveAxis, moveAngle } from '../cube/moves';
 import { identityMatrix, multiplyMatrices, rotationMatrixFromAxisAngle } from '../cube/state';
 
 const ROTATION_THRESHOLD = 0.9;
@@ -173,16 +173,6 @@ function rotationMagnitude(matrix: number[]): number {
   const cosAngle = Math.max(-1, Math.min(1, (trace - 1) / 2));
   return Math.acos(cosAngle);
 }
-
-function getMoveAxis(move: Move): [number, number, number] {
-  const face = moveFace(move);
-  let axis = MOVE_AXES[face];
-  if (face === 'L' || face === 'D' || face === 'B') {
-    axis = [-axis[0], -axis[1], -axis[2]] as [number, number, number];
-  }
-  return axis;
-}
-
 function rotationAngleAboutAxis(matrix: number[], axis: [number, number, number]): number {
   const angle = rotationMagnitude(matrix);
   const sinAngle = Math.sin(angle);

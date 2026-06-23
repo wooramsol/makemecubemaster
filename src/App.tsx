@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LiveAROverlay } from './components/LiveAROverlay';
+import { CubeAROverlay } from './components/CubeAROverlay';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
@@ -11,8 +11,6 @@ import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
-import { getFaceCenterColor } from './lib/cube/colors';
-import { moveFace } from './lib/cube/moves';
 import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
 import { APP_VERSION } from './lib/appVersion';
 import './styles/global.css';
@@ -111,15 +109,14 @@ export default function App() {
 
         {!isBooting && !hasError && (
           <>
-            <LiveAROverlay
+            <CubeAROverlay
               pose={state.currentPose}
-              colors={state.solvingFeedback.liveFaceColors}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
               faceMatchesMove={state.solvingFeedback.faceMatchesMove}
-              targetCenterColor={
-                currentMove ? getFaceCenterColor(moveFace(currentMove)) : null
-              }
+              scannedFaceColors={state.scannedFaceColors}
+              liveFace={state.solvingFeedback.visibleFace}
+              liveFaceColors={state.solvingFeedback.liveFaceColors}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}
