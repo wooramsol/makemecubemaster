@@ -93,6 +93,9 @@ export interface SolvingFeedback {
   faceMatchesMove: boolean;
   liveFaceColors: StickerColor[] | null;
   visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  visibleFaces: FaceId[];
+  stableVisibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  poseRotationProgress: number;
 }
 
 export interface FrameResult {

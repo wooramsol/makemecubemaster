@@ -147,6 +147,9 @@ export default function App() {
               viewportHeight={viewportSize.height}
               tracking={state.solvingFeedback.tracking}
               rotationProgress={state.solvingFeedback.rotationProgress}
+              expectedMove={currentMove}
+              visibleFaces={state.solvingFeedback.visibleFaces}
+              stableVisibleFaceColors={state.solvingFeedback.stableVisibleFaceColors}
             />
 
             <SolvingGuideOverlay

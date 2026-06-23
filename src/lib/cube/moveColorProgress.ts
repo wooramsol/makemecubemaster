@@ -26,8 +26,8 @@ export interface MoveColorEvaluation {
 }
 
 export interface MoveColorTrackerState {
-  orientationLock: number | null;
-  lockMissFrames: number;
+  orientationLocks: Partial<Record<FaceId, number>>;
+  lockMissFrames: Partial<Record<FaceId, number>>;
   /** Face toward camera when this step aligned — detects whole-cube reorientation */
   stepAnchorFace: FaceId | null;
   /** Saw a stable pre-move reading this step */
@@ -36,16 +36,16 @@ export interface MoveColorTrackerState {
 
 export function createMoveColorTrackerState(): MoveColorTrackerState {
   return {
-    orientationLock: null,
-    lockMissFrames: 0,
+    orientationLocks: {},
+    lockMissFrames: {},
     stepAnchorFace: null,
     sawPreMoveAlignment: false,
   };
 }
 
 export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
-  tracker.orientationLock = null;
-  tracker.lockMissFrames = 0;
+  tracker.orientationLocks = {};
+  tracker.lockMissFrames = {};
   tracker.stepAnchorFace = null;
   tracker.sawPreMoveAlignment = false;
 }
@@ -224,16 +224,18 @@ function evaluateOneFace(
 
   let best: FaceEvalResult = { progress: 0, completed: false, rejectedWholeCube: false };
 
+  const faceLock = tracker.orientationLocks[faceId] ?? null;
+
   for (const ref of refs) {
     let oriented: StickerColor[];
-    if (tracker.orientationLock !== null) {
-      oriented = orientByIndex(detected, tracker.orientationLock);
+    if (faceLock !== null) {
+      oriented = orientByIndex(detected, faceLock);
     } else {
       const pick = bestOrientationForReference(detected, ref.before, PERIPHERY);
       oriented = pick.oriented;
       if (pick.matches >= 6) {
-        tracker.orientationLock = pick.index;
-        tracker.lockMissFrames = 0;
+        tracker.orientationLocks[faceId] = pick.index;
+        tracker.lockMissFrames[faceId] = 0;
       }
     }
 
@@ -275,15 +277,15 @@ function evaluateOneFace(
       };
     }
 
-    if (tracker.orientationLock !== null) {
+    if (tracker.orientationLocks[faceId] !== undefined) {
       if (beforePeriph < 4) {
-        tracker.lockMissFrames++;
-        if (tracker.lockMissFrames > 8) {
-          tracker.orientationLock = null;
-          tracker.lockMissFrames = 0;
+        tracker.lockMissFrames[faceId] = (tracker.lockMissFrames[faceId] ?? 0) + 1;
+        if ((tracker.lockMissFrames[faceId] ?? 0) > 8) {
+          delete tracker.orientationLocks[faceId];
+          delete tracker.lockMissFrames[faceId];
         }
       } else {
-        tracker.lockMissFrames = 0;
+        tracker.lockMissFrames[faceId] = 0;
       }
     }
   }
@@ -354,6 +356,87 @@ export function evaluateMoveColorProgress(
         progress: result.progress,
         completed: result.completed,
         visibleFace: detectedFace,
+        comparisonFace: faceId,
+        rejectedWholeCube: false,
+      };
+      if (result.completed) break;
+    }
+  }
+
+  return best;
+}
+
+/** Evaluate all visible faces against the virtual cube — best progress wins. */
+export function evaluateThreeFaceMoveProgress(
+  facelet: string,
+  move: Move,
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>,
+  primaryVisibleFace: FaceId | null,
+  tracker: MoveColorTrackerState,
+): MoveColorEvaluation {
+  if (!facelet || facelet.length !== 54) {
+    return {
+      progress: 0,
+      completed: false,
+      visibleFace: primaryVisibleFace,
+      comparisonFace: null,
+      rejectedWholeCube: false,
+    };
+  }
+
+  if (primaryVisibleFace) {
+    if (tracker.stepAnchorFace === null) {
+      tracker.stepAnchorFace = primaryVisibleFace;
+    } else if (
+      primaryVisibleFace !== tracker.stepAnchorFace &&
+      !tracker.sawPreMoveAlignment
+    ) {
+      return {
+        progress: 0,
+        completed: false,
+        visibleFace: primaryVisibleFace,
+        comparisonFace: null,
+        rejectedWholeCube: true,
+      };
+    }
+  }
+
+  const affected = ALL_FACES.filter((f) => faceChangesFromMove(facelet, move, f) > 0);
+  const moveFaceId = moveFace(move);
+  const visibleIds = Object.keys(visibleFaceColors) as FaceId[];
+  const facesToTry = [
+    ...visibleIds.filter((f) => affected.includes(f)),
+    moveFaceId,
+    ...affected.filter((f) => f !== moveFaceId && !visibleIds.includes(f)),
+  ].filter((f, i, arr) => affected.includes(f) && arr.indexOf(f) === i);
+
+  let best: MoveColorEvaluation = {
+    progress: 0,
+    completed: false,
+    visibleFace: primaryVisibleFace,
+    comparisonFace: null,
+    rejectedWholeCube: false,
+  };
+
+  for (const faceId of facesToTry) {
+    const detected = visibleFaceColors[faceId];
+    if (!detected || detected.length !== 9) continue;
+
+    const result = evaluateOneFace(facelet, move, faceId, detected, tracker);
+    if (result.rejectedWholeCube) {
+      return {
+        progress: 0,
+        completed: false,
+        visibleFace: primaryVisibleFace,
+        comparisonFace: faceId,
+        rejectedWholeCube: true,
+      };
+    }
+    if (result.completed || result.progress > best.progress) {
+      best = {
+        progress: result.progress,
+        completed: result.completed,
+        visibleFace: primaryVisibleFace,
         comparisonFace: faceId,
         rejectedWholeCube: false,
       };

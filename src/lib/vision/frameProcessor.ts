@@ -108,7 +108,9 @@ export class FrameProcessor {
 
     try {
       if (this.trackingEnabled) {
-        return this.processWithTracking(width, height);
+        const tracked = this.processWithTracking(width, height);
+        if (tracked.pose || !this.solvingScanMode) return tracked;
+        return this.processDetectionOnly(width, height);
       }
       return this.processDetectionOnly(width, height);
     } catch {
