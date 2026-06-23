@@ -8,6 +8,7 @@ import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
 import { sampleVisibleFaceColors } from './multiFaceSampler';
 import { drawCameraFrame } from './selfieView';
+import { SOLVING_GUIDE_SIZE_RATIO } from './roi';
 
 const LOST_TRACKING_THRESHOLD = 30;
 
@@ -29,6 +30,7 @@ export class FrameProcessor {
   private processCtx: CanvasRenderingContext2D;
   private lastColors: StickerColor[] | null = null;
   private expectedMove: Move | null = null;
+  private solvingScanMode = false;
 
   constructor() {
     this.processCanvas = document.createElement('canvas');
@@ -50,6 +52,14 @@ export class FrameProcessor {
     this.flowTracker.reset();
     this.poseSmoother.reset();
     this.lastColors = null;
+  }
+
+  setSolvingScanMode(on: boolean): void {
+    this.solvingScanMode = on;
+  }
+
+  private guideRatio(): number | undefined {
+    return this.solvingScanMode ? SOLVING_GUIDE_SIZE_RATIO : undefined;
   }
 
   setExpectedMove(move: Move | null): void {
@@ -107,7 +117,8 @@ export class FrameProcessor {
   }
 
   private processDetectionOnly(width: number, height: number): FrameResult {
-    const detectedFace = detectCubeFace(this.processCanvas, width, height);
+    const ratio = this.guideRatio();
+    const detectedFace = detectCubeFace(this.processCanvas, width, height, ratio);
     if (!detectedFace) {
       return { ...EMPTY_RESULT };
     }

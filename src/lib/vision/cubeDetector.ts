@@ -124,8 +124,9 @@ export function detectCubeCorners(
   sourceCanvas: HTMLCanvasElement,
   frameWidth: number,
   frameHeight: number,
+  guideRatio?: number,
 ): [Point2D, Point2D, Point2D, Point2D] | null {
-  const guide = getGuideSquare(frameWidth, frameHeight);
+  const guide = getGuideSquare(frameWidth, frameHeight, guideRatio);
 
   const roiCanvas = document.createElement('canvas');
   roiCanvas.width = guide.size;
@@ -160,8 +161,9 @@ export function detectCubeFace(
   sourceCanvas: HTMLCanvasElement,
   frameWidth: number,
   frameHeight: number,
+  guideRatio?: number,
 ): DetectedFace | null {
-  const guide = getGuideSquare(frameWidth, frameHeight);
+  const guide = getGuideSquare(frameWidth, frameHeight, guideRatio);
   const colors = sampleGuideRegionColors(sourceCanvas, guide);
   const variance = measureColorVariance(sourceCanvas, guide);
 
@@ -169,7 +171,7 @@ export function detectCubeFace(
     return null;
   }
 
-  const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
+  const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight, guideRatio);
   const hintFace = colors[4] ? identifyFaceFromCenter(colors[4]) : null;
   const pose = estimatePoseFromCorners(
     corners ?? guideToCorners(guide),

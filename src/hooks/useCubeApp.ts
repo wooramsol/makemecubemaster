@@ -194,12 +194,17 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     faceletRef.current = nextFacelet;
 
+    const solution = solutionRef.current;
+    const nextIndex = solution ? solution.currentIndex + 1 : 0;
+    if (solution && nextIndex >= solution.moves.length) {
+      frameProcessor.current?.setSolvingScanMode(false);
+    }
+
     setState((prev) => {
       if (!prev.solution) return prev;
       const expected = prev.solution.moves[prev.solution.currentIndex];
       if (move !== expected) return prev;
 
-      const nextIndex = prev.solution.currentIndex + 1;
       if (nextIndex >= prev.solution.moves.length) {
         return {
           ...prev,
@@ -323,6 +328,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           }));
           if (msg.moves.length > 0) {
             frameProcessor.current?.disableTracking();
+            frameProcessor.current?.setSolvingScanMode(true);
             syncExpectedMove(msg.moves[0] ?? null);
             colorCompleteStableRef.current = 0;
           }
@@ -623,7 +629,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (!expected) return;
     if (Date.now() - solvingStartMs.current < 400) return;
     if (Date.now() - stepReadyMs.current < 300) return;
-    if (!colorEval?.completed || colorCompleteStableRef.current < 3) return;
+    if (!colorEval?.completed || colorCompleteStableRef.current < 2) return;
 
     if (solution) {
       applyCompletedMove(expected);

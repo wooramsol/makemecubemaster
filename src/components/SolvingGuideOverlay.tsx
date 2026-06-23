@@ -1,11 +1,10 @@
 import type { Move, StickerColor } from '../types';
 import { FaceColorGrid } from './FaceColorGrid';
-import {
-  buildFaceArcPaths,
-  doubleMoveLabel,
-} from '../lib/ui/staticFaceArrow';
+import { buildOuterRotationArrows } from '../lib/ui/staticFaceArrow';
 
-const GUIDE_SIZE = 280;
+const GRID_SIZE = 260;
+const ARROW_PAD = 52;
+const VIEW_SIZE = GRID_SIZE + ARROW_PAD * 2;
 
 interface SolvingGuideOverlayProps {
   visible: boolean;
@@ -24,8 +23,7 @@ export function SolvingGuideOverlay({
 }: SolvingGuideOverlayProps) {
   if (!visible) return null;
 
-  const arc = buildFaceArcPaths(GUIDE_SIZE, move, 1, true);
-  const doubleLabel = doubleMoveLabel(move);
+  const arrows = buildOuterRotationArrows(GRID_SIZE, ARROW_PAD, move, true);
   const wrong = Boolean(wrongMove);
 
   return (
@@ -37,45 +35,49 @@ export function SolvingGuideOverlay({
       )}
 
       <div className={`solving-guide-card${wrong ? ' solving-guide-card--wrong' : ''}`}>
-        <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
-        <svg
-          className="solving-guide-arrow"
-          viewBox={`0 0 ${GUIDE_SIZE} ${GUIDE_SIZE}`}
-          aria-hidden="true"
-        >
-          <g className="solving-guide-arrow-mirror">
-            <path
-              d={arc.track}
-              className="solving-guide-track"
-              fill="none"
-              strokeWidth={10}
-              strokeLinecap="round"
-            />
-            <path
-              d={arc.active}
-              className={`solving-guide-active${wrong ? ' solving-guide-active--wrong' : ''}`}
-              fill="none"
-              strokeWidth={14}
-              strokeLinecap="round"
-            />
-            <polygon
-              className={`solving-guide-head${wrong ? ' solving-guide-head--wrong' : ''}`}
-              points="0,-12 20,0 0,12"
-              transform={`translate(${arc.headX} ${arc.headY}) rotate(${(arc.headAngle * 180) / Math.PI})`}
-            />
-          </g>
-          {doubleLabel && (
-            <text
-              x={GUIDE_SIZE / 2}
-              y={GUIDE_SIZE / 2}
-              className="solving-guide-double"
-              textAnchor="middle"
-              dominantBaseline="middle"
-            >
-              {doubleLabel}
-            </text>
-          )}
-        </svg>
+        <div className="solving-guide-stage">
+          <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
+          <svg
+            className="solving-guide-arrow"
+            viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`}
+            aria-hidden="true"
+          >
+            <g className="solving-guide-arrow-mirror">
+              {arrows.arrows.map((arrow, i) => (
+                <g key={i}>
+                  <path
+                    d={arrow.d}
+                    className="solving-guide-outer-track"
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d={arrow.d}
+                    className={`solving-guide-outer-active${wrong ? ' solving-guide-outer-active--wrong' : ''}`}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                  <polygon
+                    className={`solving-guide-outer-head${wrong ? ' solving-guide-outer-head--wrong' : ''}`}
+                    points="0,-16 28,0 0,16"
+                    transform={`translate(${arrow.headX} ${arrow.headY}) rotate(${(arrow.headAngle * 180) / Math.PI})`}
+                  />
+                </g>
+              ))}
+            </g>
+            {arrows.doubleLabel && (
+              <text
+                x={VIEW_SIZE / 2}
+                y={VIEW_SIZE / 2}
+                className="solving-guide-double"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {arrows.doubleLabel}
+              </text>
+            )}
+          </svg>
+        </div>
       </div>
     </div>
   );

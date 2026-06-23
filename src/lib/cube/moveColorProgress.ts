@@ -5,6 +5,7 @@ import { allFaceRotations } from './faceOrientation';
 import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
+const PERIPHERY = [0, 1, 2, 3, 5, 6, 7, 8] as const;
 
 const FACELET_TO_STICKER: Record<string, StickerColor> = {
   U: 'W',
@@ -48,17 +49,43 @@ function countMatchingCells(a: StickerColor[], b: StickerColor[]): number {
   return matches;
 }
 
-function bestOrientedMatch(
+function countMatchingPeriphery(a: StickerColor[], b: StickerColor[]): number {
+  let matches = 0;
+  for (const i of PERIPHERY) {
+    if (a[i] === b[i]) matches++;
+  }
+  return matches;
+}
+
+interface OrientationScore {
+  oriented: StickerColor[];
+  beforeMatches: number;
+  afterMatches: number;
+  peripheryAfter: number;
+}
+
+function scoreAllOrientations(
   detected: StickerColor[],
-  reference: StickerColor[],
-): { oriented: StickerColor[]; matches: number } {
-  let best = { oriented: detected, matches: 0 };
+  before: StickerColor[],
+  after: StickerColor[],
+): OrientationScore {
+  let best: OrientationScore = {
+    oriented: detected,
+    beforeMatches: 0,
+    afterMatches: 0,
+    peripheryAfter: 0,
+  };
 
   for (const base of [detected, mirrorFaceCellsHorizontally(detected)]) {
     for (const rotated of allFaceRotations(base)) {
-      const matches = countMatchingCells(rotated, reference);
-      if (matches > best.matches) {
-        best = { oriented: rotated, matches };
+      const beforeMatches = countMatchingCells(rotated, before);
+      const afterMatches = countMatchingCells(rotated, after);
+      const peripheryAfter = countMatchingPeriphery(rotated, after);
+      const better =
+        afterMatches > best.afterMatches ||
+        (afterMatches === best.afterMatches && beforeMatches > best.beforeMatches);
+      if (better) {
+        best = { oriented: rotated, beforeMatches, afterMatches, peripheryAfter };
       }
     }
   }
@@ -84,11 +111,8 @@ function pickComparisonFace(
   if (!detectedFace) return null;
 
   const moveFaceId = moveFace(move);
-  const changesOnDetected = faceChangesFromMove(facelet, move, detectedFace);
-  if (changesOnDetected > 0) return detectedFace;
-
-  const changesOnMoveFace = faceChangesFromMove(facelet, move, moveFaceId);
-  if (changesOnMoveFace > 0) return moveFaceId;
+  if (faceChangesFromMove(facelet, move, detectedFace) > 0) return detectedFace;
+  if (faceChangesFromMove(facelet, move, moveFaceId) > 0) return moveFaceId;
 
   return detectedFace;
 }
@@ -110,30 +134,33 @@ export function evaluateMoveColorProgress(
 
   const before = faceletFaceColors(facelet, comparisonFace);
   const after = faceletFaceColors(applyMoveToFacelet(facelet, move), comparisonFace);
-  const { oriented, matches: beforeMatches } = bestOrientedMatch(detectedColors, before);
+  const score = scoreAllOrientations(detectedColors, before, after);
+  const { oriented, beforeMatches, afterMatches, peripheryAfter } = score;
 
-  if (beforeMatches < 6) {
-    return { progress: 0, completed: false, visibleFace: detectedFace, orientedColors: null };
-  }
+  const completed =
+    peripheryAfter >= 6 &&
+    afterMatches >= 6 &&
+    afterMatches > beforeMatches;
 
-  let changedCells = 0;
-  let matchedTowardTarget = 0;
-  for (let i = 0; i < 9; i++) {
-    if (before[i] !== after[i]) {
-      changedCells++;
-      if (oriented[i] === after[i]) matchedTowardTarget++;
+  let progress = 0;
+  if (completed) {
+    progress = 1;
+  } else if (beforeMatches >= 5) {
+    let changedCells = 0;
+    let matchedTowardTarget = 0;
+    for (let i = 0; i < 9; i++) {
+      if (before[i] !== after[i]) {
+        changedCells++;
+        if (oriented[i] === after[i]) matchedTowardTarget++;
+      }
     }
-  }
-
-  const afterMatches = countMatchingCells(oriented, after);
-  const progress =
-    changedCells > 0
-      ? Math.min(1, matchedTowardTarget / changedCells)
-      : afterMatches >= 9
-        ? 1
+    progress =
+      changedCells > 0
+        ? Math.min(1, matchedTowardTarget / changedCells)
         : Math.min(1, afterMatches / 9);
-
-  const completed = afterMatches >= 8 && oriented[4] === after[4];
+  } else if (afterMatches > beforeMatches) {
+    progress = Math.min(1, afterMatches / 9);
+  }
 
   return {
     progress,
