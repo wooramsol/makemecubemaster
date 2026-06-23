@@ -8,9 +8,8 @@ interface CubeAROverlayProps {
   move: Move | null;
   rotationProgress: number;
   faceMatchesMove: boolean;
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   scannedFaceColors: Partial<Record<FaceId, StickerColor[]>>;
-  liveFace: FaceId | null;
-  liveFaceColors: StickerColor[] | null;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -23,9 +22,8 @@ export function CubeAROverlay({
   move,
   rotationProgress,
   faceMatchesMove,
+  visibleFaceColors,
   scannedFaceColors,
-  liveFace,
-  liveFaceColors,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -80,8 +78,8 @@ export function CubeAROverlay({
   }, [rotationProgress]);
 
   useEffect(() => {
-    rendererRef.current?.setFaceColors(scannedFaceColors, liveFace, liveFaceColors);
-  }, [scannedFaceColors, liveFace, liveFaceColors]);
+    rendererRef.current?.setFaceColors(visibleFaceColors, scannedFaceColors);
+  }, [visibleFaceColors, scannedFaceColors]);
 
   useEffect(() => {
     if (!active) return;

@@ -1,4 +1,5 @@
 import { getGuideSquare, getColorSampleSpot } from './roi';
+import { SELFIE_CAMERA_MODE } from './selfieView';
 
 export interface GuideOverlayRect {
   left: number;
@@ -24,6 +25,32 @@ export function getCoverTransform(
   };
 }
 
+/** Map a frame-space rectangle to viewport pixels (object-fit: cover + selfie mirror). */
+export function mapFrameRectToViewport(
+  frameX: number,
+  frameY: number,
+  frameW: number,
+  frameH: number,
+  frameWidth: number,
+  frameHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+): GuideOverlayRect {
+  const { scale, offsetX, offsetY } = getCoverTransform(
+    frameWidth,
+    frameHeight,
+    containerWidth,
+    containerHeight,
+  );
+  const x = SELFIE_CAMERA_MODE ? frameWidth - frameX - frameW : frameX;
+  return {
+    left: offsetX + x * scale,
+    top: offsetY + frameY * scale,
+    width: frameW * scale,
+    height: frameH * scale,
+  };
+}
+
 /** 실제 색상 샘플링 영역과 일치하는 점선 가이드 위치 */
 export function getGuideOverlayRect(
   frameWidth: number,
@@ -36,19 +63,16 @@ export function getGuideOverlayRect(
   }
 
   const guide = getGuideSquare(frameWidth, frameHeight);
-  const { scale, offsetX, offsetY } = getCoverTransform(
+  return mapFrameRectToViewport(
+    guide.x,
+    guide.y,
+    guide.size,
+    guide.size,
     frameWidth,
     frameHeight,
     containerWidth,
     containerHeight,
   );
-
-  return {
-    left: offsetX + guide.x * scale,
-    top: offsetY + guide.y * scale,
-    width: guide.size * scale,
-    height: guide.size * scale,
-  };
 }
 
 /** 흰색 기준 중앙 스팟 (화면 좌표) */
@@ -64,17 +88,14 @@ export function getWhiteSpotOverlayRect(
 
   const guide = getGuideSquare(frameWidth, frameHeight);
   const spot = getColorSampleSpot(guide);
-  const { scale, offsetX, offsetY } = getCoverTransform(
+  return mapFrameRectToViewport(
+    spot.x,
+    spot.y,
+    spot.size,
+    spot.size,
     frameWidth,
     frameHeight,
     containerWidth,
     containerHeight,
   );
-
-  return {
-    left: offsetX + spot.x * scale,
-    top: offsetY + spot.y * scale,
-    width: spot.size * scale,
-    height: spot.size * scale,
-  };
 }

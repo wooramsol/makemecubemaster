@@ -92,6 +92,7 @@ export interface SolvingFeedback {
   visibleFace: FaceId | null;
   faceMatchesMove: boolean;
   liveFaceColors: StickerColor[] | null;
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
 }
 
 export interface FrameResult {
@@ -100,6 +101,7 @@ export interface FrameResult {
   rotationMove: Move | null;
   rotationProgress: number;
   wrongMove: Move | null;
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
 }
 
 export interface CameraIntrinsics {

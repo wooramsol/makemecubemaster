@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CubeAROverlay } from './components/CubeAROverlay';
+import { GuideFrame } from './components/GuideFrame';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
@@ -91,6 +92,8 @@ export default function App() {
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
   const showAr = state.phase === 'solving';
+  const showSolvingGuide =
+    state.phase === 'solving' && state.solvingFeedback.tracking !== 'locked';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -114,15 +117,20 @@ export default function App() {
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
               faceMatchesMove={state.solvingFeedback.faceMatchesMove}
+              visibleFaceColors={state.solvingFeedback.visibleFaceColors}
               scannedFaceColors={state.scannedFaceColors}
-              liveFace={state.solvingFeedback.visibleFace}
-              liveFaceColors={state.solvingFeedback.liveFaceColors}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}
               viewportHeight={viewportSize.height}
               active={showAr}
             />
+
+            {showSolvingGuide && (
+              <div className="guide-layer" aria-hidden="true">
+                <GuideFrame rect={guideRect} />
+              </div>
+            )}
 
             <ColorLearnOverlay
               visible={state.phase === 'colorLearn'}

@@ -72,6 +72,7 @@ const initialSolvingFeedback: SolvingFeedback = {
   visibleFace: null,
   faceMatchesMove: false,
   liveFaceColors: null,
+  visibleFaceColors: {},
 };
 
 const initialState: CubeAppState = {
@@ -582,6 +583,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         visibleFace,
         faceMatchesMove,
         liveFaceColors: result.detectedFace?.colors ?? null,
+        visibleFaceColors: result.visibleFaceColors,
       },
     }));
 

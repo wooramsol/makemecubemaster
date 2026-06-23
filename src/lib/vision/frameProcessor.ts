@@ -6,6 +6,7 @@ import { estimatePoseFromCorners } from './poseTracker';
 import { PoseSmoother } from './poseSmoother';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
+import { sampleVisibleFaceColors } from './multiFaceSampler';
 import { drawCameraFrame } from './selfieView';
 
 const LOST_TRACKING_THRESHOLD = 30;
@@ -16,6 +17,7 @@ const EMPTY_RESULT: FrameResult = {
   rotationMove: null,
   rotationProgress: 0,
   wrongMove: null,
+  visibleFaceColors: {},
 };
 
 export class FrameProcessor {
@@ -110,12 +112,19 @@ export class FrameProcessor {
       return { ...EMPTY_RESULT };
     }
     this.lastColors = detectedFace.colors;
+    const visibleFaceColors = sampleVisibleFaceColors(
+      this.processCanvas,
+      detectedFace.pose,
+      width,
+      height,
+    );
     return {
       pose: detectedFace.pose,
       detectedFace,
       rotationMove: null,
       rotationProgress: 0,
       wrongMove: null,
+      visibleFaceColors,
     };
   }
 
@@ -149,6 +158,12 @@ export class FrameProcessor {
     const detectedFace: DetectedFace | null = colors ? { colors, pose } : null;
 
     const rotation = this.rotationDetector.update(pose.rotationMatrix);
+    const visibleFaceColors = sampleVisibleFaceColors(
+      this.processCanvas,
+      pose,
+      width,
+      height,
+    );
 
     return {
       pose,
@@ -156,6 +171,7 @@ export class FrameProcessor {
       rotationMove: rotation.completedMove,
       rotationProgress: rotation.progress,
       wrongMove: rotation.wrongMove,
+      visibleFaceColors,
     };
   }
 

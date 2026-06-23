@@ -94,13 +94,12 @@ export class CubeARRenderer {
   }
 
   setFaceColors(
-    scanned: Partial<Record<FaceId, StickerColor[]>>,
-    liveFace: FaceId | null,
-    liveColors: StickerColor[] | null,
+    liveByFace: Partial<Record<FaceId, StickerColor[]>>,
+    scannedFallback: Partial<Record<FaceId, StickerColor[]>>,
   ): void {
-    const merged: Partial<Record<FaceId, StickerColor[]>> = { ...scanned };
-    if (liveFace && liveColors?.length === 9) {
-      merged[liveFace] = liveColors;
+    const merged: Partial<Record<FaceId, StickerColor[]>> = { ...scannedFallback };
+    for (const [faceId, colors] of Object.entries(liveByFace) as [FaceId, StickerColor[]][]) {
+      if (colors.length === 9) merged[faceId] = colors;
     }
     const key = JSON.stringify(merged);
     if (key === this.faceColorsKey) return;

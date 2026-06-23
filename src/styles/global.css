@@ -402,6 +402,13 @@ body,
   z-index: 5;
 }
 
+.guide-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+
 .guide-frame-css {
   position: absolute;
   top: 50%;

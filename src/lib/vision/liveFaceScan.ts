@@ -4,7 +4,7 @@ import type { FaceId, StickerColor } from '../../types';
 /** Periphery cells only — center is used for face ID and may jitter */
 const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
 
-export const STABLE_DURATION_MS = 2000;
+export const STABLE_DURATION_MS = 1000;
 const MAX_READINGS_PER_FACE = 10;
 const SAME_FACE_PERIPHERY_MATCHES = 7;
 const STABILITY_JITTER_MATCHES = 6;
