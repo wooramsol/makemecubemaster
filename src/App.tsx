@@ -7,7 +7,6 @@ import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingAROverlay } from './components/SolvingAROverlay';
 import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
-import { SolvingScanZone } from './components/SolvingScanZone';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -133,16 +132,6 @@ export default function App() {
               progress={state.liveScanProgress}
               needsNewFace={state.detectionFeedback.status === 'rotate'}
               needsClearerCenter={state.liveScanNeedsClearerCenter}
-            />
-
-            <SolvingScanZone
-              visible={isSolving}
-              frameWidth={dimensions.width}
-              frameHeight={dimensions.height}
-              viewportWidth={viewportSize.width}
-              viewportHeight={viewportSize.height}
-              tracking={state.solvingFeedback.tracking}
-              rotationProgress={state.solvingFeedback.rotationProgress}
             />
 
             <SolvingAROverlay

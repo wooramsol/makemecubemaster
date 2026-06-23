@@ -74,23 +74,23 @@ export function drawFaceArrow(
   const ru = { x: ux / uLen, y: uy / uLen };
   const rv = { x: vx / vLen, y: vy / vLen };
 
-  const radius = Math.min(uLen, vLen) * (options.guide ? 0.34 : 0.3);
+  const guide = options.guide ?? false;
+  const dimmed = options.dimmed ?? false;
+  const radius = Math.min(uLen, vLen) * (guide ? 0.38 : 0.3);
+  const guideLine = guide ? Math.max(8, radius * 0.22, Math.min(uLen, vLen) * 0.06) : 0;
   const totalAngle = Math.abs(moveAngle(move));
   const startAngle = isPrimeMove(move) ? totalAngle : 0;
   const endAngle = isPrimeMove(move) ? 0 : totalAngle;
   const clamped = Math.max(0, Math.min(1, progress));
   const currentAngle = startAngle + (endAngle - startAngle) * clamped;
 
-  const guide = options.guide ?? false;
-  const dimmed = options.dimmed ?? false;
-
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
   if (guide) {
-    const guideWidth = Math.max(6, radius * 0.2);
-    const headSize = Math.max(10, radius * 0.28);
+    const guideWidth = Math.max(guideLine, 8);
+    const headSize = Math.max(14, radius * 0.32, guideWidth * 1.4);
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.lineWidth = guideWidth + 4;
@@ -118,7 +118,8 @@ export function drawFaceArrow(
 
     if (options.faceLabel) {
       ctx.shadowBlur = 0;
-      ctx.font = `bold ${Math.max(14, radius * 0.38)}px Inter, sans-serif`;
+      const labelSize = Math.max(18, radius * 0.45);
+      ctx.font = `bold ${labelSize}px Inter, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
