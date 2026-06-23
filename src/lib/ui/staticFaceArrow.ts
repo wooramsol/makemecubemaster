@@ -1,16 +1,12 @@
 import type { Move } from '../../types';
 import { isDoubleMove, isPrimeMove, moveFace } from '../cube/moves';
 
-export interface OuterArrowPath {
-  d: string;
+export interface RotationGuideGraphic {
+  trackPath: string;
   headX: number;
   headY: number;
   headAngle: number;
-}
-
-export interface OuterRotationArrows {
-  arrows: OuterArrowPath[];
-  doubleLabel: string | null;
+  symbol: 'cw' | 'ccw' | 'double';
 }
 
 function pointOnArc(
@@ -31,7 +27,7 @@ function arcPath(
   radius: number,
   start: number,
   end: number,
-  steps = 36,
+  steps = 40,
 ): string {
   const parts: string[] = [];
   for (let i = 0; i <= steps; i++) {
@@ -42,21 +38,6 @@ function arcPath(
   return parts.join(' ');
 }
 
-function arrowAtEnd(
-  cx: number,
-  cy: number,
-  radius: number,
-  angle: number,
-): { headX: number; headY: number; headAngle: number } {
-  const head = pointOnArc(cx, cy, radius, angle);
-  const prev = pointOnArc(cx, cy, radius, angle - 0.22);
-  return {
-    headX: head.x,
-    headY: head.y,
-    headAngle: Math.atan2(head.y - prev.y, head.x - prev.x),
-  };
-}
-
 function mirrorMoveForSelfie(move: Move): Move {
   if (isDoubleMove(move)) return move;
   const face = moveFace(move);
@@ -64,64 +45,84 @@ function mirrorMoveForSelfie(move: Move): Move {
 }
 
 /**
- * Two large corner arcs outside the face grid — matches user-drawn rotation cues.
+ * Single large arc around the face with one arrowhead — unambiguous CW/CCW on screen.
+ * Screen Y grows downward; positive angle sweep = clockwise on screen.
  */
-export function buildOuterRotationArrows(
+export function buildRotationGuide(
+  viewSize: number,
+  _gridPadding: number,
   gridSize: number,
-  padding: number,
   move: Move,
   mirror = false,
-): OuterRotationArrows {
+): RotationGuideGraphic {
   const effectiveMove = mirror ? mirrorMoveForSelfie(move) : move;
+  const cx = viewSize / 2;
+  const cy = viewSize / 2;
+  const radius = gridSize * 0.46;
   const clockwise = !isPrimeMove(effectiveMove);
-  const sweep = (Math.PI / 2) * (clockwise ? 1 : -1);
+  const sweep = isDoubleMove(effectiveMove) ? Math.PI : Math.PI / 2;
 
-  const left = padding;
-  const top = padding;
-  const right = padding + gridSize;
-  const bottom = padding + gridSize;
-  const radius = padding * 0.82;
+  // Start from top of face, sweep clockwise or counter-clockwise on screen.
+  const start = -Math.PI / 2;
+  const end = start + (clockwise ? sweep : -sweep);
 
-  const corners: Array<{ cx: number; cy: number; start: number }> = clockwise
-    ? [
-        { cx: right, cy: top, start: Math.PI },
-        { cx: left, cy: bottom, start: 0 },
-      ]
-    : [
-        { cx: left, cy: top, start: Math.PI / 2 },
-        { cx: right, cy: bottom, start: -Math.PI / 2 },
-      ];
-
-  const arrows: OuterArrowPath[] = corners.map(({ cx, cy, start }) => {
-    const end = start + sweep;
-    const head = arrowAtEnd(cx, cy, radius, end);
-    return { d: arcPath(cx, cy, radius, start, end), ...head };
-  });
+  const head = pointOnArc(cx, cy, radius, end);
+  const prev = pointOnArc(cx, cy, radius, end - (clockwise ? 0.2 : -0.2));
+  const headAngle = Math.atan2(head.y - prev.y, head.x - prev.x);
 
   return {
-    arrows,
-    doubleLabel: isDoubleMove(move) ? '180°' : null,
+    trackPath: arcPath(cx, cy, radius, start, end),
+    headX: head.x,
+    headY: head.y,
+    headAngle,
+    symbol: isDoubleMove(move) ? 'double' : clockwise ? 'cw' : 'ccw',
   };
+}
+
+export function rotationSymbolLabel(symbol: RotationGuideGraphic['symbol']): string {
+  if (symbol === 'double') return '180°';
+  if (symbol === 'cw') return '↻';
+  return '↺';
 }
 
 export function doubleMoveLabel(move: Move): string | null {
   return isDoubleMove(move) ? '180°' : null;
 }
 
-// Kept for compatibility if referenced elsewhere
+// Legacy export
+export function buildOuterRotationArrows(
+  gridSize: number,
+  padding: number,
+  move: Move,
+  mirror = false,
+) {
+  const viewSize = gridSize + padding * 2;
+  const guide = buildRotationGuide(viewSize, padding, gridSize, move, mirror);
+  return {
+    arrows: [
+      {
+        d: guide.trackPath,
+        headX: guide.headX,
+        headY: guide.headY,
+        headAngle: guide.headAngle,
+      },
+    ],
+    doubleLabel: guide.symbol === 'double' ? '180°' : null,
+  };
+}
+
 export function buildFaceArcPaths(
   size: number,
   move: Move,
   _progress: number,
   mirror = false,
 ) {
-  const outer = buildOuterRotationArrows(size * 0.72, size * 0.14, move, mirror);
-  const first = outer.arrows[0]!;
+  const guide = buildRotationGuide(size, size * 0.1, size * 0.8, move, mirror);
   return {
-    track: first.d,
-    active: first.d,
-    headX: first.headX,
-    headY: first.headY,
-    headAngle: first.headAngle,
+    track: guide.trackPath,
+    active: guide.trackPath,
+    headX: guide.headX,
+    headY: guide.headY,
+    headAngle: guide.headAngle,
   };
 }

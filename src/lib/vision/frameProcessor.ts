@@ -118,7 +118,8 @@ export class FrameProcessor {
 
   private processDetectionOnly(width: number, height: number): FrameResult {
     const ratio = this.guideRatio();
-    const detectedFace = detectCubeFace(this.processCanvas, width, height, ratio);
+    const relaxed = this.solvingScanMode;
+    const detectedFace = detectCubeFace(this.processCanvas, width, height, ratio, relaxed);
     if (!detectedFace) {
       return { ...EMPTY_RESULT };
     }

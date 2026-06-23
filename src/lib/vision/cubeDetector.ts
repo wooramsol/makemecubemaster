@@ -162,12 +162,15 @@ export function detectCubeFace(
   frameWidth: number,
   frameHeight: number,
   guideRatio?: number,
+  relaxed = false,
 ): DetectedFace | null {
   const guide = getGuideSquare(frameWidth, frameHeight, guideRatio);
   const colors = sampleGuideRegionColors(sourceCanvas, guide);
   const variance = measureColorVariance(sourceCanvas, guide);
 
-  if (!isRegionCubeLike(colors, variance)) {
+  const cubeLike = isRegionCubeLike(colors, variance);
+  const centerOk = Boolean(colors[4] && identifyFaceFromCenter(colors[4]));
+  if (!cubeLike && !(relaxed && centerOk && colors.length === 9)) {
     return null;
   }
 

@@ -1003,12 +1003,7 @@ body,
 
 /* ── Static solving guide (fixed face + rotation arrow) ── */
 .viewport--solving::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  background: rgba(0, 0, 0, 0.12);
-  pointer-events: none;
+  content: none;
 }
 
 .solving-guide-overlay {
@@ -1017,21 +1012,31 @@ body,
   z-index: 12;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  padding-right: max(10px, env(safe-area-inset-right));
   pointer-events: none;
 }
 
 .solving-guide-card {
   position: relative;
-  width: min(92vw, 364px);
-  padding: 10px;
-  border-radius: 22px;
-  background: rgba(12, 12, 16, 0.28);
+  width: min(46vw, 210px);
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  background: rgba(12, 12, 16, 0.42);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.solving-guide-dir-label {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .solving-guide-stage {
@@ -1040,13 +1045,13 @@ body,
 }
 
 .solving-guide-stage .face-color-grid--solving {
-  width: 72%;
+  width: 68%;
   margin: 0 auto;
 }
 
 .solving-guide-card--wrong {
   box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.4),
     0 0 0 2px rgba(255, 107, 107, 0.55);
 }
 
@@ -1054,21 +1059,21 @@ body,
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
+  gap: 4px;
   width: 100%;
   aspect-ratio: 1;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.22);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .solving-face-cell {
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 2px solid rgba(0, 0, 0, 0.28);
-  opacity: 0.52;
+  opacity: 0.55;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
@@ -1088,53 +1093,142 @@ body,
 }
 
 .solving-guide-outer-track {
-  stroke: rgba(192, 132, 252, 0.35);
-  stroke-width: 16;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 12;
 }
 
 .solving-guide-outer-active {
-  stroke: #c084fc;
-  stroke-width: 20;
-  filter: drop-shadow(0 0 10px rgba(192, 132, 252, 0.85));
+  stroke: #facc15;
+  stroke-width: 16;
+  filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.75));
 }
 
 .solving-guide-outer-active--wrong {
   stroke: #ff6b6b;
-  filter: drop-shadow(0 0 10px rgba(255, 107, 107, 0.7));
+  filter: drop-shadow(0 0 8px rgba(255, 107, 107, 0.7));
 }
 
 .solving-guide-outer-head {
-  fill: #c084fc;
+  fill: #facc15;
 }
 
 .solving-guide-outer-head--wrong {
   fill: #ff6b6b;
 }
 
-.solving-guide-double {
-  fill: rgba(255, 255, 255, 0.92);
-  font-size: 32px;
+.solving-guide-symbol {
+  fill: rgba(255, 255, 255, 0.95);
+  font-size: 36px;
   font-weight: 700;
   paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.55);
-  stroke-width: 4px;
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 5px;
 }
 
-.solving-guide-progress {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.16);
-  overflow: hidden;
+.viewport--solving .solving-skip {
+  left: auto;
+  right: max(16px, env(safe-area-inset-right));
 }
 
-.solving-guide-progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #facc15, #fde047);
-  transition: width 0.06s linear;
+/* Center scan zone — live feedback while cube stays in middle */
+.solving-scan-zone-root {
+  position: absolute;
+  inset: 0;
+  z-index: 11;
+  pointer-events: none;
 }
 
-.solving-guide-card--wrong .solving-guide-progress-fill {
-  background: linear-gradient(90deg, #ff6b6b, #ff8a80);
+.solving-scan-zone {
+  position: absolute;
+  border-radius: 16px;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.solving-scan-zone--searching {
+  border-color: rgba(250, 204, 21, 0.75);
+  animation: solving-scan-pulse 1.2s ease-in-out infinite;
+}
+
+.solving-scan-zone--locked {
+  border-color: rgba(74, 222, 128, 0.9);
+  border-style: solid;
+  box-shadow: 0 0 18px rgba(74, 222, 128, 0.35);
+}
+
+.solving-scan-zone--rotating {
+  border-color: rgba(96, 165, 250, 0.95);
+  border-style: solid;
+  box-shadow: 0 0 22px rgba(96, 165, 250, 0.4);
+}
+
+.solving-scan-zone--lost {
+  border-color: rgba(248, 113, 113, 0.85);
+  animation: solving-scan-pulse 0.8s ease-in-out infinite;
+}
+
+.solving-scan-zone-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 18px;
+  background: conic-gradient(
+    rgba(96, 165, 250, 0.85) 0deg,
+    rgba(96, 165, 250, 0.85) var(--scan-progress, 0deg),
+    transparent var(--scan-progress, 0deg),
+    transparent 360deg
+  );
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  padding: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.solving-scan-zone--rotating .solving-scan-zone-ring {
+  opacity: 1;
+}
+
+.solving-scan-zone-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #facc15;
+}
+
+.solving-scan-zone--locked .solving-scan-zone-dot {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+}
+
+.solving-scan-zone--rotating .solving-scan-zone-dot {
+  background: #60a5fa;
+  animation: solving-dot-pulse 0.5s ease-in-out infinite;
+}
+
+.solving-scan-zone--lost .solving-scan-zone-dot {
+  background: #f87171;
+}
+
+@keyframes solving-scan-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes solving-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.35);
+  }
 }

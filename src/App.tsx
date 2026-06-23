@@ -6,6 +6,7 @@ import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingGuideOverlay } from './components/SolvingGuideOverlay';
+import { SolvingScanZone } from './components/SolvingScanZone';
 import { colorsForMoveFromFacelet } from './lib/cube/moveColorProgress';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
@@ -136,6 +137,16 @@ export default function App() {
               progress={state.liveScanProgress}
               needsNewFace={state.detectionFeedback.status === 'rotate'}
               needsClearerCenter={state.liveScanNeedsClearerCenter}
+            />
+
+            <SolvingScanZone
+              visible={state.phase === 'solving'}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
+              tracking={state.solvingFeedback.tracking}
+              rotationProgress={state.solvingFeedback.rotationProgress}
             />
 
             <SolvingGuideOverlay
