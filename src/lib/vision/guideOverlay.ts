@@ -42,13 +42,21 @@ export function mapFrameRectToViewport(
     containerWidth,
     containerHeight,
   );
-  const x = SELFIE_CAMERA_MODE ? frameWidth - frameX - frameW : frameX;
-  return {
-    left: offsetX + x * scale,
-    top: offsetY + frameY * scale,
-    width: frameW * scale,
-    height: frameH * scale,
-  };
+  const left = offsetX + frameX * scale;
+  const top = offsetY + frameY * scale;
+  const width = frameW * scale;
+  const height = frameH * scale;
+
+  if (SELFIE_CAMERA_MODE) {
+    return {
+      left: containerWidth - left - width,
+      top,
+      width,
+      height,
+    };
+  }
+
+  return { left, top, width, height };
 }
 
 /** 실제 색상 샘플링 영역과 일치하는 점선 가이드 위치 */

@@ -1,5 +1,4 @@
 import type { StickerColor } from '../types';
-import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
 import {
   COLOR_HEX,
   COLOR_LABELS,
@@ -7,8 +6,6 @@ import {
   type ColorLearnSample,
 } from '../lib/vision/colorReference';
 import { useConfirmKey } from '../hooks/useConfirmKey';
-import { GuideFrame } from './GuideFrame';
-import { GuideSpot } from './GuideSpot';
 
 interface ColorLearnOverlayProps {
   visible: boolean;
@@ -17,8 +14,6 @@ interface ColorLearnOverlayProps {
   ready: boolean;
   error: string | null;
   onConfirm: () => void;
-  guideRect: GuideOverlayRect | null;
-  spotRect: GuideOverlayRect | null;
 }
 
 export function ColorLearnOverlay({
@@ -28,8 +23,6 @@ export function ColorLearnOverlay({
   ready,
   error,
   onConfirm,
-  guideRect,
-  spotRect,
 }: ColorLearnOverlayProps) {
   const target: StickerColor = COLOR_LEARN_ORDER[stepIndex] ?? 'R';
   useConfirmKey(onConfirm, visible && ready);
@@ -38,9 +31,6 @@ export function ColorLearnOverlay({
 
   return (
     <div className="color-learn-overlay" aria-live="polite">
-      <GuideFrame rect={guideRect} />
-      <GuideSpot rect={spotRect} strokeColor={COLOR_HEX[target]} />
-
       <div className="color-learn-panel">
         <p className="color-learn-target" style={{ color: COLOR_HEX[target] }}>
           {COLOR_LABELS[target]}

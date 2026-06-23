@@ -1,7 +1,5 @@
 import type { DetectionFeedback, StickerColor } from '../types';
-import type { GuideOverlayRect } from '../lib/vision/guideOverlay';
 import { FaceColorGrid } from './FaceColorGrid';
-import { GuideFrame } from './GuideFrame';
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '…',
@@ -14,18 +12,15 @@ const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
 interface DetectionOverlayProps {
   feedback: DetectionFeedback;
   visible: boolean;
-  guideRect: GuideOverlayRect | null;
 }
 
-export function DetectionOverlay({ feedback, visible, guideRect }: DetectionOverlayProps) {
+export function DetectionOverlay({ feedback, visible }: DetectionOverlayProps) {
   if (!visible) return null;
 
   const showGrid = feedback.cellColors.length === 9;
 
   return (
     <div className="detection-overlay" aria-live="polite">
-      <GuideFrame rect={guideRect} />
-
       <div className="scan-ui-panel scan-ui-panel--compact">
         <div className={`detection-status ${feedback.status}`}>
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>

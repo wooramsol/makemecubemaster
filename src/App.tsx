@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CubeAROverlay } from './components/CubeAROverlay';
-import { GuideFrame } from './components/GuideFrame';
+import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
@@ -12,7 +12,7 @@ import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
-import { getGuideOverlayRect, getWhiteSpotOverlayRect } from './lib/vision/guideOverlay';
+import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
 import { APP_VERSION } from './lib/appVersion';
 import './styles/global.css';
 
@@ -66,34 +66,12 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
-  const guideRect = useMemo(
-    () =>
-      getGuideOverlayRect(
-        dimensions.width,
-        dimensions.height,
-        viewportSize.width,
-        viewportSize.height,
-      ),
-    [dimensions.width, dimensions.height, viewportSize.width, viewportSize.height],
-  );
-
-  const spotRect = useMemo(
-    () =>
-      getWhiteSpotOverlayRect(
-        dimensions.width,
-        dimensions.height,
-        viewportSize.width,
-        viewportSize.height,
-      ),
-    [dimensions.width, dimensions.height, viewportSize.width, viewportSize.height],
-  );
+  const colorLearnTarget = COLOR_LEARN_ORDER[state.colorLearnIndex] ?? 'R';
 
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
   const showAr = state.phase === 'solving';
-  const showSolvingGuide =
-    state.phase === 'solving' && state.solvingFeedback.tracking !== 'locked';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -112,6 +90,17 @@ export default function App() {
 
         {!isBooting && !hasError && (
           <>
+            <GuideLayer
+              phase={state.phase}
+              trackingLocked={state.solvingFeedback.tracking === 'locked'}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
+              colorLearnSpot={state.phase === 'colorLearn'}
+              spotColor={COLOR_HEX[colorLearnTarget]}
+            />
+
             <CubeAROverlay
               pose={state.currentPose}
               move={currentMove}
@@ -126,12 +115,6 @@ export default function App() {
               active={showAr}
             />
 
-            {showSolvingGuide && (
-              <div className="guide-layer" aria-hidden="true">
-                <GuideFrame rect={guideRect} />
-              </div>
-            )}
-
             <ColorLearnOverlay
               visible={state.phase === 'colorLearn'}
               stepIndex={state.colorLearnIndex}
@@ -139,14 +122,11 @@ export default function App() {
               ready={state.colorLearnReady}
               error={state.colorLearnError}
               onConfirm={confirmColorLearn}
-              guideRect={guideRect}
-              spotRect={spotRect}
             />
 
             <ScanReadyOverlay
               visible={state.phase === 'scanReady'}
               feedback={state.detectionFeedback}
-              guideRect={guideRect}
               onStart={startLiveScan}
             />
 
@@ -158,7 +138,6 @@ export default function App() {
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
-              guideRect={guideRect}
             />
 
             <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
