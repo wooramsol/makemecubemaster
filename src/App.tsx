@@ -81,10 +81,13 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const solvingFaceColors =
-    currentMove && state.phase === 'solving'
-      ? colorsForMove(currentMove, state.scannedFaceColors)
-      : [];
+  const solvingFaceColors = (() => {
+    if (!currentMove || state.phase !== 'solving') return [];
+    const base = colorsForMove(currentMove, state.scannedFaceColors);
+    const live = state.solvingFeedback.liveFaceColors;
+    if (live?.length === 9) return live;
+    return base;
+  })();
 
   return (
     <main className="app">

@@ -1,5 +1,5 @@
 import type { Move } from '../../types';
-import { isDoubleMove, isPrimeMove, moveAngle } from '../cube/moves';
+import { isDoubleMove, isPrimeMove, moveAngle, moveFace } from '../cube/moves';
 
 export interface FaceArcPaths {
   track: string;
@@ -38,13 +38,25 @@ function arcPath(
   return parts.join(' ');
 }
 
-export function buildFaceArcPaths(size: number, move: Move, progress: number): FaceArcPaths {
+function mirrorMoveForSelfie(move: Move): Move {
+  if (isDoubleMove(move)) return move;
+  const face = moveFace(move);
+  return isPrimeMove(move) ? (face as Move) : (`${face}'` as Move);
+}
+
+export function buildFaceArcPaths(
+  size: number,
+  move: Move,
+  progress: number,
+  mirror = false,
+): FaceArcPaths {
+  const effectiveMove = mirror ? mirrorMoveForSelfie(move) : move;
   const cx = size / 2;
   const cy = size / 2;
   const radius = size * 0.31;
-  const total = Math.abs(moveAngle(move));
-  const start = isPrimeMove(move) ? total : 0;
-  const end = isPrimeMove(move) ? 0 : total;
+  const total = Math.abs(moveAngle(effectiveMove));
+  const start = isPrimeMove(effectiveMove) ? total : 0;
+  const end = isPrimeMove(effectiveMove) ? 0 : total;
   const clamped = Math.max(0.06, Math.min(1, progress));
   const current = start + (end - start) * clamped;
 
