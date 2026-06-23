@@ -136,8 +136,9 @@ export default function App() {
                 visible
                 move={currentMove}
               facelet={state.solvingFacelet}
-              rotationProgress={state.solvingFeedback.rotationProgress}
-              handMotionDetected={state.solvingFeedback.handMotionDetected}
+                rotationProgress={state.solvingFeedback.rotationProgress}
+                scanMatch={state.solvingFeedback.scanMatch}
+                handMotionDetected={state.solvingFeedback.handMotionDetected}
               wrongMove={state.solvingFeedback.wrongMove}
               currentStep={currentStep}
               totalSteps={totalSteps}

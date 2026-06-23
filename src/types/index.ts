@@ -105,6 +105,8 @@ export interface SolvingFeedback {
   stableVisibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   poseRotationProgress: number;
   handMotionDetected: boolean;
+  scanMatch: number;
+  comparisonFace: FaceId | null;
   faceScanInfos: FaceScanInfo[];
 }
 

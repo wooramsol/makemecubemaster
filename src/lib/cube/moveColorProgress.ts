@@ -277,7 +277,7 @@ function evaluateOneFace(
     const changedMatch = countMatchingAtIndices(oriented, ref.after, changed);
     const progress = changedMatch / changed.length;
 
-    if (beforePeriph >= 6) {
+    if (beforePeriph >= 5) {
       tracker.sawPreMoveAlignment = true;
     }
 
@@ -290,18 +290,22 @@ function evaluateOneFace(
     );
 
     if (!layerSignature) {
-      if (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) {
+      if (
+        (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) &&
+        progress < 0.2
+      ) {
         best = { progress: 0, completed: false, rejectedWholeCube: true };
       }
       continue;
     }
 
     const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
+    const isDouble = changed.length >= 6;
+    const matchRatio = isDouble ? 0.55 : 0.65;
     const completed =
-      tracker.sawPreMoveAlignment &&
-      changedMatch >= Math.ceil(changed.length * 0.65) &&
-      afterPeriph > beforePeriph &&
-      afterPeriph >= 5;
+      (tracker.sawPreMoveAlignment || beforePeriph >= 4) &&
+      changedMatch >= Math.ceil(changed.length * matchRatio) &&
+      (isDouble ? afterPeriph >= 5 : afterPeriph > beforePeriph && afterPeriph >= 5);
 
     if (completed || progress > best.progress) {
       best = {

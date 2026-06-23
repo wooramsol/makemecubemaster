@@ -88,6 +88,8 @@ const initialSolvingFeedback: SolvingFeedback = {
   stableVisibleFaceColors: {},
   poseRotationProgress: 0,
   handMotionDetected: false,
+  scanMatch: 0,
+  comparisonFace: null,
   faceScanInfos: [],
 };
 
@@ -627,7 +629,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         recentFaceDetectionsRef.current[faceId] = [];
       }
       recentFaceDetectionsRef.current[faceId]!.push([...colors]);
-      if (recentFaceDetectionsRef.current[faceId]!.length > 6) {
+      if (recentFaceDetectionsRef.current[faceId]!.length > 3) {
         recentFaceDetectionsRef.current[faceId]!.shift();
       }
     }
@@ -640,18 +642,37 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       if (stable) stableVisibleFaceColors[faceId] = stable;
     }
 
+    const evalColors: Partial<Record<FaceId, StickerColor[]>> = {
+      ...result.visibleFaceColors,
+      ...stableVisibleFaceColors,
+    };
+    if (moveFaceId && result.detectedFace?.colors?.length === 9) {
+      if (!visibleFace || visibleFace === moveFaceId) {
+        evalColors[moveFaceId] = result.detectedFace.colors;
+      }
+    }
+
     const colorEval =
       expected && faceletRef.current
         ? evaluateThreeFaceMoveProgress(
             faceletRef.current,
             expected,
-            stableVisibleFaceColors,
+            evalColors,
             visibleFace,
             moveColorTrackerRef.current,
           )
         : null;
 
-    if (colorEval?.rejectedWholeCube) {
+    const scanMatch =
+      moveFaceId && faceletRef.current && evalColors[moveFaceId]
+        ? matchFaceToFacelet(faceletRef.current, moveFaceId, evalColors[moveFaceId]!)
+        : visibleFace && faceletRef.current && evalColors[visibleFace]
+          ? matchFaceToFacelet(faceletRef.current, visibleFace, evalColors[visibleFace]!)
+          : 0;
+
+    const colorProgress = colorEval?.progress ?? 0;
+
+    if (colorEval?.rejectedWholeCube && colorProgress < 0.2) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
       if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
@@ -661,8 +682,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     const poseRotationProgress = result.rotationProgress;
-    const colorProgress = colorEval?.progress ?? 0;
-    const handMotionDetected = Boolean(colorEval?.rejectedWholeCube);
+    const handMotionDetected = Boolean(colorEval?.rejectedWholeCube && colorProgress < 0.2);
     const rotationProgress = colorProgress;
     const moveComplete = Boolean(colorEval?.completed);
 
@@ -731,6 +751,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         stableVisibleFaceColors,
         poseRotationProgress,
         handMotionDetected,
+        scanMatch,
+        comparisonFace: colorEval?.comparisonFace ?? null,
         faceScanInfos,
       },
     }));
