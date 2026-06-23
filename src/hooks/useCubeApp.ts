@@ -646,23 +646,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       if (stable) stableVisibleFaceColors[faceId] = stable;
     }
 
-    const evalColors: Partial<Record<FaceId, StickerColor[]>> = {
-      ...stableVisibleFaceColors,
+    const turnEvalColors: Partial<Record<FaceId, StickerColor[]>> = {
+      ...result.visibleFaceColors,
     };
-    for (const [faceId, colors] of Object.entries(result.visibleFaceColors) as [
-      FaceId,
-      StickerColor[],
-    ][]) {
-      if (!evalColors[faceId] && colors?.length === 9) {
-        evalColors[faceId] = colors;
-      }
-    }
-    if (
-      moveFaceId &&
-      result.detectedFace?.colors?.length === 9 &&
-      !stableVisibleFaceColors[moveFaceId]
-    ) {
-      evalColors[moveFaceId] = result.detectedFace.colors;
+    if (result.detectedFace?.colors?.length === 9) {
+      if (visibleFace) turnEvalColors[visibleFace] = result.detectedFace.colors;
+      if (moveFaceId) turnEvalColors[moveFaceId] = result.detectedFace.colors;
     }
 
     const colorEval =
@@ -670,18 +659,20 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         ? evaluateThreeFaceMoveProgress(
             faceletRef.current,
             expected,
-            evalColors,
+            turnEvalColors,
             visibleFace,
             moveColorTrackerRef.current,
           )
         : null;
 
     const scanFaceId =
-      moveFaceId && (stableVisibleFaceColors[moveFaceId] || evalColors[moveFaceId])
+      moveFaceId &&
+      (stableVisibleFaceColors[moveFaceId] || turnEvalColors[moveFaceId])
         ? moveFaceId
         : visibleFace;
     const scanColors =
-      scanFaceId && (stableVisibleFaceColors[scanFaceId] ?? evalColors[scanFaceId]);
+      scanFaceId &&
+      (stableVisibleFaceColors[scanFaceId] ?? turnEvalColors[scanFaceId]);
     const scanMatchRaw =
       scanFaceId && faceletRef.current && scanColors?.length === 9
         ? matchFaceToFacelet(faceletRef.current, scanFaceId, scanColors)
@@ -713,6 +704,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       recentFaceDetectionsRef.current = {};
       colorCompleteStableRef.current = 0;
       if (result.pose) frameProcessor.current?.syncPose(result.pose);
+    } else if (
+      moveColorTrackerRef.current.sawPreMoveAlignment &&
+      colorEval?.comparisonFace
+    ) {
+      delete recentFaceDetectionsRef.current[colorEval.comparisonFace];
     }
 
     const poseRotationProgress = result.rotationProgress;

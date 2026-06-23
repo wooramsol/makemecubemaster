@@ -7,6 +7,7 @@ import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
 
 const FACE_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
 const PERIPHERY = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+const ALL_CELLS = [0, 1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 const FACELET_TO_STICKER: Record<string, StickerColor> = {
   U: 'W',
@@ -258,17 +259,23 @@ function evaluateOneFace(
 
   let best: FaceEvalResult = { progress: 0, completed: false, rejectedWholeCube: false };
 
-  const faceLock = tracker.orientationLocks[faceId] ?? null;
-
   for (const ref of refs) {
+    const beforePick = bestOrientationForReference(detected, ref.before, PERIPHERY);
+    const afterPick = bestOrientationForReference(detected, ref.after, ALL_CELLS);
+
     let oriented: StickerColor[];
-    if (faceLock !== null) {
-      oriented = orientByIndex(detected, faceLock);
+    if (tracker.sawPreMoveAlignment) {
+      // After turn starts, align grid to post-move layout (not pre-move lock).
+      oriented =
+        afterPick.matches >= beforePick.matches ? afterPick.oriented : beforePick.oriented;
+      tracker.orientationLocks[faceId] =
+        afterPick.matches >= beforePick.matches ? afterPick.index : beforePick.index;
+    } else if (tracker.orientationLocks[faceId] !== undefined) {
+      oriented = orientByIndex(detected, tracker.orientationLocks[faceId]!);
     } else {
-      const pick = bestOrientationForReference(detected, ref.before, PERIPHERY);
-      oriented = pick.oriented;
-      if (pick.matches >= 6) {
-        tracker.orientationLocks[faceId] = pick.index;
+      oriented = beforePick.oriented;
+      if (beforePick.matches >= 5) {
+        tracker.orientationLocks[faceId] = beforePick.index;
         tracker.lockMissFrames[faceId] = 0;
       }
     }
@@ -289,7 +296,9 @@ function evaluateOneFace(
       unchanged,
     );
 
-    if (!layerSignature) {
+    const turning = tracker.sawPreMoveAlignment || progress > 0.15;
+
+    if (!layerSignature && !turning) {
       if (
         (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) &&
         progress < 0.2
@@ -301,11 +310,12 @@ function evaluateOneFace(
 
     const afterPeriph = countMatchingAtIndices(oriented, ref.after, PERIPHERY);
     const isDouble = changed.length >= 6;
-    const matchRatio = isDouble ? 0.55 : 0.65;
+    const matchRatio = isDouble ? 0.5 : 0.58;
     const completed =
       (tracker.sawPreMoveAlignment || beforePeriph >= 4) &&
       changedMatch >= Math.ceil(changed.length * matchRatio) &&
-      (isDouble ? afterPeriph >= 5 : afterPeriph > beforePeriph && afterPeriph >= 5);
+      afterPeriph >= 4 &&
+      (isDouble || changedMatch >= Math.ceil(changed.length * 0.7) || afterPeriph > beforePeriph);
 
     if (completed || progress > best.progress) {
       best = {
@@ -315,7 +325,7 @@ function evaluateOneFace(
       };
     }
 
-    if (tracker.orientationLocks[faceId] !== undefined) {
+    if (tracker.orientationLocks[faceId] !== undefined && !tracker.sawPreMoveAlignment) {
       if (beforePeriph < 4) {
         tracker.lockMissFrames[faceId] = (tracker.lockMissFrames[faceId] ?? 0) + 1;
         if ((tracker.lockMissFrames[faceId] ?? 0) > 8) {
