@@ -8,6 +8,7 @@ import {
   moveAngle,
   moveFace,
 } from '../cube/moves';
+import { getSelfieDisplayMove } from '../cube/moveRotationDisplay';
 import { getVisibleFaces } from '../vision/visibleFaces';
 import { configureCameraFromIntrinsics, poseToThreeMatrix } from './poseBridge';
 import { createFaceColorTexture, updateFaceColorTexture } from './faceColorTexture';
@@ -17,6 +18,9 @@ const FACE_TINT = 0x446688;
 const MOVE_FACE_TINT = 0xffcc33;
 const ARROW_TRACK = 0xffffff;
 const ARROW_ACTIVE = 0xffee44;
+const GUIDE_ARROW_TRACK = 0xff3333;
+const GUIDE_ARROW_ACTIVE = 0xffeb3b;
+const GUIDE_EDGE_COLOR = 0xffffff;
 
 const FACE_PLANE_TRANSFORMS: Record<
   FaceId,
@@ -46,8 +50,10 @@ export class CubeARRenderer {
   private frameWidth = 1;
   private frameHeight = 1;
   private faceColorsKey = '';
+  private guideMode: boolean;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, options?: { guideMode?: boolean }) {
+    this.guideMode = options?.guideMode ?? false;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       alpha: true,
@@ -97,6 +103,7 @@ export class CubeARRenderer {
     liveByFace: Partial<Record<FaceId, StickerColor[]>>,
     scannedFallback: Partial<Record<FaceId, StickerColor[]>>,
   ): void {
+    if (this.guideMode) return;
     const merged: Partial<Record<FaceId, StickerColor[]>> = { ...scannedFallback };
     for (const [faceId, colors] of Object.entries(liveByFace) as [FaceId, StickerColor[]][]) {
       if (colors.length === 9) merged[faceId] = colors;
@@ -149,9 +156,15 @@ export class CubeARRenderer {
     }
 
     const moveFaceId = this.currentMove ? moveFace(this.currentMove) : null;
-    this.arrowRoot.visible = Boolean(this.currentMove && faceMatchesMove);
+    this.arrowRoot.visible = Boolean(this.currentMove && (this.guideMode || faceMatchesMove));
     if (moveFaceId) {
       this.highlightMoveFace(moveFaceId);
+    }
+
+    if (this.guideMode) {
+      for (const [faceId, mesh] of this.faceMeshes) {
+        mesh.visible = faceId === moveFaceId && visible.includes(faceId);
+      }
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -177,13 +190,14 @@ export class CubeARRenderer {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     const material = new THREE.LineBasicMaterial({
-      color: EDGE_COLOR,
+      color: this.guideMode ? GUIDE_EDGE_COLOR : EDGE_COLOR,
       transparent: true,
-      opacity: 0.95,
+      opacity: this.guideMode ? 0.55 : 0.95,
       linewidth: 2,
       depthWrite: false,
     });
-    this.cubeRoot.add(new THREE.LineSegments(geometry, material));
+    const lines = new THREE.LineSegments(geometry, material);
+    this.cubeRoot.add(lines);
   }
 
   private buildFacePlanes(): void {
@@ -210,6 +224,17 @@ export class CubeARRenderer {
   private highlightMoveFace(face: FaceId | null): void {
     for (const [faceId, mesh] of this.faceMeshes) {
       const mat = mesh.material as THREE.MeshBasicMaterial;
+      if (this.guideMode) {
+        if (faceId === face) {
+          mat.map = null;
+          mat.color.setHex(MOVE_FACE_TINT);
+          mat.opacity = 0.22;
+        } else {
+          mat.opacity = 0;
+        }
+        mat.needsUpdate = true;
+        continue;
+      }
       if (!mat.map) {
         if (faceId === face) {
           mat.color.setHex(MOVE_FACE_TINT);
@@ -230,17 +255,18 @@ export class CubeARRenderer {
     this.clearArrow();
     if (!move) return;
 
+    const effectiveMove = this.guideMode ? getSelfieDisplayMove(move) : move;
     const face = moveFace(move);
-    const axis = new THREE.Vector3(...getMoveAxis(move)).normalize();
+    const axis = new THREE.Vector3(...getMoveAxis(effectiveMove)).normalize();
     const { ref, perp } = arcBasis(axis);
-    const radius = 0.36;
-    const targetAngle = moveAngle(move);
+    const radius = this.guideMode ? 0.42 : 0.36;
+    const targetAngle = moveAngle(effectiveMove);
     const startAngle = targetAngle < 0 ? targetAngle : 0;
     const endAngle = targetAngle < 0 ? 0 : targetAngle;
-    const segments = 40;
+    const segments = 48;
 
     const normal = new THREE.Vector3(...FACE_NORMALS[face]).normalize();
-    const surface = normal.clone().multiplyScalar(0.54);
+    const surface = normal.clone().multiplyScalar(0.545);
 
     const fullPoints: THREE.Vector3[] = [];
     for (let i = 0; i <= segments; i++) {
@@ -251,21 +277,40 @@ export class CubeARRenderer {
     this.arrowRoot.userData = { fullPoints, segments, startAngle, endAngle, radius, ref, perp, surface };
 
     const trackCurve = new THREE.CatmullRomCurve3(fullPoints);
-    const trackGeo = new THREE.TubeGeometry(trackCurve, segments, 0.028, 8, false);
+    const trackRadius = this.guideMode ? 0.045 : 0.028;
+    const trackGeo = new THREE.TubeGeometry(trackCurve, segments, trackRadius, 10, false);
     const trackMat = new THREE.MeshBasicMaterial({
-      color: ARROW_TRACK,
+      color: this.guideMode ? GUIDE_ARROW_TRACK : ARROW_TRACK,
       transparent: true,
-      opacity: 0.35,
+      opacity: this.guideMode ? 0.92 : 0.35,
       depthWrite: false,
     });
     this.trackMesh = new THREE.Mesh(trackGeo, trackMat);
     this.arrowRoot.add(this.trackMesh);
 
-    if (isDoubleMove(move)) {
-      const badge = new THREE.Mesh(
-        new THREE.CircleGeometry(0.09, 24),
+    if (this.guideMode && !isDoubleMove(effectiveMove)) {
+      const tip = fullPoints[fullPoints.length - 1]!;
+      const prev = fullPoints[fullPoints.length - 2] ?? tip;
+      const dir = new THREE.Vector3().subVectors(tip, prev).normalize();
+      const head = new THREE.Mesh(
+        new THREE.ConeGeometry(0.12, 0.26, 14),
         new THREE.MeshBasicMaterial({
-          color: ARROW_ACTIVE,
+          color: GUIDE_ARROW_TRACK,
+          transparent: true,
+          opacity: 0.98,
+          depthWrite: false,
+        }),
+      );
+      head.position.copy(tip);
+      head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      this.arrowRoot.add(head);
+    }
+
+    if (isDoubleMove(effectiveMove)) {
+      const badge = new THREE.Mesh(
+        new THREE.CircleGeometry(this.guideMode ? 0.12 : 0.09, 24),
+        new THREE.MeshBasicMaterial({
+          color: this.guideMode ? GUIDE_ARROW_TRACK : ARROW_ACTIVE,
           transparent: true,
           opacity: 0.95,
           depthWrite: false,
@@ -301,16 +346,17 @@ export class CubeARRenderer {
     };
 
     const currentEnd = startAngle + (endAngle - startAngle) * this.traceProgress;
-    if (Math.abs(currentEnd - startAngle) < 0.04) return;
+    if (!this.guideMode && Math.abs(currentEnd - startAngle) < 0.04) return;
 
-    const endIdx = Math.max(2, Math.floor(segments * this.traceProgress));
+    const endIdx = Math.max(2, Math.floor(segments * Math.max(this.guideMode ? 0.05 : 0, this.traceProgress)));
     const partial = fullPoints.slice(0, endIdx + 1);
     if (partial.length < 2) return;
 
     const curve = new THREE.CatmullRomCurve3(partial);
-    const progressGeo = new THREE.TubeGeometry(curve, endIdx, 0.052, 10, false);
+    const progressRadius = this.guideMode ? 0.058 : 0.052;
+    const progressGeo = new THREE.TubeGeometry(curve, endIdx, progressRadius, 10, false);
     const progressMat = new THREE.MeshBasicMaterial({
-      color: ARROW_ACTIVE,
+      color: this.guideMode ? GUIDE_ARROW_ACTIVE : ARROW_ACTIVE,
       transparent: true,
       opacity: 0.98,
       depthWrite: false,
@@ -322,7 +368,7 @@ export class CubeARRenderer {
     const prev = partial[partial.length - 2] ?? tip;
     const dir = new THREE.Vector3().subVectors(tip, prev).normalize();
     const head = new THREE.Mesh(
-      new THREE.ConeGeometry(0.1, 0.22, 12),
+      new THREE.ConeGeometry(this.guideMode ? 0.13 : 0.1, this.guideMode ? 0.28 : 0.22, 12),
       progressMat.clone(),
     );
     head.position.copy(tip);

@@ -79,6 +79,18 @@ body,
   visibility: visible;
 }
 
+.solving-cube-ar-overlay {
+  position: absolute;
+  pointer-events: none;
+  visibility: hidden;
+  z-index: 15;
+  transform: scaleX(-1);
+}
+
+.solving-cube-ar-overlay.active {
+  visibility: visible;
+}
+
 .cube-ar-overlay {
   position: absolute;
   pointer-events: none;

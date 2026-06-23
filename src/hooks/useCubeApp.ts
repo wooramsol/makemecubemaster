@@ -674,7 +674,14 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colorCompleteStableRef.current = 0;
     }
 
-    const faceScanInfos: FaceScanInfo[] = visibleFaces.slice(0, 3).map((faceId) => {
+    const faceScanInfos: FaceScanInfo[] = (
+      visibleFaces.length >= 3
+        ? visibleFaces.slice(0, 3)
+        : [
+            ...visibleFaces,
+            ...(['U', 'R', 'F'] as FaceId[]).filter((f) => !visibleFaces.includes(f)),
+          ].slice(0, 3)
+    ).map((faceId) => {
       const raw = result.visibleFaceColors[faceId];
       const stable = stableVisibleFaceColors[faceId];
       const colors = stable ?? raw;

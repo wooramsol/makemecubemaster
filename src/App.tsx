@@ -5,7 +5,7 @@ import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import { SolvingAROverlay } from './components/SolvingAROverlay';
+import { SolvingCubeAROverlay } from './components/SolvingCubeAROverlay';
 import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
@@ -134,7 +134,7 @@ export default function App() {
               needsClearerCenter={state.liveScanNeedsClearerCenter}
             />
 
-            <SolvingAROverlay
+            <SolvingCubeAROverlay
               active={isSolving && Boolean(currentMove && state.currentPose)}
               pose={state.currentPose}
               move={currentMove}
@@ -149,8 +149,6 @@ export default function App() {
               visible={isSolving && Boolean(currentMove)}
               tracking={state.solvingFeedback.tracking}
               faceScanInfos={state.solvingFeedback.faceScanInfos}
-              expectedMove={currentMove}
-              rotationProgress={state.solvingFeedback.rotationProgress}
               onSkip={skipCurrentMove}
             />
 

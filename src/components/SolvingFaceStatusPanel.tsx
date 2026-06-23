@@ -1,12 +1,9 @@
-import type { FaceScanInfo, Move, SolvingTrackingStatus } from '../types';
-import { getMoveRotationDisplay } from '../lib/cube/moveRotationDisplay';
+import type { FaceScanInfo, SolvingTrackingStatus } from '../types';
 
 interface SolvingFaceStatusPanelProps {
   visible: boolean;
   tracking: SolvingTrackingStatus;
   faceScanInfos: FaceScanInfo[];
-  expectedMove: Move | null;
-  rotationProgress: number;
   onSkip?: () => void;
 }
 
@@ -20,17 +17,13 @@ export function SolvingFaceStatusPanel({
   visible,
   tracking,
   faceScanInfos,
-  expectedMove,
-  rotationProgress,
   onSkip,
 }: SolvingFaceStatusPanelProps) {
   if (!visible) return null;
 
   const lockedCount = faceScanInfos.filter((f) => f.status === 'locked').length;
   const scanningCount = faceScanInfos.filter((f) => f.status === 'scanning').length;
-  const total = faceScanInfos.length;
-  const expectedDisplay = expectedMove ? getMoveRotationDisplay(expectedMove, true) : null;
-  const progressPct = Math.round(rotationProgress * 100);
+  const total = 3;
 
   const overallClass =
     lockedCount >= 3
@@ -46,7 +39,7 @@ export function SolvingFaceStatusPanel({
       <div className="solving-face-status-header">
         <span className="solving-face-status-title">3면 추적</span>
         <span className="solving-face-status-summary">
-          {lockedCount}/{total || 3} 인식됨
+          {lockedCount}/{total} 인식됨
           {scanningCount > 0 ? ` · ${scanningCount} 스캔 중` : ''}
         </span>
         {onSkip && (
@@ -57,14 +50,7 @@ export function SolvingFaceStatusPanel({
       </div>
 
       <div className="solving-face-status-chips">
-        {(faceScanInfos.length > 0
-          ? faceScanInfos
-          : (['U', 'R', 'F'] as const).map((faceId) => ({
-              faceId,
-              status: 'missing' as const,
-              matchScore: 0,
-            }))
-        ).map((info) => (
+        {faceScanInfos.map((info) => (
           <div
             key={info.faceId}
             className={`solving-face-chip solving-face-chip--${info.status}`}
@@ -83,17 +69,6 @@ export function SolvingFaceStatusPanel({
           </div>
         ))}
       </div>
-
-      {expectedDisplay && (
-        <div className="solving-face-status-rotation">
-          <span className="solving-face-status-axis">{expectedDisplay.face}</span>
-          <span className="solving-face-status-symbol">{expectedDisplay.symbol}</span>
-          <span className="solving-face-status-dir">{expectedDisplay.direction}</span>
-          {rotationProgress > 0.04 && (
-            <span className="solving-face-status-pct">{progressPct}%</span>
-          )}
-        </div>
-      )}
     </div>
   );
 }
