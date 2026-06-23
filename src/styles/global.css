@@ -1197,6 +1197,19 @@ body,
   background: #facc15;
 }
 
+.solving-scan-zone-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
 .solving-scan-zone--locked .solving-scan-zone-dot {
   background: #4ade80;
   box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
@@ -1311,4 +1324,162 @@ body,
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px dashed rgba(255, 255, 255, 0.35);
+}
+
+/* 3-face scan status panel */
+.solving-face-status {
+  position: absolute;
+  top: max(52px, calc(env(safe-area-inset-top) + 44px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 14;
+  width: min(94vw, 380px);
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(8, 10, 16, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+.solving-face-status--all-locked {
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(74, 222, 128, 0.55);
+}
+
+.solving-face-status--partial {
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(250, 204, 21, 0.5);
+}
+
+.solving-face-status--lost {
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(248, 113, 113, 0.55);
+}
+
+.solving-face-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.solving-face-status-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #e2e8f0;
+}
+
+.solving-face-status-summary {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.solving-face-status-skip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.solving-face-status-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.solving-face-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.solving-face-chip--locked {
+  background: rgba(74, 222, 128, 0.14);
+}
+
+.solving-face-chip--scanning {
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.solving-face-chip--missing {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.solving-face-chip-id {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.solving-face-chip-state {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.solving-face-chip-score {
+  font-size: 10px;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.solving-face-chip-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: var(--match, 0%);
+  background: linear-gradient(90deg, #60a5fa, #4ade80);
+  border-radius: 0 2px 0 0;
+}
+
+.solving-face-status-rotation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.solving-face-status-axis {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f8fafc;
+}
+
+.solving-face-status-symbol {
+  font-size: 18px;
+  color: #60a5fa;
+}
+
+.solving-face-status-dir {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.solving-face-status-pct {
+  font-size: 11px;
+  font-weight: 700;
+  color: #93c5fd;
 }

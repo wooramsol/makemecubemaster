@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
 import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
-import { SolvingGuideOverlay } from './components/SolvingGuideOverlay';
+import { SolvingAROverlay } from './components/SolvingAROverlay';
+import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
 import { SolvingScanZone } from './components/SolvingScanZone';
-import { colorsForMoveFromFacelet } from './lib/cube/moveColorProgress';
+import { faceletColorsForFaces } from './lib/cube/moveColorProgress';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -72,6 +73,7 @@ export default function App() {
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
   const hasError = Boolean(state.error || webcamState.error);
   const isComputing = state.phase === 'computing';
+  const isSolving = state.phase === 'solving';
 
   const totalSteps = state.solution?.moves.length ?? 0;
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
@@ -80,15 +82,23 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const solvingFaceColors =
-    currentMove && state.phase === 'solving' && state.solvingFacelet
-      ? colorsForMoveFromFacelet(currentMove, state.solvingFacelet)
-      : [];
+  const virtualVisibleColors = useMemo(
+    () =>
+      isSolving && state.solvingFacelet
+        ? faceletColorsForFaces(
+            state.solvingFacelet,
+            state.solvingFeedback.visibleFaces.length > 0
+              ? state.solvingFeedback.visibleFaces
+              : ['U', 'R', 'F'],
+          )
+        : {},
+    [isSolving, state.solvingFacelet, state.solvingFeedback.visibleFaces],
+  );
 
   return (
     <main className="app">
       <div
-        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${state.phase === 'solving' ? ' viewport--solving' : ''}`}
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}`}
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
@@ -140,23 +150,33 @@ export default function App() {
             />
 
             <SolvingScanZone
-              visible={state.phase === 'solving'}
+              visible={isSolving}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}
               viewportHeight={viewportSize.height}
               tracking={state.solvingFeedback.tracking}
               rotationProgress={state.solvingFeedback.rotationProgress}
-              expectedMove={currentMove}
-              visibleFaces={state.solvingFeedback.visibleFaces}
-              stableVisibleFaceColors={state.solvingFeedback.stableVisibleFaceColors}
             />
 
-            <SolvingGuideOverlay
-              visible={state.phase === 'solving' && Boolean(currentMove)}
-              move={currentMove!}
-              faceColors={solvingFaceColors}
-              wrongMove={state.solvingFeedback.wrongMove}
+            <SolvingAROverlay
+              active={isSolving && Boolean(currentMove && state.currentPose)}
+              pose={state.currentPose}
+              move={currentMove}
+              rotationProgress={state.solvingFeedback.rotationProgress}
+              virtualFaceColors={virtualVisibleColors}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
+            />
+
+            <SolvingFaceStatusPanel
+              visible={isSolving && Boolean(currentMove)}
+              tracking={state.solvingFeedback.tracking}
+              faceScanInfos={state.solvingFeedback.faceScanInfos}
+              expectedMove={currentMove}
+              rotationProgress={state.solvingFeedback.rotationProgress}
               onSkip={skipCurrentMove}
             />
 

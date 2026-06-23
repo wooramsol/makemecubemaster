@@ -85,6 +85,14 @@ export interface DetectionFeedback {
 
 export type SolvingTrackingStatus = 'searching' | 'locked' | 'lost';
 
+export type FaceScanStatus = 'missing' | 'scanning' | 'locked';
+
+export interface FaceScanInfo {
+  faceId: FaceId;
+  status: FaceScanStatus;
+  matchScore: number;
+}
+
 export interface SolvingFeedback {
   tracking: SolvingTrackingStatus;
   rotationProgress: number;
@@ -96,6 +104,7 @@ export interface SolvingFeedback {
   visibleFaces: FaceId[];
   stableVisibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   poseRotationProgress: number;
+  faceScanInfos: FaceScanInfo[];
 }
 
 export interface FrameResult {

@@ -61,6 +61,40 @@ export function colorsForMoveFromFacelet(move: Move, facelet: string): StickerCo
   return faceletFaceColors(facelet, moveFace(move));
 }
 
+export function getFaceletFaceColors(facelet: string, faceId: FaceId): StickerColor[] {
+  if (!facelet || facelet.length !== 54) return [];
+  return faceletFaceColors(facelet, faceId);
+}
+
+export function faceletColorsForFaces(
+  facelet: string,
+  faceIds: FaceId[],
+): Partial<Record<FaceId, StickerColor[]>> {
+  const result: Partial<Record<FaceId, StickerColor[]>> = {};
+  for (const faceId of faceIds) {
+    const colors = getFaceletFaceColors(facelet, faceId);
+    if (colors.length === 9) result[faceId] = colors;
+  }
+  return result;
+}
+
+/** 0–1 score: how well detected colors match virtual cube face (periphery stickers). */
+export function matchFaceToFacelet(
+  facelet: string,
+  faceId: FaceId,
+  detected: StickerColor[],
+): number {
+  if (!facelet || facelet.length !== 54 || detected.length !== 9) return 0;
+  const expected = faceletFaceColors(facelet, faceId);
+  const refs = [expected, mirrorFaceCellsHorizontally(expected)];
+  let best = 0;
+  for (const ref of refs) {
+    const pick = bestOrientationForReference(detected, ref, PERIPHERY);
+    best = Math.max(best, pick.matches / PERIPHERY.length);
+  }
+  return best;
+}
+
 export function applyMoveToFacelet(facelet: string, move: Move): string {
   const cube = Cube.fromString(facelet);
   cube.move(move);

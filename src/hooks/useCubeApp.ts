@@ -5,6 +5,7 @@ import type {
   DetectionFeedback,
   DetectionStatus,
   FaceId,
+  FaceScanInfo,
   Move,
   SolutionProgress,
   SolvingFeedback,
@@ -18,6 +19,7 @@ import {
   createMoveColorTrackerState,
   resetMoveColorTracker,
   majorityVoteFaceColors,
+  matchFaceToFacelet,
 } from '../lib/cube/moveColorProgress';
 import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { getVisibleFaces } from '../lib/vision/visibleFaces';
@@ -85,6 +87,7 @@ const initialSolvingFeedback: SolvingFeedback = {
   visibleFaces: [],
   stableVisibleFaceColors: {},
   poseRotationProgress: 0,
+  faceScanInfos: [],
 };
 
 const initialState: CubeAppState = {
@@ -671,8 +674,24 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colorCompleteStableRef.current = 0;
     }
 
+    const faceScanInfos: FaceScanInfo[] = visibleFaces.slice(0, 3).map((faceId) => {
+      const raw = result.visibleFaceColors[faceId];
+      const stable = stableVisibleFaceColors[faceId];
+      const colors = stable ?? raw;
+      if (!colors || colors.length !== 9) {
+        return { faceId, status: 'missing' as const, matchScore: 0 };
+      }
+      const matchScore = faceletRef.current
+        ? matchFaceToFacelet(faceletRef.current, faceId, colors)
+        : 0;
+      const status =
+        matchScore >= 0.65 ? ('locked' as const) : ('scanning' as const);
+      return { faceId, status, matchScore };
+    });
+
     setState((s) => ({
       ...s,
+      currentPose: result.pose ?? s.currentPose,
       solvingFeedback: {
         tracking,
         rotationProgress,
@@ -684,6 +703,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         visibleFaces,
         stableVisibleFaceColors,
         poseRotationProgress,
+        faceScanInfos,
       },
     }));
 

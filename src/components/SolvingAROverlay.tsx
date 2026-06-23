@@ -7,8 +7,7 @@ interface SolvingAROverlayProps {
   pose: CubePose | null;
   move: Move | null;
   rotationProgress: number;
-  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
-  scannedFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  virtualFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -20,8 +19,7 @@ export function SolvingAROverlay({
   pose,
   move,
   rotationProgress,
-  visibleFaceColors,
-  scannedFaceColors,
+  virtualFaceColors,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -31,12 +29,12 @@ export function SolvingAROverlay({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poseRef = useRef(pose);
   const progressRef = useRef(rotationProgress);
-  const colorsRef = useRef(visibleFaceColors);
+  const colorsRef = useRef(virtualFaceColors);
   const moveRef = useRef(move);
 
   poseRef.current = pose;
   progressRef.current = rotationProgress;
-  colorsRef.current = visibleFaceColors;
+  colorsRef.current = virtualFaceColors;
   moveRef.current = move;
 
   useEffect(() => {
@@ -70,7 +68,6 @@ export function SolvingAROverlay({
             currentMove,
             progressRef.current,
             colorsRef.current,
-            scannedFaceColors,
             moveFace(currentMove),
             frameWidth,
             frameHeight,
@@ -83,14 +80,7 @@ export function SolvingAROverlay({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [
-    active,
-    scannedFaceColors,
-    frameWidth,
-    frameHeight,
-    viewportWidth,
-    viewportHeight,
-  ]);
+  }, [active, frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   return (
     <canvas
