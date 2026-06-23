@@ -136,6 +136,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const moveColorTrackerRef = useRef(createMoveColorTrackerState());
   const recentDetectionsRef = useRef<StickerColor[][]>([]);
   const recentFaceDetectionsRef = useRef<Partial<Record<FaceId, StickerColor[][]>>>({});
+  const scanMatchSmootherRef = useRef(0);
+  const recentScanMatchRef = useRef<number[]>([]);
 
   const syncExpectedMove = useCallback((move: Move | null) => {
     if (move === expectedMoveRef.current) return;
@@ -245,6 +247,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     resetMoveColorTracker(moveColorTrackerRef.current);
     recentDetectionsRef.current = [];
     recentFaceDetectionsRef.current = {};
+    scanMatchSmootherRef.current = 0;
+    recentScanMatchRef.current = [];
   }, []);
 
   const buildFeedback = useCallback(
@@ -629,7 +633,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         recentFaceDetectionsRef.current[faceId] = [];
       }
       recentFaceDetectionsRef.current[faceId]!.push([...colors]);
-      if (recentFaceDetectionsRef.current[faceId]!.length > 3) {
+      if (recentFaceDetectionsRef.current[faceId]!.length > 5) {
         recentFaceDetectionsRef.current[faceId]!.shift();
       }
     }
@@ -643,13 +647,22 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     const evalColors: Partial<Record<FaceId, StickerColor[]>> = {
-      ...result.visibleFaceColors,
       ...stableVisibleFaceColors,
     };
-    if (moveFaceId && result.detectedFace?.colors?.length === 9) {
-      if (!visibleFace || visibleFace === moveFaceId) {
-        evalColors[moveFaceId] = result.detectedFace.colors;
+    for (const [faceId, colors] of Object.entries(result.visibleFaceColors) as [
+      FaceId,
+      StickerColor[],
+    ][]) {
+      if (!evalColors[faceId] && colors?.length === 9) {
+        evalColors[faceId] = colors;
       }
+    }
+    if (
+      moveFaceId &&
+      result.detectedFace?.colors?.length === 9 &&
+      !stableVisibleFaceColors[moveFaceId]
+    ) {
+      evalColors[moveFaceId] = result.detectedFace.colors;
     }
 
     const colorEval =
@@ -663,12 +676,33 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
           )
         : null;
 
-    const scanMatch =
-      moveFaceId && faceletRef.current && evalColors[moveFaceId]
-        ? matchFaceToFacelet(faceletRef.current, moveFaceId, evalColors[moveFaceId]!)
-        : visibleFace && faceletRef.current && evalColors[visibleFace]
-          ? matchFaceToFacelet(faceletRef.current, visibleFace, evalColors[visibleFace]!)
-          : 0;
+    const scanFaceId =
+      moveFaceId && (stableVisibleFaceColors[moveFaceId] || evalColors[moveFaceId])
+        ? moveFaceId
+        : visibleFace;
+    const scanColors =
+      scanFaceId && (stableVisibleFaceColors[scanFaceId] ?? evalColors[scanFaceId]);
+    const scanMatchRaw =
+      scanFaceId && faceletRef.current && scanColors?.length === 9
+        ? matchFaceToFacelet(faceletRef.current, scanFaceId, scanColors)
+        : 0;
+
+    const recentScan = recentScanMatchRef.current;
+    recentScan.push(scanMatchRaw);
+    if (recentScan.length > 8) recentScan.shift();
+    const sortedScan = [...recentScan].sort((a, b) => a - b);
+    const medianScan = sortedScan[Math.floor(sortedScan.length / 2)] ?? 0;
+
+    let smoothScan = scanMatchSmootherRef.current;
+    if (medianScan > 0) {
+      smoothScan = smoothScan * 0.55 + medianScan * 0.45;
+    } else if (smoothScan > 0.35) {
+      smoothScan *= 0.92;
+    } else {
+      smoothScan *= 0.75;
+    }
+    scanMatchSmootherRef.current = smoothScan;
+    const scanMatch = smoothScan;
 
     const colorProgress = colorEval?.progress ?? 0;
 
@@ -834,6 +868,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     colorCompleteStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
     recentFaceDetectionsRef.current = {};
+    scanMatchSmootherRef.current = 0;
+    recentScanMatchRef.current = [];
     stepReadyMs.current = Date.now();
   }, [applyCompletedMove, syncExpectedMove]);
 

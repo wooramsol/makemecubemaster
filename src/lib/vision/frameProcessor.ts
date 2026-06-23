@@ -1,6 +1,6 @@
 import type { CubePose, DetectedFace, FrameResult, Move, StickerColor } from '../../types';
 import { identifyFaceFromCenter } from '../cube/colors';
-import { createGrayMat, detectCubeCorners, detectCubeFace, detectSolvingCorners, detectSolvingFace } from './cubeDetector';
+import { createGrayMat, detectCubeCorners, detectCubeFace } from './cubeDetector';
 import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
 import { PoseSmoother } from './poseSmoother';
@@ -11,7 +11,7 @@ import { getVisibleFaces } from './visibleFaces';
 import { alignPoseToTrackedQuad } from './poseAlign';
 import { sampleColorsFromQuad } from './quadColorSampler';
 import { drawCameraFrame } from './selfieView';
-import { SOLVING_GUIDE_SIZE_RATIO } from './roi';
+import { GUIDE_SIZE_RATIO } from './roi';
 
 const LOST_TRACKING_THRESHOLD = 30;
 
@@ -86,7 +86,7 @@ export class FrameProcessor {
   }
 
   private guideRatio(): number | undefined {
-    return this.solvingScanMode ? SOLVING_GUIDE_SIZE_RATIO : undefined;
+    return this.solvingScanMode ? GUIDE_SIZE_RATIO : undefined;
   }
 
   setExpectedMove(move: Move | null): void {
@@ -149,30 +149,37 @@ export class FrameProcessor {
 
   private processSolving(width: number, height: number): FrameResult {
     if (this.solvingReseedPending) {
-      const fresh = detectSolvingCorners(this.processCanvas, width, height);
-      if (fresh) this.flowTracker.seed(fresh);
+      const fresh = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
+      if (fresh) this.flowTracker.seed(fresh.pose.corners);
       this.solvingReseedPending = false;
     }
 
-    const detectedCorners = detectSolvingCorners(this.processCanvas, width, height);
+    const guideFace = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
+    const guideCorners = guideFace?.pose.corners ?? null;
     const gray = createGrayMat(this.processCanvas);
+    const detectedCorners =
+      guideCorners ?? detectCubeCorners(this.processCanvas, width, height, GUIDE_SIZE_RATIO);
     const corners = this.flowTracker.update(gray, detectedCorners);
     gray.delete();
 
     if (corners) {
-      const quadColors = sampleColorsFromQuad(this.processCanvas, width, height, corners);
+      const quadColors =
+        guideFace?.colors ??
+        sampleColorsFromQuad(this.processCanvas, width, height, corners);
       const hintFace = quadColors?.[4]
         ? identifyFaceFromCenter(quadColors[4])
-        : this.lastSolvingPose?.visibleFace ?? null;
+        : guideFace?.pose.visibleFace ?? this.lastSolvingPose?.visibleFace ?? null;
 
-      let pose = estimatePoseFromCorners(corners, width, height, hintFace);
+      let pose = guideFace
+        ? this.poseSmoother.update({ ...guideFace.pose, corners })
+        : estimatePoseFromCorners(corners, width, height, hintFace);
       if (hintFace) pose = { ...pose, visibleFace: hintFace };
       if (!pose.visibleFace) {
         const visible = getVisibleFaces(pose);
         if (visible[0]) pose = { ...pose, visibleFace: visible[0] };
       }
       const lostFrames = this.flowTracker.getLostFrames();
-      pose.confidence = detectedCorners ? 0.85 : Math.max(0.4, 0.85 - lostFrames * 0.012);
+      pose.confidence = guideFace ? 0.88 : Math.max(0.45, 0.85 - lostFrames * 0.012);
       pose = this.poseSmoother.update(pose);
       pose = alignPoseToTrackedQuad(pose, width, height);
 
@@ -187,11 +194,14 @@ export class FrameProcessor {
         width,
         height,
       );
+      if (quadColors && pose.visibleFace) {
+        visibleFaceColors[pose.visibleFace] = quadColors;
+      }
       const rotation = this.rotationDetector.update(pose.rotationMatrix);
       const detectedFace: DetectedFace | null = quadColors
-        ? { colors: quadColors, pose }
+        ? { colors: quadColors, pose: aligned }
         : this.lastColors
-          ? { colors: this.lastColors, pose }
+          ? { colors: this.lastColors, pose: aligned }
           : null;
 
       return {
@@ -204,7 +214,7 @@ export class FrameProcessor {
       };
     }
 
-    const fallbackFace = detectSolvingFace(this.processCanvas, width, height);
+    const fallbackFace = detectCubeFace(this.processCanvas, width, height, GUIDE_SIZE_RATIO, true);
     if (fallbackFace) {
       this.lastColors = fallbackFace.colors;
       let pose = this.poseSmoother.update(fallbackFace.pose);

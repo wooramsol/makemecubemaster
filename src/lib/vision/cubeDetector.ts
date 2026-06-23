@@ -7,7 +7,7 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { identifyFaceFromCenter } from '../cube/colors';
-import { getGuideSquare, guideToCorners, translateCorners, SOLVING_GUIDE_SIZE_RATIO, GUIDE_SIZE_RATIO } from './roi';
+import { getGuideSquare, guideToCorners, translateCorners, GUIDE_SIZE_RATIO } from './roi';
 import { sampleColorsFromQuad } from './quadColorSampler';
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
@@ -158,7 +158,7 @@ export function detectCubeCorners(
   return guided?.corners ?? null;
 }
 
-const SOLVING_CORNER_RATIOS = [0.72, SOLVING_GUIDE_SIZE_RATIO, 0.42, GUIDE_SIZE_RATIO, 0.85];
+const SOLVING_CORNER_RATIOS = [GUIDE_SIZE_RATIO, 0.35, 0.42];
 
 /** 풀이 단계 — 여러 스케일 + 전체 프레임에서 코너 검출 */
 export function detectSolvingCorners(
