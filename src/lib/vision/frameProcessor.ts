@@ -1,7 +1,9 @@
 import type { CubePose, DetectedFace, FrameResult, Move, StickerColor } from '../../types';
+import { identifyFaceFromCenter } from '../cube/colors';
 import { createGrayMat, detectCubeCorners, detectCubeFace } from './cubeDetector';
 import { OpticalFlowTracker } from './opticalFlowTracker';
 import { estimatePoseFromCorners } from './poseTracker';
+import { PoseSmoother } from './poseSmoother';
 import { RotationDetector } from './rotationDetector';
 import { measureColorLearnSpot } from './colorReference';
 import { drawCameraFrame } from './selfieView';
@@ -19,6 +21,7 @@ const EMPTY_RESULT: FrameResult = {
 export class FrameProcessor {
   private rotationDetector = new RotationDetector();
   private flowTracker = new OpticalFlowTracker();
+  private poseSmoother = new PoseSmoother();
   private trackingEnabled = false;
   private processCanvas: HTMLCanvasElement;
   private processCtx: CanvasRenderingContext2D;
@@ -36,12 +39,14 @@ export class FrameProcessor {
     this.trackingEnabled = true;
     this.rotationDetector.reset();
     this.flowTracker.reset();
+    this.poseSmoother.reset();
   }
 
   disableTracking(): void {
     this.trackingEnabled = false;
     this.rotationDetector.reset();
     this.flowTracker.reset();
+    this.poseSmoother.reset();
     this.lastColors = null;
   }
 
@@ -133,11 +138,13 @@ export class FrameProcessor {
       }
     }
 
-    const pose = estimatePoseFromCorners(corners, width, height);
+    const hintFace = colors?.[4] ? identifyFaceFromCenter(colors[4]) : null;
+    let pose = estimatePoseFromCorners(corners, width, height, hintFace);
     const lostFrames = this.flowTracker.getLostFrames();
     pose.confidence = detectedCorners
       ? 0.85
       : Math.max(0.35, 0.85 - lostFrames * 0.01);
+    pose = this.poseSmoother.update(pose);
 
     const detectedFace: DetectedFace | null = colors ? { colors, pose } : null;
 

@@ -34,6 +34,11 @@ export interface CubePose {
   rotationMatrix: number[];
   translation: [number, number, number];
   confidence: number;
+  visibleFace?: FaceId | null;
+  cameraFx?: number;
+  cameraFy?: number;
+  cameraCx?: number;
+  cameraCy?: number;
 }
 
 export interface DetectedFace {

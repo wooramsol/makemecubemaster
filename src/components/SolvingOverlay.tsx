@@ -37,12 +37,12 @@ function trackingHint(
 ): string {
   if (!faceMatchesMove) {
     const target = faceLabel(moveFace(currentMove));
-    return `Show the ${target} face to the camera`;
+    return `Turn the ${target} face — 3D arrow shows on the cube`;
   }
   if (status === 'lost') return 'Cube lost — hold it steady in view';
   if (status === 'searching') return 'Center the cube in the guide';
   if (progress > 0.15) return 'Keep turning…';
-  return 'Follow the arrow on the cube face';
+  return 'Follow the highlighted face and arrow';
 }
 
 export function SolvingOverlay({

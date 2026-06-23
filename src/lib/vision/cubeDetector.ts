@@ -6,6 +6,7 @@ import {
   sampleGuideRegionColors,
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
+import { identifyFaceFromCenter } from '../cube/colors';
 import { getGuideSquare, guideToCorners, translateCorners } from './roi';
 
 function isSquareLike(corners: [Point2D, Point2D, Point2D, Point2D]): boolean {
@@ -169,7 +170,13 @@ export function detectCubeFace(
   }
 
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight);
-  const pose = estimatePoseFromCorners(corners ?? guideToCorners(guide), frameWidth, frameHeight);
+  const hintFace = colors[4] ? identifyFaceFromCenter(colors[4]) : null;
+  const pose = estimatePoseFromCorners(
+    corners ?? guideToCorners(guide),
+    frameWidth,
+    frameHeight,
+    hintFace,
+  );
   pose.confidence = corners ? 0.85 : 0.7;
 
   return { colors, pose };
