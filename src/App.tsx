@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppTitle } from './components/AppTitle';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
@@ -11,7 +12,6 @@ import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
-import { APP_VERSION } from './lib/appVersion';
 import './styles/global.css';
 
 export default function App() {
@@ -85,6 +85,7 @@ export default function App() {
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
+        <AppTitle />
 
         {!isBooting && !hasError && (
           <>
@@ -121,6 +122,10 @@ export default function App() {
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={viewportSize.width}
+              viewportHeight={viewportSize.height}
             />
 
             <LiveScanOverlay
@@ -135,14 +140,14 @@ export default function App() {
               <SolvingMoveHint
                 visible
                 move={currentMove}
-              facelet={state.solvingFacelet}
+                facelet={state.solvingFacelet}
                 rotationProgress={state.solvingFeedback.rotationProgress}
                 scanMatch={state.solvingFeedback.scanMatch}
                 handMotionDetected={state.solvingFeedback.handMotionDetected}
-              wrongMove={state.solvingFeedback.wrongMove}
-              currentStep={currentStep}
-              totalSteps={totalSteps}
-              onSkip={skipCurrentMove}
+                wrongMove={state.solvingFeedback.wrongMove}
+                currentStep={currentStep}
+                totalSteps={totalSteps}
+                onSkip={skipCurrentMove}
               />
             )}
 
@@ -191,9 +196,6 @@ export default function App() {
           </div>
         )}
       </div>
-      <p className="app-version" aria-hidden="true">
-        v{APP_VERSION}
-      </p>
     </main>
   );
 }
