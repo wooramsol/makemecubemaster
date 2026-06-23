@@ -149,6 +149,7 @@ export class FrameProcessor {
 
     const hintFace = colors?.[4] ? identifyFaceFromCenter(colors[4]) : null;
     let pose = estimatePoseFromCorners(corners, width, height, hintFace);
+    if (hintFace) pose = { ...pose, visibleFace: hintFace };
     const lostFrames = this.flowTracker.getLostFrames();
     pose.confidence = detectedCorners
       ? 0.85
