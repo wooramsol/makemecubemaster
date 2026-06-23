@@ -59,7 +59,7 @@ export function SolvingScanZone({
           style={{ '--scan-progress': `${ringDeg}deg` } as React.CSSProperties}
         />
         <span className="solving-scan-zone-dot" />
-        <p className="solving-scan-zone-hint">Hold cube here</p>
+        <p className="solving-scan-zone-hint">큐브를 여기에 맞추세요</p>
       </div>
     </div>
   );

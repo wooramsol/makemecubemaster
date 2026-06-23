@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
 import { ColorLearnOverlay } from './components/ColorLearnOverlay';
@@ -8,7 +8,6 @@ import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingAROverlay } from './components/SolvingAROverlay';
 import { SolvingFaceStatusPanel } from './components/SolvingFaceStatusPanel';
 import { SolvingScanZone } from './components/SolvingScanZone';
-import { faceletColorsForFaces } from './lib/cube/moveColorProgress';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { StepIndicator } from './components/StepIndicator';
@@ -82,19 +81,6 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const virtualVisibleColors = useMemo(
-    () =>
-      isSolving && state.solvingFacelet
-        ? faceletColorsForFaces(
-            state.solvingFacelet,
-            state.solvingFeedback.visibleFaces.length > 0
-              ? state.solvingFeedback.visibleFaces
-              : ['U', 'R', 'F'],
-          )
-        : {},
-    [isSolving, state.solvingFacelet, state.solvingFeedback.visibleFaces],
-  );
-
   return (
     <main className="app">
       <div
@@ -164,7 +150,6 @@ export default function App() {
               pose={state.currentPose}
               move={currentMove}
               rotationProgress={state.solvingFeedback.rotationProgress}
-              virtualFaceColors={virtualVisibleColors}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}

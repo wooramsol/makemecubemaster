@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { CubePose, FaceId, Move, StickerColor } from '../types';
+import type { CubePose, Move } from '../types';
 import { moveFace } from '../lib/cube/moves';
 import { drawSolvingAR } from '../lib/vision/solvingArDraw';
 
@@ -7,7 +7,6 @@ interface SolvingAROverlayProps {
   pose: CubePose | null;
   move: Move | null;
   rotationProgress: number;
-  virtualFaceColors: Partial<Record<FaceId, StickerColor[]>>;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -19,7 +18,6 @@ export function SolvingAROverlay({
   pose,
   move,
   rotationProgress,
-  virtualFaceColors,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -29,12 +27,10 @@ export function SolvingAROverlay({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const poseRef = useRef(pose);
   const progressRef = useRef(rotationProgress);
-  const colorsRef = useRef(virtualFaceColors);
   const moveRef = useRef(move);
 
   poseRef.current = pose;
   progressRef.current = rotationProgress;
-  colorsRef.current = virtualFaceColors;
   moveRef.current = move;
 
   useEffect(() => {
@@ -67,7 +63,6 @@ export function SolvingAROverlay({
             currentPose,
             currentMove,
             progressRef.current,
-            colorsRef.current,
             moveFace(currentMove),
             frameWidth,
             frameHeight,

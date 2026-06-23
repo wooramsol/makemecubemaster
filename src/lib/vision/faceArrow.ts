@@ -1,5 +1,6 @@
 import type { Move, Point2D } from '../../types';
-import { isDoubleMove, isPrimeMove, moveAngle } from '../cube/moves';
+import { isDoubleMove, isPrimeMove, moveAngle, moveFace } from '../cube/moves';
+import { getSelfieDisplayMove } from '../cube/moveRotationDisplay';
 import { getCoverTransform } from './guideOverlay';
 
 export function mapFramePointToScreen(
@@ -21,6 +22,29 @@ export function mapFramePointToScreen(
   };
 }
 
+export function drawCubeRotationArrow(
+  ctx: CanvasRenderingContext2D,
+  corners: [Point2D, Point2D, Point2D, Point2D],
+  move: Move,
+  progress: number,
+  frameWidth: number,
+  frameHeight: number,
+  containerWidth: number,
+  containerHeight: number,
+): void {
+  drawFaceArrow(
+    ctx,
+    corners,
+    getSelfieDisplayMove(move),
+    progress,
+    frameWidth,
+    frameHeight,
+    containerWidth,
+    containerHeight,
+    { guide: true, faceLabel: moveFace(move) },
+  );
+}
+
 export function drawFaceArrow(
   ctx: CanvasRenderingContext2D,
   corners: [Point2D, Point2D, Point2D, Point2D],
@@ -30,7 +54,7 @@ export function drawFaceArrow(
   frameHeight: number,
   containerWidth: number,
   containerHeight: number,
-  options: { dimmed?: boolean } = {},
+  options: { dimmed?: boolean; guide?: boolean; faceLabel?: string } = {},
 ): void {
   if (!frameWidth || !frameHeight || !containerWidth || !containerHeight) return;
 
@@ -50,20 +74,76 @@ export function drawFaceArrow(
   const ru = { x: ux / uLen, y: uy / uLen };
   const rv = { x: vx / vLen, y: vy / vLen };
 
-  const radius = Math.min(uLen, vLen) * 0.3;
+  const radius = Math.min(uLen, vLen) * (options.guide ? 0.34 : 0.3);
   const totalAngle = Math.abs(moveAngle(move));
   const startAngle = isPrimeMove(move) ? totalAngle : 0;
   const endAngle = isPrimeMove(move) ? 0 : totalAngle;
   const clamped = Math.max(0, Math.min(1, progress));
   const currentAngle = startAngle + (endAngle - startAngle) * clamped;
 
+  const guide = options.guide ?? false;
   const dimmed = options.dimmed ?? false;
-  const outlineAlpha = dimmed ? 0.45 : 0.7;
-  const trackAlpha = dimmed ? 0.25 : 0.4;
 
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+
+  if (guide) {
+    const guideWidth = Math.max(6, radius * 0.2);
+    const headSize = Math.max(10, radius * 0.28);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = guideWidth + 4;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+    ctx.shadowBlur = 8;
+    strokeArc(ctx, cx, cy, ru, rv, radius, startAngle, endAngle);
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(255, 45, 45, 0.55)';
+    ctx.lineWidth = guideWidth;
+    strokeArc(ctx, cx, cy, ru, rv, radius, startAngle, endAngle);
+
+    ctx.strokeStyle = '#ff2d2d';
+    ctx.lineWidth = Math.max(4, guideWidth * 0.75);
+    drawArrowHead(ctx, cx, cy, ru, rv, radius, endAngle, headSize);
+
+    if (clamped > 0.04) {
+      ctx.strokeStyle = '#ffeb3b';
+      ctx.lineWidth = Math.max(5, guideWidth * 0.85);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 6;
+      strokeArc(ctx, cx, cy, ru, rv, radius, startAngle, currentAngle);
+      drawArrowHead(ctx, cx, cy, ru, rv, radius, currentAngle, headSize * 0.85);
+    }
+
+    if (options.faceLabel) {
+      ctx.shadowBlur = 0;
+      ctx.font = `bold ${Math.max(14, radius * 0.38)}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+      ctx.fillText(options.faceLabel, cx + 1, cy + 1);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(options.faceLabel, cx, cy);
+    }
+
+    if (isDoubleMove(move)) {
+      ctx.fillStyle = '#ff2d2d';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.font = `bold ${Math.max(16, radius * 0.42)}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeText('180°', cx, cy);
+      ctx.fillText('180°', cx, cy);
+    }
+
+    ctx.restore();
+    return;
+  }
+
+  const outlineAlpha = dimmed ? 0.45 : 0.7;
+  const trackAlpha = dimmed ? 0.25 : 0.4;
 
   ctx.strokeStyle = `rgba(255, 255, 255, ${outlineAlpha})`;
   ctx.lineWidth = Math.max(3, radius * 0.14);

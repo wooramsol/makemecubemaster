@@ -11,9 +11,9 @@ interface SolvingFaceStatusPanelProps {
 }
 
 function statusLabel(status: FaceScanInfo['status']): string {
-  if (status === 'locked') return 'OK';
-  if (status === 'scanning') return '…';
-  return '—';
+  if (status === 'locked') return '인식';
+  if (status === 'scanning') return '스캔';
+  return '없음';
 }
 
 export function SolvingFaceStatusPanel({
@@ -44,10 +44,10 @@ export function SolvingFaceStatusPanel({
   return (
     <div className={`solving-face-status ${overallClass}`} aria-live="polite">
       <div className="solving-face-status-header">
-        <span className="solving-face-status-title">3-face scan</span>
+        <span className="solving-face-status-title">3면 추적</span>
         <span className="solving-face-status-summary">
-          {lockedCount}/{total || 3} locked
-          {scanningCount > 0 ? ` · ${scanningCount} scanning` : ''}
+          {lockedCount}/{total || 3} 인식됨
+          {scanningCount > 0 ? ` · ${scanningCount} 스캔 중` : ''}
         </span>
         {onSkip && (
           <button type="button" className="solving-face-status-skip" onClick={onSkip}>

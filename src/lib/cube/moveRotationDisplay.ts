@@ -14,6 +14,11 @@ function mirrorMoveForSelfie(move: Move): Move {
   return isPrimeMove(move) ? (face as Move) : (`${face}'` as Move);
 }
 
+/** Move notation adjusted for selfie camera preview (matches on-screen arrow). */
+export function getSelfieDisplayMove(move: Move): Move {
+  return mirrorMoveForSelfie(move);
+}
+
 /** Selfie-mirrored rotation hint for the on-screen guide. */
 export function getMoveRotationDisplay(move: Move, selfieMirror = true): MoveRotationDisplay {
   const effective = selfieMirror ? mirrorMoveForSelfie(move) : move;
