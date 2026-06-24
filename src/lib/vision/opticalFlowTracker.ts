@@ -6,9 +6,14 @@ export class OpticalFlowTracker {
   private prevGray: import('../../types/opencv').OpenCVMat | null = null;
   private trackedCorners: [Point2D, Point2D, Point2D, Point2D] | null = null;
   private lostFrames = 0;
+  private lastFlowVectors: Point2D[] | null = null;
 
   getLostFrames(): number {
     return this.lostFrames;
+  }
+
+  getLastFlowVectors(): Point2D[] | null {
+    return this.lastFlowVectors;
   }
 
   reset(): void {
@@ -16,6 +21,7 @@ export class OpticalFlowTracker {
     this.prevGray = null;
     this.trackedCorners = null;
     this.lostFrames = 0;
+    this.lastFlowVectors = null;
   }
 
   /** Pre-load corners from scan/solve start without resetting on first frame. */
@@ -33,6 +39,7 @@ export class OpticalFlowTracker {
     if (detectedCorners) {
       this.trackedCorners = detectedCorners;
       this.lostFrames = 0;
+      this.lastFlowVectors = null;
       this.prevGray?.delete();
       this.prevGray = gray.clone();
       return detectedCorners;
@@ -55,16 +62,20 @@ export class OpticalFlowTracker {
     cv.calcOpticalFlowPyrLK(this.prevGray, gray, prevPts, nextPts, status, err);
 
     const updated: Point2D[] = [];
+    const flowVectors: Point2D[] = [];
     let validCount = 0;
     for (let i = 0; i < 4; i++) {
       const ok = status.data[i] === 1;
       const x = nextPts.data32F[i * 2]!;
       const y = nextPts.data32F[i * 2 + 1]!;
+      const prev = this.trackedCorners[i]!;
       if (ok && Number.isFinite(x) && Number.isFinite(y)) {
         updated.push({ x, y });
+        flowVectors.push({ x: x - prev.x, y: y - prev.y });
         validCount++;
       } else {
-        updated.push(this.trackedCorners[i]!);
+        updated.push(prev);
+        flowVectors.push({ x: 0, y: 0 });
       }
     }
 
@@ -85,6 +96,7 @@ export class OpticalFlowTracker {
     }
 
     this.trackedCorners = updated as [Point2D, Point2D, Point2D, Point2D];
+    this.lastFlowVectors = flowVectors;
     this.lostFrames = 0;
     if (this.lostFrames > MAX_LOST_FRAMES) {
       this.reset();

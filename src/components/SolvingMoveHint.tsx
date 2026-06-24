@@ -25,6 +25,9 @@ interface SolvingMoveHintProps {
   frameHeight: number;
   viewportWidth: number;
   viewportHeight: number;
+  layerTurnInProgress: boolean;
+  sawShapeBreak: boolean;
+  layerTurnValidated: boolean;
   onSkip?: () => void;
 }
 
@@ -42,6 +45,9 @@ export function SolvingMoveHint({
   frameHeight,
   viewportWidth,
   viewportHeight,
+  layerTurnInProgress,
+  sawShapeBreak,
+  layerTurnValidated,
   onSkip,
 }: SolvingMoveHintProps) {
   const arrowRef = useRef<HTMLCanvasElement>(null);
@@ -111,10 +117,12 @@ export function SolvingMoveHint({
     statusText = 'Repositioning detected — turn one layer only, not the whole cube';
   } else if (wrong) {
     statusText = 'Wrong turn — follow the arrow direction';
-  } else if (rotationProgress >= 0.9) {
+  } else if (layerTurnValidated && rotationProgress >= 0.9) {
     statusText = `Turn recognized — hold steady (${progressPct}%)`;
+  } else if (layerTurnInProgress || sawShapeBreak) {
+    statusText = 'Layer turning — cube shape shifting…';
   } else if (rotationProgress > 0.12) {
-    statusText = `Good — keep turning (${progressPct}%)`;
+    statusText = `Keep turning the layer (${progressPct}%)`;
   } else if (scanPct >= 45) {
     statusText = `Scan OK (${scanPct}%) — ${actionLine}`;
   }

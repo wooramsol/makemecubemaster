@@ -151,6 +151,9 @@ export default function App() {
                 frameHeight={dimensions.height}
                 viewportWidth={viewportSize.width}
                 viewportHeight={viewportSize.height}
+                layerTurnInProgress={state.solvingFeedback.layerTurnInProgress}
+                sawShapeBreak={state.solvingFeedback.sawShapeBreak}
+                layerTurnValidated={state.solvingFeedback.layerTurnValidated}
                 onSkip={skipCurrentMove}
               />
             )}

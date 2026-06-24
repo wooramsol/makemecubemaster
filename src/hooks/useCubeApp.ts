@@ -23,6 +23,11 @@ import {
 } from '../lib/cube/moveColorProgress';
 import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { getVisibleFaces } from '../lib/vision/visibleFaces';
+import {
+  createLayerTurnShapeState,
+  resetLayerTurnShapeState,
+  updateLayerTurnShape,
+} from '../lib/vision/layerTurnShape';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
 import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '../lib/vision/cubeColorReconcile';
@@ -91,6 +96,10 @@ const initialSolvingFeedback: SolvingFeedback = {
   scanMatch: 0,
   comparisonFace: null,
   faceScanInfos: [],
+  deformationScore: 0,
+  layerTurnInProgress: false,
+  sawShapeBreak: false,
+  layerTurnValidated: false,
 };
 
 const initialState: CubeAppState = {
@@ -139,10 +148,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const recentFaceDetectionsRef = useRef<Partial<Record<FaceId, StickerColor[][]>>>({});
   const scanMatchSmootherRef = useRef(0);
   const recentScanMatchRef = useRef<number[]>([]);
+  const layerTurnShapeRef = useRef(createLayerTurnShapeState());
 
   const syncExpectedMove = useCallback((move: Move | null) => {
     if (move === expectedMoveRef.current) return;
     expectedMoveRef.current = move;
+    resetLayerTurnShapeState(layerTurnShapeRef.current);
     frameProcessor.current?.setExpectedMove(move);
   }, []);
 
@@ -247,6 +258,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     colorCompleteStableRef.current = 0;
     progressHighStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
+    resetLayerTurnShapeState(layerTurnShapeRef.current);
     recentDetectionsRef.current = [];
     recentFaceDetectionsRef.current = {};
     scanMatchSmootherRef.current = 0;
@@ -365,6 +377,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             colorCompleteStableRef.current = 0;
             progressHighStableRef.current = 0;
             resetMoveColorTracker(moveColorTrackerRef.current);
+            resetLayerTurnShapeState(layerTurnShapeRef.current);
             recentDetectionsRef.current = [];
             recentFaceDetectionsRef.current = {};
           }
@@ -706,6 +719,16 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     scanMatchSmootherRef.current = smoothScan;
     const scanMatch = smoothScan;
 
+    const alignedForBaseline =
+      scanMatch >= 0.42 &&
+      colorProgress < 0.25 &&
+      !moveColorTrackerRef.current.sawPreMoveAlignment;
+    const shapeUpdate = updateLayerTurnShape(
+      layerTurnShapeRef.current,
+      result.shapeMetrics?.deformationScore ?? 0,
+      alignedForBaseline,
+    );
+
     if (colorEval?.rejectedWholeCube && colorProgress < 0.2) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
@@ -713,6 +736,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       recentFaceDetectionsRef.current = {};
       colorCompleteStableRef.current = 0;
       progressHighStableRef.current = 0;
+      resetLayerTurnShapeState(layerTurnShapeRef.current);
       if (result.pose) frameProcessor.current?.syncPose(result.pose);
     } else if (
       moveColorTrackerRef.current.sawPreMoveAlignment &&
@@ -722,20 +746,32 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     const poseRotationProgress = result.rotationProgress;
-    const handMotionDetected = Boolean(colorEval?.rejectedWholeCube && colorProgress < 0.2);
+    const handMotionDetected = Boolean(
+      colorEval?.rejectedWholeCube &&
+        colorProgress < 0.2 &&
+        !shapeUpdate.deformationActive &&
+        !shapeUpdate.sawShapeBreak,
+    );
     const highTurnProgress =
-      moveColorTrackerRef.current.sawPreMoveAlignment && colorProgress >= 0.65;
+      shapeUpdate.sawShapeBreak &&
+      moveColorTrackerRef.current.sawPreMoveAlignment &&
+      colorProgress >= 0.65;
     if (highTurnProgress) {
       progressHighStableRef.current++;
     } else {
       progressHighStableRef.current = 0;
     }
-    const moveComplete =
+    const colorReady =
       Boolean(colorEval?.completed) ||
-      (highTurnProgress && progressHighStableRef.current >= 3);
+      (highTurnProgress && progressHighStableRef.current >= 4);
+    const moveComplete = shapeUpdate.layerTurnValidated && colorReady;
     const rotationProgress = moveComplete
       ? Math.max(colorProgress, 0.95)
-      : colorProgress;
+      : shapeUpdate.layerTurnValidated
+        ? colorProgress
+        : shapeUpdate.sawShapeBreak
+          ? Math.min(colorProgress, 0.88)
+          : Math.min(colorProgress, 0.28);
 
     let tracking: SolvingFeedback['tracking'] = 'searching';
     if (result.pose && (visibleFaces.length >= 2 || result.detectedFace)) {
@@ -805,6 +841,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         scanMatch,
         comparisonFace: colorEval?.comparisonFace ?? null,
         faceScanInfos,
+        deformationScore: result.shapeMetrics?.deformationScore ?? 0,
+        layerTurnInProgress: shapeUpdate.deformationActive,
+        sawShapeBreak: shapeUpdate.sawShapeBreak,
+        layerTurnValidated: shapeUpdate.layerTurnValidated,
       },
     }));
 
@@ -821,6 +861,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colorCompleteStableRef.current = 0;
       progressHighStableRef.current = 0;
       resetMoveColorTracker(moveColorTrackerRef.current);
+      resetLayerTurnShapeState(layerTurnShapeRef.current);
       recentFaceDetectionsRef.current = {};
       stepReadyMs.current = Date.now();
     }
@@ -886,6 +927,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     colorCompleteStableRef.current = 0;
     progressHighStableRef.current = 0;
     resetMoveColorTracker(moveColorTrackerRef.current);
+    resetLayerTurnShapeState(layerTurnShapeRef.current);
     recentFaceDetectionsRef.current = {};
     scanMatchSmootherRef.current = 0;
     recentScanMatchRef.current = [];
