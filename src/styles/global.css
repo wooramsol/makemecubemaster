@@ -1088,40 +1088,86 @@ body,
 .solving-move-hint-stage {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 120px;
+  min-height: 200px;
   padding: 8px 4px;
   border-radius: 12px;
 }
 
-.solving-move-hint-face-wrap {
-  position: relative;
-  width: 112px;
-  height: 112px;
-  flex-shrink: 0;
+.iso-cube-guide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.solving-move-hint-edge-arrow {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+.iso-cube-guide-svg {
+  display: block;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
 }
 
-.solving-move-hint-face-label {
-  position: absolute;
-  left: 50%;
-  bottom: 2px;
-  transform: translateX(-50%);
+.iso-cube-guide-edge {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.iso-cube-guide-cell {
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 0.6;
+}
+
+.iso-cube-guide-cell--turn {
+  stroke-width: 1.2;
+}
+
+.iso-cube-guide-cell-ring {
+  stroke: #ffeb3b;
+  stroke-width: 2.2;
+}
+
+.iso-cube-guide-arrow-track {
+  stroke: rgba(255, 45, 45, 0.75);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.iso-cube-guide-arrow-progress {
+  stroke: #ffeb3b;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.iso-cube-guide-arrow-head {
+  fill: #ff2d2d;
+}
+
+.iso-cube-guide-arrow-label {
+  fill: #ffeb3b;
   font-size: 11px;
   font-weight: 700;
-  color: #fff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-  pointer-events: none;
+  font-family: Inter, sans-serif;
+}
+
+.iso-cube-guide-legend {
+  fill: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: Inter, sans-serif;
+}
+
+.iso-cube-guide-caption {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fde68a;
+  text-align: center;
+  line-height: 1.3;
 }
 
 .solving-move-hint-arrow {
