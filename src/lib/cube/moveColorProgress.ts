@@ -1,7 +1,7 @@
 import Cube from 'cubejs';
 import type { FaceId, Move, StickerColor } from '../../types';
 import { ALL_FACES } from './colors';
-import { moveFace } from './moves';
+import { isDoubleMove, moveFace } from './moves';
 import { allFaceRotations } from './faceOrientation';
 import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
 
@@ -237,6 +237,54 @@ interface FaceEvalResult {
   progress: number;
   completed: boolean;
   rejectedWholeCube: boolean;
+}
+
+const FACE_LAYER_MOVES: Record<FaceId, Move[]> = {
+  U: ['U', "U'", 'U2'],
+  D: ['D', "D'", 'D2'],
+  R: ['R', "R'", 'R2'],
+  L: ['L', "L'", 'L2'],
+  F: ['F', "F'", 'F2'],
+  B: ['B', "B'", 'B2'],
+};
+
+/** Which layer move best matches detected visible-face colors. */
+export function detectDominantLayerMove(
+  facelet: string,
+  expected: Move,
+  visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>,
+  primaryFace: FaceId | null,
+  _tracker?: MoveColorTrackerState,
+): Move | null {
+  const faceId = primaryFace ?? moveFace(expected);
+  const visibleIds = (Object.keys(visibleFaceColors) as FaceId[]).filter(
+    (id) => visibleFaceColors[id]?.length === 9,
+  );
+  const scanFaces = visibleIds.length >= 2 ? visibleIds : [faceId];
+  const candidates = isDoubleMove(expected)
+    ? ([`${moveFace(expected)}2`] as Move[])
+    : FACE_LAYER_MOVES[moveFace(expected)];
+
+  let best: { move: Move; progress: number } = { move: expected, progress: 0 };
+
+  for (const candidate of candidates) {
+    const afterFl = applyMoveToFacelet(facelet, candidate);
+    let sum = 0;
+    for (const scanFace of scanFaces) {
+      const detected = visibleFaceColors[scanFace];
+      if (!detected) continue;
+      sum += matchFaceToFacelet(afterFl, scanFace, detected);
+    }
+    const progress = sum / scanFaces.length;
+    if (progress > best.progress) {
+      best = { move: candidate, progress };
+    }
+  }
+
+  if (best.move !== expected && best.progress >= 0.58) {
+    return best.move;
+  }
+  return null;
 }
 
 function evaluateOneFace(
