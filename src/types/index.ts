@@ -108,6 +108,18 @@ export interface SolvingFeedback {
   scanMatch: number;
   comparisonFace: FaceId | null;
   faceScanInfos: FaceScanInfo[];
+  deformationScore: number;
+  layerTurnInProgress: boolean;
+  sawShapeBreak: boolean;
+  layerTurnValidated: boolean;
+}
+
+export interface QuadShapeMetrics {
+  aspectRatio: number;
+  angleDeviation: number;
+  projectedResidual: number;
+  flowDivergence: number;
+  deformationScore: number;
 }
 
 export interface FrameResult {
@@ -117,6 +129,7 @@ export interface FrameResult {
   rotationProgress: number;
   wrongMove: Move | null;
   visibleFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  shapeMetrics: QuadShapeMetrics | null;
 }
 
 export interface CameraIntrinsics {

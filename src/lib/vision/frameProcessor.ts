@@ -10,6 +10,7 @@ import { sampleVisibleFaceColors } from './multiFaceSampler';
 import { getVisibleFaces } from './visibleFaces';
 import { alignPoseToTrackedQuad } from './poseAlign';
 import { sampleColorsFromQuad } from './quadColorSampler';
+import { computeDeformationScore } from './quadShapeMetrics';
 import { drawCameraFrame } from './selfieView';
 import { GUIDE_SIZE_RATIO } from './roi';
 
@@ -22,6 +23,7 @@ const EMPTY_RESULT: FrameResult = {
   rotationProgress: 0,
   wrongMove: null,
   visibleFaceColors: {},
+  shapeMetrics: null,
 };
 
 export class FrameProcessor {
@@ -101,6 +103,20 @@ export class FrameProcessor {
 
   getFrameCanvas(): HTMLCanvasElement {
     return this.processCanvas;
+  }
+
+  private buildShapeMetrics(
+    pose: CubePose,
+    width: number,
+    height: number,
+  ): import('../../types').QuadShapeMetrics {
+    return computeDeformationScore(
+      pose.corners,
+      pose,
+      width,
+      height,
+      this.flowTracker.getLastFlowVectors(),
+    );
   }
 
   captureFrame(video: HTMLVideoElement): boolean {
@@ -211,6 +227,7 @@ export class FrameProcessor {
         rotationProgress: rotation.progress,
         wrongMove: rotation.wrongMove,
         visibleFaceColors,
+        shapeMetrics: this.buildShapeMetrics(aligned, width, height),
       };
     }
 
@@ -239,6 +256,7 @@ export class FrameProcessor {
         rotationProgress: rotation.progress,
         wrongMove: rotation.wrongMove,
         visibleFaceColors,
+        shapeMetrics: this.buildShapeMetrics(aligned, width, height),
       };
     }
 
@@ -253,6 +271,7 @@ export class FrameProcessor {
           rotationProgress: rotation.progress,
           wrongMove: rotation.wrongMove,
           visibleFaceColors: {},
+          shapeMetrics: this.buildShapeMetrics(this.lastSolvingPose, width, height),
         };
       }
       this.lastSolvingPose = null;
@@ -282,6 +301,7 @@ export class FrameProcessor {
       rotationProgress: 0,
       wrongMove: null,
       visibleFaceColors,
+      shapeMetrics: null,
     };
   }
 
@@ -335,6 +355,7 @@ export class FrameProcessor {
       rotationProgress: rotation.progress,
       wrongMove: rotation.wrongMove,
       visibleFaceColors,
+      shapeMetrics: this.buildShapeMetrics(pose, width, height),
     };
   }
 
