@@ -120,3 +120,28 @@ export function computeDeformationScore(
     deformationScore,
   };
 }
+
+/** Whole-cube reposition: corners move together, quad stays roughly square. */
+export function isRigidCubeReposition(metrics: QuadShapeMetrics): boolean {
+  const uniformFlow = metrics.flowDivergence < 0.2;
+  const mildDeform = metrics.deformationScore >= 0.08;
+  const squareish = metrics.aspectRatio < 1.18 && metrics.angleDeviation < 0.14;
+  const poseDrift = metrics.projectedResidual >= 0.08;
+  return uniformFlow && squareish && (mildDeform || poseDrift);
+}
+
+/**
+ * Layer turn: corners shear unevenly — high flow divergence and/or visible quad skew.
+ * Residual-only spikes (PnP drift during rigid spin) do not count.
+ */
+export function isLayerTurnDeformation(metrics: QuadShapeMetrics): boolean {
+  if (metrics.deformationScore < 0.17) return false;
+
+  const shear =
+    metrics.aspectRatio >= 1.14 ||
+    metrics.angleDeviation >= 0.1 ||
+    metrics.projectedResidual >= 0.16;
+  const divergentFlow = metrics.flowDivergence >= 0.18;
+
+  return divergentFlow || (shear && metrics.flowDivergence >= 0.1);
+}

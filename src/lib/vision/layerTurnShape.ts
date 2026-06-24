@@ -1,6 +1,5 @@
-const BREAK_THRESHOLD = 0.19;
 const SETTLE_THRESHOLD = 0.12;
-const BREAK_FRAMES_NEEDED = 2;
+const BREAK_FRAMES_NEEDED = 3;
 const SETTLE_FRAMES_NEEDED = 3;
 
 export interface LayerTurnShapeState {
@@ -37,21 +36,45 @@ export interface LayerTurnShapeUpdate {
   peakDeformation: number;
 }
 
+export interface LayerTurnShapeInput {
+  deformationScore: number;
+  aligned: boolean;
+  layerTurnDeform: boolean;
+  rigidReposition: boolean;
+}
+
 /**
  * Tracks the layer-turn arc: rigid cube → shape breaks mid-turn → settles again.
- * Whole-cube hand spins keep deformation low and never set sawShapeBreak.
+ * Whole-cube hand spins use uniform flow and must not set sawShapeBreak.
  */
 export function updateLayerTurnShape(
   state: LayerTurnShapeState,
-  deformationScore: number,
-  aligned: boolean,
+  input: LayerTurnShapeInput,
 ): LayerTurnShapeUpdate {
+  const { deformationScore, aligned, layerTurnDeform, rigidReposition } = input;
+
   if (aligned && !state.sawShapeBreak) {
     state.baselineDeformation = state.baselineDeformation * 0.85 + deformationScore * 0.15;
   }
 
-  const breakLevel = Math.max(BREAK_THRESHOLD, state.baselineDeformation + 0.08);
-  const aboveBreak = deformationScore >= breakLevel;
+  if (rigidReposition) {
+    state.breakFrames = 0;
+    state.settledFrames = 0;
+    state.deformationActive = false;
+    if (!state.settledAfterBreak) {
+      state.sawShapeBreak = false;
+      state.peakDeformation = 0;
+    }
+    return {
+      sawShapeBreak: state.sawShapeBreak,
+      settledAfterBreak: state.settledAfterBreak,
+      deformationActive: false,
+      layerTurnValidated: false,
+      peakDeformation: state.peakDeformation,
+    };
+  }
+
+  const aboveBreak = layerTurnDeform;
   const belowSettle = deformationScore <= SETTLE_THRESHOLD;
 
   if (aboveBreak) {
@@ -64,7 +87,7 @@ export function updateLayerTurnShape(
     state.breakFrames = Math.max(0, state.breakFrames - 1);
   }
 
-  state.deformationActive = deformationScore > SETTLE_THRESHOLD * 1.35;
+  state.deformationActive = layerTurnDeform || deformationScore > SETTLE_THRESHOLD * 1.5;
 
   if (state.sawShapeBreak && belowSettle) {
     state.settledFrames++;
@@ -75,8 +98,7 @@ export function updateLayerTurnShape(
     state.settledFrames = 0;
   }
 
-  const layerTurnValidated =
-    state.sawShapeBreak && (state.settledAfterBreak || state.peakDeformation >= 0.28);
+  const layerTurnValidated = state.sawShapeBreak && state.settledAfterBreak;
 
   return {
     sawShapeBreak: state.sawShapeBreak,

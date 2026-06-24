@@ -13,7 +13,11 @@ import {
   evaluateSolvingFrame,
   type SolvingFrameInput,
 } from './solvingStepPolicy';
-import { computeDeformationScore } from '../vision/quadShapeMetrics';
+import {
+  computeDeformationScore,
+  isLayerTurnDeformation,
+  isRigidCubeReposition,
+} from '../vision/quadShapeMetrics';
 import type { CubePose, Point2D } from '../../types';
 
 function squareCorners(cx: number, cy: number, size: number): [Point2D, Point2D, Point2D, Point2D] {
@@ -38,6 +42,18 @@ function skewedCorners(cx: number, cy: number, size: number): [Point2D, Point2D,
 }
 
 function deformScore(corners: [Point2D, Point2D, Point2D, Point2D]): number {
+  return metricsFromCorners(corners, [
+    { x: 2, y: 0 },
+    { x: 8, y: 1 },
+    { x: 1, y: 7 },
+    { x: -3, y: 2 },
+  ]).deformationScore;
+}
+
+function metricsFromCorners(
+  corners: [Point2D, Point2D, Point2D, Point2D],
+  flow: Point2D[],
+) {
   const pose: CubePose = {
     corners,
     center: { x: 200, y: 200 },
@@ -47,12 +63,41 @@ function deformScore(corners: [Point2D, Point2D, Point2D, Point2D]): number {
     confidence: 0.9,
     visibleFace: 'R',
   };
-  return computeDeformationScore(corners, pose, 400, 400, [
+  return computeDeformationScore(corners, pose, 400, 400, flow);
+}
+
+function rigidRepositionFrame(): Pick<
+  SolvingFrameInput,
+  'deformationScore' | 'rigidReposition' | 'layerTurnDeform'
+> {
+  const metrics = metricsFromCorners(squareCorners(200, 200, 140), [
+    { x: 5, y: 2 },
+    { x: 5, y: 2 },
+    { x: 5, y: 2 },
+    { x: 5, y: 2 },
+  ]);
+  return {
+    deformationScore: metrics.deformationScore,
+    rigidReposition: isRigidCubeReposition(metrics),
+    layerTurnDeform: isLayerTurnDeformation(metrics),
+  };
+}
+
+function layerTurnFrame(): Pick<
+  SolvingFrameInput,
+  'deformationScore' | 'rigidReposition' | 'layerTurnDeform'
+> {
+  const metrics = metricsFromCorners(skewedCorners(200, 200, 140), [
     { x: 2, y: 0 },
-    { x: 8, y: 1 },
-    { x: 1, y: 7 },
-    { x: -3, y: 2 },
-  ]).deformationScore;
+    { x: 9, y: 1 },
+    { x: 0, y: 8 },
+    { x: -4, y: 2 },
+  ]);
+  return {
+    deformationScore: metrics.deformationScore,
+    rigidReposition: isRigidCubeReposition(metrics),
+    layerTurnDeform: isLayerTurnDeformation(metrics),
+  };
 }
 
 function runSequence(inputs: SolvingFrameInput[]) {
@@ -87,6 +132,15 @@ describe('layer deformation metrics', () => {
     const skewed = deformScore(skewedCorners(200, 200, 140));
     expect(skewed).toBeGreaterThan(rigid + 0.08);
   });
+
+  it('classifies uniform flow as rigid reposition, divergent flow as layer turn', () => {
+    const rigid = rigidRepositionFrame();
+    const layer = layerTurnFrame();
+    expect(rigid.rigidReposition).toBe(true);
+    expect(rigid.layerTurnDeform).toBe(false);
+    expect(layer.layerTurnDeform).toBe(true);
+    expect(layer.rigidReposition).toBe(false);
+  });
 });
 
 describe('solving step policy simulation', () => {
@@ -103,12 +157,14 @@ describe('solving step policy simulation', () => {
       sawPreMoveAlignment: tracker.sawPreMoveAlignment,
       rejectedWholeCube: false,
       wrongMove: null,
+      rigidReposition: false,
+      layerTurnDeform: false,
     }));
 
-    const breakingFrames: SolvingFrameInput[] = Array.from({ length: 3 }, () => ({
+    const breakingFrames: SolvingFrameInput[] = Array.from({ length: 4 }, () => ({
       colorEval: colorEvalFor(facelet, expected, 'R', null, tracker),
       scanMatch: 0.72,
-      deformationScore: deformScore(skewedCorners(200, 200, 140)),
+      ...layerTurnFrame(),
       sawPreMoveAlignment: true,
       rejectedWholeCube: false,
       wrongMove: null,
@@ -120,10 +176,12 @@ describe('solving step policy simulation', () => {
     const settleFrames: SolvingFrameInput[] = Array.from({ length: 6 }, () => ({
       colorEval: after,
       scanMatch: 0.78,
-      deformationScore: deformScore(squareCorners(200, 200, 140)),
+      deformationScore: 0.06,
       sawPreMoveAlignment: true,
       rejectedWholeCube: false,
       wrongMove: null,
+      rigidReposition: false,
+      layerTurnDeform: false,
     }));
 
     const { last } = runSequence([...alignedFrames, ...breakingFrames, ...settleFrames]);
@@ -145,7 +203,7 @@ describe('solving step policy simulation', () => {
     const frames: SolvingFrameInput[] = Array.from({ length: 12 }, () => ({
       colorEval: noTurnEval,
       scanMatch: 0.35,
-      deformationScore: 0.05,
+      ...rigidRepositionFrame(),
       sawPreMoveAlignment: false,
       rejectedWholeCube: true,
       wrongMove: null,
@@ -184,11 +242,13 @@ describe('solving step policy simulation', () => {
         sawPreMoveAlignment: tracker3.sawPreMoveAlignment,
         rejectedWholeCube: false,
         wrongMove: null,
+        rigidReposition: false,
+        layerTurnDeform: false,
       })),
-      ...Array.from({ length: 3 }, () => ({
+      ...Array.from({ length: 4 }, () => ({
         colorEval: wrongEval,
         scanMatch: 0.7,
-        deformationScore: deformScore(skewedCorners(200, 200, 140)),
+        ...layerTurnFrame(),
         sawPreMoveAlignment: true,
         rejectedWholeCube: false,
         wrongMove: "R'" as Move,
@@ -200,6 +260,8 @@ describe('solving step policy simulation', () => {
         sawPreMoveAlignment: true,
         rejectedWholeCube: false,
         wrongMove: "R'" as Move,
+        rigidReposition: false,
+        layerTurnDeform: false,
       })),
     ];
 

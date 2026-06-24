@@ -346,6 +346,15 @@ function evaluateOneFace(
 
     const turning = tracker.sawPreMoveAlignment || progress > 0.15;
 
+    if (
+      turning &&
+      looksLikeWholeFaceSpin(oriented, ref.before) &&
+      changedMatch < Math.ceil(changed.length * 0.45)
+    ) {
+      best = { progress: 0, completed: false, rejectedWholeCube: true };
+      continue;
+    }
+
     if (!layerSignature && !turning) {
       if (
         (looksLikeWholeFaceSpin(oriented, ref.before) || unchanged.length >= 3) &&

@@ -34,6 +34,8 @@ export interface SolvingFrameInput {
   sawPreMoveAlignment: boolean;
   rejectedWholeCube: boolean;
   wrongMove: Move | null;
+  rigidReposition: boolean;
+  layerTurnDeform: boolean;
 }
 
 export interface SolvingFrameResult {
@@ -61,22 +63,25 @@ export function evaluateSolvingFrame(
     colorProgress < 0.25 &&
     !input.sawPreMoveAlignment;
 
-  const shapeUpdate = updateLayerTurnShape(
-    state.layerTurnShape,
-    input.deformationScore,
-    alignedForBaseline,
-  );
+  const shapeUpdate = updateLayerTurnShape(state.layerTurnShape, {
+    deformationScore: input.deformationScore,
+    aligned: alignedForBaseline,
+    layerTurnDeform: input.layerTurnDeform,
+    rigidReposition: input.rigidReposition,
+  });
 
   const handMotionDetected = Boolean(
-    input.rejectedWholeCube &&
-      colorProgress < 0.2 &&
-      !shapeUpdate.deformationActive &&
-      !shapeUpdate.sawShapeBreak,
+    input.rigidReposition ||
+      (input.rejectedWholeCube &&
+        colorProgress < 0.35 &&
+        !shapeUpdate.sawShapeBreak),
   );
 
   const highTurnProgress =
     shapeUpdate.sawShapeBreak &&
     input.sawPreMoveAlignment &&
+    input.layerTurnDeform &&
+    !input.rigidReposition &&
     colorProgress >= 0.65;
 
   if (highTurnProgress) {
@@ -86,8 +91,10 @@ export function evaluateSolvingFrame(
   }
 
   const colorReady =
-    Boolean(input.colorEval?.completed) ||
-    (highTurnProgress && state.progressHighStable >= HIGH_PROGRESS_FRAMES);
+    !input.rigidReposition &&
+    !input.rejectedWholeCube &&
+    (Boolean(input.colorEval?.completed) ||
+      (highTurnProgress && state.progressHighStable >= HIGH_PROGRESS_FRAMES));
 
   const blockedByWrongMove = Boolean(input.wrongMove);
   const moveComplete =
