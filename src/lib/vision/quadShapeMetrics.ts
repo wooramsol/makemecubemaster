@@ -32,6 +32,7 @@ export interface QuadShapeMetrics {
   angleDeviation: number;
   projectedResidual: number;
   flowDivergence: number;
+  flowMagnitude: number;
   deformationScore: number;
 }
 
@@ -76,10 +77,21 @@ export function projectedCornerResidual(
   return sum / 4 / scale;
 }
 
-export function flowDivergence(vectors: Point2D[] | null): number {
-  if (!vectors || vectors.length < 4) return 0;
+function flowMagnitudes(vectors: Point2D[] | null): number[] {
+  if (!vectors || vectors.length < 4) return [];
+  return vectors.map((v) => hypot(v.x, v.y));
+}
 
-  const magnitudes = vectors.map((v) => hypot(v.x, v.y));
+export function flowMeanMagnitude(vectors: Point2D[] | null): number {
+  const magnitudes = flowMagnitudes(vectors);
+  if (magnitudes.length === 0) return 0;
+  return magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length;
+}
+
+export function flowDivergence(vectors: Point2D[] | null): number {
+  const magnitudes = flowMagnitudes(vectors);
+  if (magnitudes.length < 4) return 0;
+
   const mean = magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length;
   if (mean < 0.35) return 0;
 
@@ -101,6 +113,7 @@ export function computeDeformationScore(
     ? projectedCornerResidual(pose, corners, frameWidth, frameHeight)
     : 0;
   const divergence = flowDivergence(flowVectors);
+  const magnitude = flowMeanMagnitude(flowVectors);
 
   const aspectTerm = Math.min(1, Math.max(0, aspectRatio - 1) / 0.45);
   const angleTerm = Math.min(1, angleDeviation / 0.35);
@@ -117,12 +130,15 @@ export function computeDeformationScore(
     angleDeviation,
     projectedResidual,
     flowDivergence: divergence,
+    flowMagnitude: magnitude,
     deformationScore,
   };
 }
 
 /** Whole-cube reposition: corners move together, quad stays roughly square. */
 export function isRigidCubeReposition(metrics: QuadShapeMetrics): boolean {
+  if (metrics.flowMagnitude < 0.4) return false;
+
   const uniformFlow = metrics.flowDivergence < 0.2;
   const mildDeform = metrics.deformationScore >= 0.08;
   const squareish = metrics.aspectRatio < 1.18 && metrics.angleDeviation < 0.14;
@@ -135,13 +151,21 @@ export function isRigidCubeReposition(metrics: QuadShapeMetrics): boolean {
  * Residual-only spikes (PnP drift during rigid spin) do not count.
  */
 export function isLayerTurnDeformation(metrics: QuadShapeMetrics): boolean {
-  if (metrics.deformationScore < 0.17) return false;
+  if (metrics.deformationScore < 0.13) return false;
+  if (metrics.flowMagnitude < 0.3) return false;
+
+  const squareish = metrics.aspectRatio < 1.15 && metrics.angleDeviation < 0.12;
+  if (metrics.flowDivergence < 0.15 && squareish) return false;
 
   const shear =
-    metrics.aspectRatio >= 1.14 ||
-    metrics.angleDeviation >= 0.1 ||
-    metrics.projectedResidual >= 0.16;
-  const divergentFlow = metrics.flowDivergence >= 0.18;
+    metrics.aspectRatio >= 1.1 ||
+    metrics.angleDeviation >= 0.08 ||
+    metrics.projectedResidual >= 0.13;
+  const divergentFlow = metrics.flowDivergence >= 0.12;
 
-  return divergentFlow || (shear && metrics.flowDivergence >= 0.1);
+  return (
+    divergentFlow ||
+    (shear && metrics.flowMagnitude >= 0.3) ||
+    (metrics.deformationScore >= 0.2 && metrics.flowMagnitude >= 0.3 && !squareish)
+  );
 }

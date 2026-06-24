@@ -119,6 +119,7 @@ export interface QuadShapeMetrics {
   angleDeviation: number;
   projectedResidual: number;
   flowDivergence: number;
+  flowMagnitude: number;
   deformationScore: number;
 }
 

@@ -1,6 +1,6 @@
 const SETTLE_THRESHOLD = 0.12;
-const BREAK_FRAMES_NEEDED = 3;
-const SETTLE_FRAMES_NEEDED = 3;
+const BREAK_FRAMES_NEEDED = 2;
+const SETTLE_FRAMES_NEEDED = 2;
 
 export interface LayerTurnShapeState {
   baselineDeformation: number;
@@ -74,7 +74,9 @@ export function updateLayerTurnShape(
     };
   }
 
-  const aboveBreak = layerTurnDeform;
+  const aboveBreak =
+    layerTurnDeform ||
+    (deformationScore >= state.baselineDeformation + 0.1 && deformationScore >= 0.18);
   const belowSettle = deformationScore <= SETTLE_THRESHOLD;
 
   if (aboveBreak) {

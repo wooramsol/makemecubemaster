@@ -269,4 +269,41 @@ describe('solving step policy simulation', () => {
     expect(last.sawShapeBreak).toBe(true);
     expect(last.moveComplete).toBe(false);
   });
+
+  it('4. shows 0% turn progress when idle (no alignment or shape break)', () => {
+    const noisyEval = {
+      progress: 0.32,
+      completed: false,
+      visibleFace: 'R' as const,
+      comparisonFace: null,
+      rejectedWholeCube: false,
+    };
+
+    const { last } = runSequence(
+      Array.from({ length: 5 }, () => ({
+        colorEval: noisyEval,
+        scanMatch: 0.55,
+        deformationScore: 0.05,
+        sawPreMoveAlignment: false,
+        rejectedWholeCube: false,
+        wrongMove: null,
+        rigidReposition: false,
+        layerTurnDeform: false,
+      })),
+    );
+
+    expect(last.rotationProgress).toBe(0);
+    expect(last.sawShapeBreak).toBe(false);
+  });
+
+  it('5. does not flag rigid reposition when cube is still', () => {
+    const metrics = metricsFromCorners(squareCorners(200, 200, 140), [
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+    expect(metrics.flowMagnitude).toBe(0);
+    expect(isRigidCubeReposition(metrics)).toBe(false);
+  });
 });
