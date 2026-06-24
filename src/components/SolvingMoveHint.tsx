@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { Move } from '../types';
 import { getFaceLayerName } from '../lib/cube/faceLayerNames';
 import { colorsForMoveFromFacelet } from '../lib/cube/moveColorProgress';
@@ -8,7 +8,6 @@ import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
 } from '../lib/vision/guideOverlay';
-import { drawGridRotationHint } from '../lib/vision/gridRotationArrow';
 import { FaceColorGrid } from './FaceColorGrid';
 
 interface SolvingMoveHintProps {
@@ -50,9 +49,6 @@ export function SolvingMoveHint({
   layerTurnValidated,
   onSkip,
 }: SolvingMoveHintProps) {
-  const arrowRef = useRef<HTMLCanvasElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-
   const panelStyle = useMemo(() => {
     const guideRect = getSolvingScanOverlayRect(
       frameWidth,
@@ -72,51 +68,19 @@ export function SolvingMoveHint({
   const progressPct = Math.round(Math.max(0, Math.min(1, rotationProgress)) * 100);
   const scanPct = Math.round(scanMatch * 100);
 
-  useEffect(() => {
-    if (!visible) return;
-    const canvas = arrowRef.current;
-    const stage = stageRef.current;
-    if (!canvas || !stage) return;
-
-    const resize = () => {
-      const rect = stage.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio, 2);
-      canvas.width = Math.max(1, Math.floor(rect.width * dpr));
-      canvas.height = Math.max(1, Math.floor(rect.height * dpr));
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
-    };
-    resize();
-
-    let raf = 0;
-    const draw = () => {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const dpr = Math.min(window.devicePixelRatio, 2);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const w = canvas.width / dpr;
-      const h = canvas.height / dpr;
-      ctx.clearRect(0, 0, w, h);
-      drawGridRotationHint(ctx, w, h, move, rotationProgress);
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => cancelAnimationFrame(raf);
-  }, [visible, move, rotationProgress]);
-
   if (!visible) return null;
 
   const actionLine = isDoubleMove(move)
     ? `Flip the ${layerName} layer 180° (either way)`
     : `Turn the ${layerName} layer ${display.direction.toLowerCase()}`;
 
-  let statusText = `Show the ${faceId} face to the camera, then follow the red arrow`;
+  let statusText = `Show the ${faceId} face to the camera`;
   if (scanPct < 45) {
     statusText = `Hold ${faceId} (${layerName}) face steady in the guide — scan ${scanPct}%`;
+  } else if (wrong) {
+    statusText = `Wrong turn (${wrongMove}) — need ${move} (${display.direction.toLowerCase()})`;
   } else if (handMotionDetected) {
     statusText = 'Repositioning detected — turn one layer only, not the whole cube';
-  } else if (wrong) {
-    statusText = 'Wrong turn — follow the arrow direction';
   } else if (layerTurnValidated && rotationProgress >= 0.9) {
     statusText = `Turn recognized — hold steady (${progressPct}%)`;
   } else if (layerTurnInProgress || sawShapeBreak) {
@@ -144,11 +108,15 @@ export function SolvingMoveHint({
 
         <p className="solving-move-hint-action">{actionLine}</p>
 
-        <div className="solving-move-hint-stage" ref={stageRef}>
+        <div className="solving-move-hint-stage">
           {faceColors.length === 9 && (
             <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
           )}
-          <canvas ref={arrowRef} className="solving-move-hint-arrow" aria-hidden="true" />
+          <div className={`solving-move-hint-badge${wrong ? ' solving-move-hint-badge--wrong' : ''}`}>
+            <span className="solving-move-hint-symbol">{display.symbol}</span>
+            <span className="solving-move-hint-turns">{display.turns}</span>
+            <span className="solving-move-hint-direction">{display.direction}</span>
+          </div>
         </div>
 
         <div className="solving-move-hint-meters">

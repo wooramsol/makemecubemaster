@@ -1,0 +1,123 @@
+import type { Move } from '../../types';
+import type { MoveColorEvaluation } from './moveColorProgress';
+import {
+  createLayerTurnShapeState,
+  resetLayerTurnShapeState,
+  updateLayerTurnShape,
+  type LayerTurnShapeState,
+} from '../vision/layerTurnShape';
+
+export interface SolvingStepState {
+  layerTurnShape: LayerTurnShapeState;
+  colorCompleteStable: number;
+  progressHighStable: number;
+}
+
+export function createSolvingStepState(): SolvingStepState {
+  return {
+    layerTurnShape: createLayerTurnShapeState(),
+    colorCompleteStable: 0,
+    progressHighStable: 0,
+  };
+}
+
+export function resetSolvingStepState(state: SolvingStepState): void {
+  resetLayerTurnShapeState(state.layerTurnShape);
+  state.colorCompleteStable = 0;
+  state.progressHighStable = 0;
+}
+
+export interface SolvingFrameInput {
+  colorEval: MoveColorEvaluation | null;
+  scanMatch: number;
+  deformationScore: number;
+  sawPreMoveAlignment: boolean;
+  rejectedWholeCube: boolean;
+  wrongMove: Move | null;
+}
+
+export interface SolvingFrameResult {
+  moveComplete: boolean;
+  rotationProgress: number;
+  handMotionDetected: boolean;
+  layerTurnValidated: boolean;
+  sawShapeBreak: boolean;
+  layerTurnInProgress: boolean;
+  colorReady: boolean;
+  colorCompleteStable: number;
+}
+
+const STABLE_FRAMES_TO_ADVANCE = 2;
+const HIGH_PROGRESS_FRAMES = 4;
+
+export function evaluateSolvingFrame(
+  state: SolvingStepState,
+  input: SolvingFrameInput,
+): SolvingFrameResult {
+  const colorProgress = input.colorEval?.progress ?? 0;
+
+  const alignedForBaseline =
+    input.scanMatch >= 0.42 &&
+    colorProgress < 0.25 &&
+    !input.sawPreMoveAlignment;
+
+  const shapeUpdate = updateLayerTurnShape(
+    state.layerTurnShape,
+    input.deformationScore,
+    alignedForBaseline,
+  );
+
+  const handMotionDetected = Boolean(
+    input.rejectedWholeCube &&
+      colorProgress < 0.2 &&
+      !shapeUpdate.deformationActive &&
+      !shapeUpdate.sawShapeBreak,
+  );
+
+  const highTurnProgress =
+    shapeUpdate.sawShapeBreak &&
+    input.sawPreMoveAlignment &&
+    colorProgress >= 0.65;
+
+  if (highTurnProgress) {
+    state.progressHighStable++;
+  } else {
+    state.progressHighStable = 0;
+  }
+
+  const colorReady =
+    Boolean(input.colorEval?.completed) ||
+    (highTurnProgress && state.progressHighStable >= HIGH_PROGRESS_FRAMES);
+
+  const blockedByWrongMove = Boolean(input.wrongMove);
+  const moveComplete =
+    shapeUpdate.layerTurnValidated && colorReady && !blockedByWrongMove;
+
+  const rotationProgress = moveComplete
+    ? Math.max(colorProgress, 0.95)
+    : shapeUpdate.layerTurnValidated
+      ? colorProgress
+      : shapeUpdate.sawShapeBreak
+        ? Math.min(colorProgress, 0.88)
+        : Math.min(colorProgress, 0.28);
+
+  if (moveComplete) {
+    state.colorCompleteStable++;
+  } else {
+    state.colorCompleteStable = 0;
+  }
+
+  const shouldAdvance =
+    moveComplete && state.colorCompleteStable >= STABLE_FRAMES_TO_ADVANCE;
+
+  return {
+    moveComplete: shouldAdvance,
+    rotationProgress,
+    handMotionDetected,
+    layerTurnValidated: shapeUpdate.layerTurnValidated,
+    sawShapeBreak: shapeUpdate.sawShapeBreak,
+    layerTurnInProgress: shapeUpdate.deformationActive,
+    colorReady,
+    colorCompleteStable: state.colorCompleteStable,
+  };
+}
