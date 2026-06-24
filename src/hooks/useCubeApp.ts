@@ -24,6 +24,10 @@ import {
 import { identifyFaceFromCenter } from '../lib/cube/colors';
 import { getVisibleFaces } from '../lib/vision/visibleFaces';
 import {
+  isLayerTurnDeformation,
+  isRigidCubeReposition,
+} from '../lib/vision/quadShapeMetrics';
+import {
   createSolvingStepState,
   evaluateSolvingFrame,
   resetSolvingStepState,
@@ -717,7 +721,16 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     scanMatchSmootherRef.current = smoothScan;
     const scanMatch = smoothScan;
 
-    if (colorEval?.rejectedWholeCube && colorProgress < 0.2) {
+    const shapeMetrics = result.shapeMetrics;
+    const rigidReposition = shapeMetrics ? isRigidCubeReposition(shapeMetrics) : false;
+    const layerTurnDeform = shapeMetrics ? isLayerTurnDeformation(shapeMetrics) : false;
+    const wholeCubeMotion =
+      rigidReposition || Boolean(colorEval?.rejectedWholeCube);
+
+    if (
+      wholeCubeMotion &&
+      (colorProgress < 0.45 || rigidReposition)
+    ) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
       if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
@@ -735,10 +748,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     const stepResult = evaluateSolvingFrame(solvingStepStateRef.current, {
       colorEval,
       scanMatch,
-      deformationScore: result.shapeMetrics?.deformationScore ?? 0,
+      deformationScore: shapeMetrics?.deformationScore ?? 0,
       sawPreMoveAlignment: moveColorTrackerRef.current.sawPreMoveAlignment,
-      rejectedWholeCube: Boolean(colorEval?.rejectedWholeCube),
+      rejectedWholeCube: wholeCubeMotion,
       wrongMove: result.wrongMove,
+      rigidReposition,
+      layerTurnDeform,
     });
 
     let wrongMove = result.wrongMove;
