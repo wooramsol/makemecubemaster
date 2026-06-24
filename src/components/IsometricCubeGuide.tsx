@@ -13,25 +13,22 @@ import { mirrorFaceCellsHorizontally } from '../lib/vision/selfieView';
 interface IsometricCubeGuideProps {
   move: Move;
   facelet: string;
-  rotationProgress?: number;
 }
 
-function pointsToPath(points: Point2[]): string {
-  if (points.length === 0) return '';
+function pathFromPoints(points: Point2[]): string {
   const [first, ...rest] = points;
-  return `M ${first!.x.toFixed(2)} ${first!.y.toFixed(2)} ${rest.map((p) => `L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')} Z`;
+  return `M ${first!.x.toFixed(1)} ${first!.y.toFixed(1)} ${rest.map((p) => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')} Z`;
 }
 
-function arrowHeadPath(tip: Point2, angle: number, size: number): string {
+function arrowHead(tip: Point2, angle: number, size: number): string {
   const ux = Math.cos(angle);
   const uy = Math.sin(angle);
   const px = -uy;
   const py = ux;
-  const wing = size;
-  return `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${(tip.x - ux * wing + px * wing * 0.55).toFixed(2)} ${(tip.y - uy * wing + py * wing * 0.55).toFixed(2)} L ${(tip.x - ux * wing - px * wing * 0.55).toFixed(2)} ${(tip.y - uy * wing - py * wing * 0.55).toFixed(2)} Z`;
+  return `M ${tip.x.toFixed(1)} ${tip.y.toFixed(1)} L ${(tip.x - ux * size + px * size * 0.55).toFixed(1)} ${(tip.y - uy * size + py * size * 0.55).toFixed(1)} L ${(tip.x - ux * size - px * size * 0.55).toFixed(1)} ${(tip.y - uy * size - py * size * 0.55).toFixed(1)} Z`;
 }
 
-export function IsometricCubeGuide({ move, facelet, rotationProgress = 0.2 }: IsometricCubeGuideProps) {
+export function IsometricCubeGuide({ move, facelet }: IsometricCubeGuideProps) {
   const guidance = useMemo(() => getMoveGuidanceView(move), [move]);
   const model = useMemo(
     () => buildIsoCubeGuideModel(move, guidance.holdFace),
@@ -49,86 +46,54 @@ export function IsometricCubeGuide({ move, facelet, rotationProgress = 0.2 }: Is
     return result;
   }, [facelet, model.visibleFaces]);
 
-  const progress = Math.max(0.12, Math.min(1, rotationProgress));
-
   return (
-    <div className="iso-cube-guide" aria-hidden>
-      <svg
-        className="iso-cube-guide-svg"
-        viewBox={`0 0 ${model.size} ${model.size}`}
-        width={model.size}
-        height={model.size}
-      >
-        <defs>
-          <filter id="iso-turn-glow" x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#ffeb3b" floodOpacity="0.9" />
-          </filter>
-        </defs>
+    <svg
+      className="iso-cube-guide-svg"
+      viewBox={`0 0 ${model.size} ${model.size}`}
+      width={model.size}
+      height={model.size}
+      role="img"
+      aria-label={`Turn ${guidance.turnLayer} layer ${guidance.direction.toLowerCase()}`}
+    >
+      {model.faceOutlines.map((face) => (
+        <path
+          key={`bg-${face.faceId}`}
+          d={pathFromPoints(face.points)}
+          className="iso-cube-guide-face-bg"
+        />
+      ))}
 
-        {model.edges.map(([a, b], i) => (
-          <line
-            key={`edge-${i}`}
-            x1={a.x}
-            y1={a.y}
-            x2={b.x}
-            y2={b.y}
-            className="iso-cube-guide-edge"
+      {model.cells.map((cell) => {
+        const color = stickerColorForCell(faceColors, cell.faceId, cell.index);
+        return (
+          <path
+            key={`${cell.faceId}-${cell.index}`}
+            d={pathFromPoints(cell.points)}
+            className={cell.isTurning ? 'iso-cube-guide-cell iso-cube-guide-cell--turn' : 'iso-cube-guide-cell'}
+            fill={color ? COLOR_HEX[color] : '#475569'}
           />
-        ))}
+        );
+      })}
 
-        {model.cells.map((cell) => {
-          const color = stickerColorForCell(faceColors, cell.faceId, cell.index);
-          return (
-            <g key={`${cell.faceId}-${cell.index}`}>
-              <path
-                d={pointsToPath(cell.points)}
-                className={cell.isTurning ? 'iso-cube-guide-cell iso-cube-guide-cell--turn' : 'iso-cube-guide-cell'}
-                fill={color ? COLOR_HEX[color] : '#334155'}
-                filter={cell.isTurning ? 'url(#iso-turn-glow)' : undefined}
-              />
-              {cell.isTurning && (
-                <path
-                  d={pointsToPath(cell.points)}
-                  className="iso-cube-guide-cell-ring"
-                  fill="none"
-                />
-              )}
-            </g>
-          );
-        })}
+      {model.faceOutlines.map((face) => (
+        <g key={`outline-${face.faceId}`}>
+          <path
+            d={pathFromPoints(face.points)}
+            className="iso-cube-guide-face-outline"
+            fill="none"
+          />
+          <text x={face.label.x} y={face.label.y} className="iso-cube-guide-face-label">
+            {face.faceId}
+          </text>
+        </g>
+      ))}
 
-        {model.arrow && (
-          <g className="iso-cube-guide-arrow">
-            <path d={model.arrow.path} className="iso-cube-guide-arrow-track" fill="none" />
-            <path
-              d={model.arrow.path}
-              className="iso-cube-guide-arrow-progress"
-              fill="none"
-              pathLength={1}
-              strokeDasharray={1}
-              strokeDashoffset={1 - progress}
-            />
-            <path d={arrowHeadPath(model.arrow.head, model.arrow.headAngle, 9)} className="iso-cube-guide-arrow-head" />
-            {model.arrow.label && (
-              <text
-                x={model.arrow.head.x}
-                y={model.arrow.head.y - 14}
-                className="iso-cube-guide-arrow-label"
-                textAnchor="middle"
-              >
-                {model.arrow.label}
-              </text>
-            )}
-          </g>
-        )}
-
-        <text x={8} y={14} className="iso-cube-guide-legend">
-          Turn {guidance.turnLayer}
-        </text>
-      </svg>
-      <p className="iso-cube-guide-caption">
-        Yellow = {guidance.turnLayerName} layer · {guidance.direction}
-      </p>
-    </div>
+      {model.arrow && (
+        <g className="iso-cube-guide-arrow">
+          <path d={model.arrow.path} className="iso-cube-guide-arrow-path" fill="none" />
+          <path d={arrowHead(model.arrow.head, model.arrow.headAngle, 11)} className="iso-cube-guide-arrow-head" />
+        </g>
+      )}
+    </svg>
   );
 }
