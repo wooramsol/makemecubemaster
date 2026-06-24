@@ -31,6 +31,8 @@ export interface MoveColorTrackerState {
   lockMissFrames: Partial<Record<FaceId, number>>;
   /** Face toward camera when this step aligned — detects whole-cube reorientation */
   stepAnchorFace: FaceId | null;
+  /** Required camera-facing face for this step (side-face hold, not turn face). */
+  requiredHoldFace: FaceId | null;
   /** Saw a stable pre-move reading this step */
   sawPreMoveAlignment: boolean;
 }
@@ -40,6 +42,7 @@ export function createMoveColorTrackerState(): MoveColorTrackerState {
     orientationLocks: {},
     lockMissFrames: {},
     stepAnchorFace: null,
+    requiredHoldFace: null,
     sawPreMoveAlignment: false,
   };
 }
@@ -47,7 +50,7 @@ export function createMoveColorTrackerState(): MoveColorTrackerState {
 export function resetMoveColorTracker(tracker: MoveColorTrackerState): void {
   tracker.orientationLocks = {};
   tracker.lockMissFrames = {};
-  tracker.stepAnchorFace = null;
+  tracker.stepAnchorFace = tracker.requiredHoldFace;
   tracker.sawPreMoveAlignment = false;
 }
 
@@ -496,10 +499,11 @@ export function evaluateThreeFaceMoveProgress(
   }
 
   if (primaryVisibleFace) {
-    if (tracker.stepAnchorFace === null) {
-      tracker.stepAnchorFace = primaryVisibleFace;
+    const anchorFace = tracker.requiredHoldFace ?? tracker.stepAnchorFace;
+    if (anchorFace === null) {
+      tracker.stepAnchorFace = tracker.requiredHoldFace ?? primaryVisibleFace;
     } else if (
-      primaryVisibleFace !== tracker.stepAnchorFace &&
+      primaryVisibleFace !== anchorFace &&
       !tracker.sawPreMoveAlignment
     ) {
       return {

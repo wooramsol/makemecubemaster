@@ -36,6 +36,7 @@ export interface SolvingFrameInput {
   wrongMove: Move | null;
   rigidReposition: boolean;
   layerTurnDeform: boolean;
+  holdFaceAligned: boolean;
 }
 
 export interface SolvingFrameResult {
@@ -78,6 +79,7 @@ export function evaluateSolvingFrame(
   );
 
   const highTurnProgress =
+    input.holdFaceAligned &&
     shapeUpdate.sawShapeBreak &&
     input.sawPreMoveAlignment &&
     (input.layerTurnDeform || colorProgress >= 0.5) &&
@@ -91,26 +93,26 @@ export function evaluateSolvingFrame(
   }
 
   const colorReady =
+    input.holdFaceAligned &&
     !input.rigidReposition &&
     !input.rejectedWholeCube &&
     (Boolean(input.colorEval?.completed) ||
       (highTurnProgress && state.progressHighStable >= HIGH_PROGRESS_FRAMES));
 
   const layerTurnValidated =
-    (shapeUpdate.sawShapeBreak &&
-      (shapeUpdate.settledAfterBreak || colorProgress >= 0.72)) ||
-    (Boolean(input.colorEval?.completed) &&
-      input.sawPreMoveAlignment &&
-      !input.rigidReposition &&
-      colorProgress >= 0.78);
+    input.holdFaceAligned &&
+    shapeUpdate.sawShapeBreak &&
+    shapeUpdate.settledAfterBreak &&
+    (Boolean(input.colorEval?.completed) || colorProgress >= 0.68);
 
   const blockedByWrongMove = Boolean(input.wrongMove);
   const moveComplete = layerTurnValidated && colorReady && !blockedByWrongMove;
 
   const turnActivity =
-    shapeUpdate.sawShapeBreak ||
-    input.sawPreMoveAlignment ||
-    shapeUpdate.deformationActive;
+    input.holdFaceAligned &&
+    (shapeUpdate.sawShapeBreak ||
+      input.sawPreMoveAlignment ||
+      shapeUpdate.deformationActive);
 
   const rotationProgress = moveComplete
     ? Math.max(colorProgress, 0.95)
