@@ -1086,160 +1086,95 @@ body,
 }
 
 .solving-move-hint-stage {
-  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
   width: 100%;
-  min-height: 200px;
-  padding: 8px 4px;
-  border-radius: 12px;
-}
-
-.iso-cube-guide {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  padding: 4px 0 8px;
 }
 
 .iso-cube-guide-svg {
   display: block;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.35);
+  shape-rendering: geometricPrecision;
 }
 
-.iso-cube-guide-edge {
-  stroke: rgba(255, 255, 255, 0.85);
-  stroke-width: 1.6;
-  stroke-linecap: round;
+.iso-cube-guide-face-bg {
+  fill: #1e293b;
 }
 
 .iso-cube-guide-cell {
-  stroke: rgba(0, 0, 0, 0.45);
-  stroke-width: 0.6;
+  stroke: #0f172a;
+  stroke-width: 1;
+  stroke-linejoin: round;
 }
 
 .iso-cube-guide-cell--turn {
-  stroke-width: 1.2;
-}
-
-.iso-cube-guide-cell-ring {
-  stroke: #ffeb3b;
+  stroke: #ffffff;
   stroke-width: 2.2;
+  filter: brightness(1.15);
 }
 
-.iso-cube-guide-arrow-track {
-  stroke: rgba(255, 45, 45, 0.75);
-  stroke-width: 5;
-  stroke-linecap: round;
+.iso-cube-guide-face-outline {
+  stroke: #ffffff;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
 }
 
-.iso-cube-guide-arrow-progress {
-  stroke: #ffeb3b;
-  stroke-width: 5;
+.iso-cube-guide-face-label {
+  fill: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: Inter, sans-serif;
+  paint-order: stroke;
+  stroke: #000000;
+  stroke-width: 3px;
+}
+
+.iso-cube-guide-arrow-path {
+  stroke: #ffffff;
+  stroke-width: 4.5;
   stroke-linecap: round;
+  stroke-linejoin: round;
+  paint-order: stroke;
+  filter: drop-shadow(0 0 2px #000);
 }
 
 .iso-cube-guide-arrow-head {
-  fill: #ff2d2d;
-}
-
-.iso-cube-guide-arrow-label {
-  fill: #ffeb3b;
-  font-size: 11px;
-  font-weight: 700;
-  font-family: Inter, sans-serif;
-}
-
-.iso-cube-guide-legend {
   fill: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: Inter, sans-serif;
+  filter: drop-shadow(0 0 2px #000);
 }
 
-.iso-cube-guide-caption {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: #fde68a;
-  text-align: center;
-  line-height: 1.3;
+.solving-move-hint-dir {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fde047;
+  line-height: 1;
 }
 
 .solving-move-hint-arrow {
   display: none;
 }
 
-.solving-move-hint-action {
-  margin: 0 0 8px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #facc15;
-  letter-spacing: 0.01em;
-}
-
 .solving-move-hint-meters {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 8px;
-  font-size: 11px;
+  margin-top: 4px;
+  font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.75);
 }
 
-.solving-move-hint-meter strong {
-  color: #fff;
+.solving-move-hint-dir {
+  font-size: 20px;
   font-weight: 800;
-}
-
-.solving-move-hint-badge {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  pointer-events: none;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-
-.solving-move-hint-badge--wrong {
-  background: rgba(80, 0, 0, 0.42);
-}
-
-.solving-move-hint-symbol {
-  font-size: 40px;
-  font-weight: 800;
+  color: #fde047;
   line-height: 1;
-  color: #facc15;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
 }
 
-.solving-move-hint-badge--wrong .solving-move-hint-symbol {
-  color: #ff8a80;
-}
-
-.solving-move-hint-turns {
-  font-size: 16px;
-  font-weight: 700;
-  color: #fff;
-}
-
-.solving-move-hint-direction {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
+.solving-move-hint-badge,
+.solving-move-hint-action {
+  display: none;
 }
 
 .solving-move-hint-progress {
