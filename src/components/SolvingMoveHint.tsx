@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import type { Move } from '../types';
-import {
-  getFaceletFaceColors,
-} from '../lib/cube/moveColorProgress';
 import { getMoveGuidanceView } from '../lib/cube/moveGuidanceView';
 import { isDoubleMove } from '../lib/cube/moves';
-import { drawEdgeRotationArrow } from '../lib/vision/edgeRotationArrow';
 import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
 } from '../lib/vision/guideOverlay';
-import { FaceColorGrid } from './FaceColorGrid';
+import { IsometricCubeGuide } from './IsometricCubeGuide';
 
 interface SolvingMoveHintProps {
   visible: boolean;
@@ -53,7 +49,6 @@ export function SolvingMoveHint({
   holdFaceAligned,
   onSkip,
 }: SolvingMoveHintProps) {
-  const arrowCanvasRef = useRef<HTMLCanvasElement>(null);
   const guidance = useMemo(() => getMoveGuidanceView(move), [move]);
 
   const panelStyle = useMemo(() => {
@@ -64,54 +59,34 @@ export function SolvingMoveHint({
       viewportHeight,
     );
     if (!guideRect || !viewportWidth) return undefined;
-    return getPanelBesideGuideStyle(guideRect, viewportWidth, 220);
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, 240);
   }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
-  const faceColors = getFaceletFaceColors(facelet, guidance.holdFace);
   const wrong = Boolean(wrongMove);
   const progressPct = Math.round(Math.max(0, Math.min(1, rotationProgress)) * 100);
   const scanPct = Math.round(scanMatch * 100);
 
-  useEffect(() => {
-    const canvas = arrowCanvasRef.current;
-    if (!canvas || !visible) return;
-    const size = 112;
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.clearRect(0, 0, size, size);
-    drawEdgeRotationArrow(
-      ctx,
-      size,
-      size,
-      guidance.edgeSpec,
-      Math.max(0.15, rotationProgress),
-      isDoubleMove(move),
-    );
-  }, [visible, guidance.edgeSpec, rotationProgress, move]);
-
   if (!visible) return null;
 
   const actionLine = isDoubleMove(move)
-    ? `Hold ${guidance.holdFace} face — flip ${guidance.turnLayerName} layer 180° along ${guidance.axisLabel}`
-    : `Hold ${guidance.holdFace} face — turn ${guidance.turnLayerName} layer ${guidance.direction.toLowerCase()} along ${guidance.axisLabel}`;
+    ? `Corner view — flip the highlighted ${guidance.turnLayerName} layer 180°`
+    : `Corner view — turn the highlighted ${guidance.turnLayerName} layer ${guidance.direction.toLowerCase()}`;
 
-  let statusText = `Show the ${guidance.holdFace} (${guidance.holdFaceName}) face — not the ${guidance.turnLayer} face`;
+  let statusText = `Hold corner view: ${guidance.holdFace} + two adjacent faces visible`;
   if (!holdFaceAligned) {
-    statusText = `Point the ${guidance.holdFace} face at the camera (scan ${scanPct}%)`;
+    statusText = `Align ${guidance.holdFace} face to camera (scan ${scanPct}%)`;
   } else if (scanPct < 45) {
-    statusText = `Hold ${guidance.holdFace} face steady in the guide — scan ${scanPct}%`;
+    statusText = `Hold steady in the guide — scan ${scanPct}%`;
   } else if (wrong) {
     statusText = `Wrong turn (${wrongMove}) — need ${move} (${guidance.direction.toLowerCase()})`;
   } else if (handMotionDetected) {
-    statusText = 'Whole-cube spin detected — turn one layer along the edge axis only';
+    statusText = 'Whole-cube spin — turn only the yellow highlighted layer';
   } else if (layerTurnValidated && rotationProgress >= 0.9) {
     statusText = `Turn recognized — hold steady (${progressPct}%)`;
   } else if (layerTurnInProgress || sawShapeBreak) {
-    statusText = 'Layer turning along edge axis…';
+    statusText = 'Layer turning — follow the arrow on the highlighted face';
   } else if (rotationProgress > 0.12) {
-    statusText = `Keep turning the ${guidance.turnLayerName} layer (${progressPct}%)`;
+    statusText = `Keep turning ${guidance.turnLayer} (${progressPct}%)`;
   } else if (scanPct >= 45) {
     statusText = `Scan OK (${scanPct}%) — ${actionLine}`;
   }
@@ -134,19 +109,11 @@ export function SolvingMoveHint({
         <p className="solving-move-hint-action">{actionLine}</p>
 
         <div className="solving-move-hint-stage">
-          {faceColors.length === 9 && (
-            <div className="solving-move-hint-face-wrap">
-              <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
-              <canvas
-                ref={arrowCanvasRef}
-                className="solving-move-hint-edge-arrow"
-                width={112}
-                height={112}
-                aria-hidden
-              />
-              <span className="solving-move-hint-face-label">{guidance.holdFace}</span>
-            </div>
-          )}
+          <IsometricCubeGuide
+            move={move}
+            facelet={facelet}
+            rotationProgress={rotationProgress}
+          />
           <div className={`solving-move-hint-badge${wrong ? ' solving-move-hint-badge--wrong' : ''}`}>
             <span className="solving-move-hint-symbol">{guidance.symbol}</span>
             <span className="solving-move-hint-turns">{guidance.turns}</span>
