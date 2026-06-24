@@ -80,7 +80,7 @@ export function evaluateSolvingFrame(
   const highTurnProgress =
     shapeUpdate.sawShapeBreak &&
     input.sawPreMoveAlignment &&
-    input.layerTurnDeform &&
+    (input.layerTurnDeform || colorProgress >= 0.5) &&
     !input.rigidReposition &&
     colorProgress >= 0.65;
 
@@ -96,17 +96,31 @@ export function evaluateSolvingFrame(
     (Boolean(input.colorEval?.completed) ||
       (highTurnProgress && state.progressHighStable >= HIGH_PROGRESS_FRAMES));
 
+  const layerTurnValidated =
+    (shapeUpdate.sawShapeBreak &&
+      (shapeUpdate.settledAfterBreak || colorProgress >= 0.72)) ||
+    (Boolean(input.colorEval?.completed) &&
+      input.sawPreMoveAlignment &&
+      !input.rigidReposition &&
+      colorProgress >= 0.78);
+
   const blockedByWrongMove = Boolean(input.wrongMove);
-  const moveComplete =
-    shapeUpdate.layerTurnValidated && colorReady && !blockedByWrongMove;
+  const moveComplete = layerTurnValidated && colorReady && !blockedByWrongMove;
+
+  const turnActivity =
+    shapeUpdate.sawShapeBreak ||
+    input.sawPreMoveAlignment ||
+    shapeUpdate.deformationActive;
 
   const rotationProgress = moveComplete
     ? Math.max(colorProgress, 0.95)
-    : shapeUpdate.layerTurnValidated
+    : layerTurnValidated
       ? colorProgress
       : shapeUpdate.sawShapeBreak
         ? Math.min(colorProgress, 0.88)
-        : Math.min(colorProgress, 0.28);
+        : turnActivity
+          ? Math.min(colorProgress, 0.28)
+          : 0;
 
   if (moveComplete) {
     state.colorCompleteStable++;
@@ -121,7 +135,7 @@ export function evaluateSolvingFrame(
     moveComplete: shouldAdvance,
     rotationProgress,
     handMotionDetected,
-    layerTurnValidated: shapeUpdate.layerTurnValidated,
+    layerTurnValidated,
     sawShapeBreak: shapeUpdate.sawShapeBreak,
     layerTurnInProgress: shapeUpdate.deformationActive,
     colorReady,

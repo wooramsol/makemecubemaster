@@ -729,7 +729,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     if (
       wholeCubeMotion &&
-      (colorProgress < 0.45 || rigidReposition)
+      rigidReposition &&
+      shapeMetrics &&
+      (colorProgress < 0.45 || shapeMetrics.flowMagnitude >= 0.45)
     ) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
