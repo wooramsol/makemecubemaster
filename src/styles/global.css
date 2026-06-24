@@ -1087,10 +1087,41 @@ body,
 
 .solving-move-hint-stage {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
-  aspect-ratio: 1;
+  min-height: 120px;
+  padding: 8px 4px;
   border-radius: 12px;
-  overflow: hidden;
+}
+
+.solving-move-hint-face-wrap {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  flex-shrink: 0;
+}
+
+.solving-move-hint-edge-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.solving-move-hint-face-label {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
 
 .solving-move-hint-arrow {

@@ -13,6 +13,7 @@ import type {
 } from '../types';
 import { buildFaceletFromMap } from '../lib/cube/state';
 import { moveFace } from '../lib/cube/moves';
+import { getMoveHoldFace, isHoldFaceAligned } from '../lib/cube/moveGuidanceView';
 import {
   evaluateThreeFaceMoveProgress,
   applyMoveToFacelet,
@@ -105,6 +106,7 @@ const initialSolvingFeedback: SolvingFeedback = {
   layerTurnInProgress: false,
   sawShapeBreak: false,
   layerTurnValidated: false,
+  holdFaceAligned: false,
 };
 
 const initialState: CubeAppState = {
@@ -158,6 +160,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     if (move === expectedMoveRef.current) return;
     expectedMoveRef.current = move;
     resetSolvingStepState(solvingStepStateRef.current);
+    moveColorTrackerRef.current.requiredHoldFace = move ? getMoveHoldFace(move) : null;
+    moveColorTrackerRef.current.stepAnchorFace = move
+      ? getMoveHoldFace(move)
+      : null;
     frameProcessor.current?.setExpectedMove(move);
   }, []);
 
@@ -631,9 +637,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       ? identifyFaceFromCenter(result.detectedFace.colors[4]!)
       : result.pose?.visibleFace ?? null;
     const moveFaceId = expected ? moveFace(expected) : null;
-    const faceMatchesMove = Boolean(
-      visibleFace && moveFaceId && visibleFace === moveFaceId,
-    );
+    const holdFaceId = expected ? getMoveHoldFace(expected) : null;
 
     const visibleFaces = result.pose
       ? getVisibleFaces(result.pose)
@@ -669,6 +673,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     };
     if (result.detectedFace?.colors?.length === 9) {
       if (visibleFace) turnEvalColors[visibleFace] = result.detectedFace.colors;
+      if (holdFaceId) turnEvalColors[holdFaceId] = result.detectedFace.colors;
       if (moveFaceId) turnEvalColors[moveFaceId] = result.detectedFace.colors;
     }
 
@@ -692,9 +697,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         : faceletRef.current;
 
     const scanFaceId =
-      moveFaceId &&
-      (stableVisibleFaceColors[moveFaceId] || turnEvalColors[moveFaceId])
-        ? moveFaceId
+      holdFaceId &&
+      (stableVisibleFaceColors[holdFaceId] || turnEvalColors[holdFaceId])
+        ? holdFaceId
         : visibleFace;
     const scanColors =
       scanFaceId &&
@@ -720,6 +725,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
     scanMatchSmootherRef.current = smoothScan;
     const scanMatch = smoothScan;
+    const holdFaceAligned = Boolean(
+      holdFaceId && isHoldFaceAligned(visibleFace, holdFaceId, scanMatch),
+    );
+    const faceMatchesMove = holdFaceAligned;
 
     const shapeMetrics = result.shapeMetrics;
     const rigidReposition = shapeMetrics ? isRigidCubeReposition(shapeMetrics) : false;
@@ -735,7 +744,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     ) {
       moveColorTrackerRef.current.orientationLocks = {};
       moveColorTrackerRef.current.sawPreMoveAlignment = false;
-      if (visibleFace) moveColorTrackerRef.current.stepAnchorFace = visibleFace;
+      moveColorTrackerRef.current.stepAnchorFace =
+        holdFaceId ?? visibleFace ?? moveColorTrackerRef.current.stepAnchorFace;
       recentFaceDetectionsRef.current = {};
       colorCompleteStableRef.current = 0;
       resetSolvingStepState(solvingStepStateRef.current);
@@ -756,6 +766,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       wrongMove: result.wrongMove,
       rigidReposition,
       layerTurnDeform,
+      holdFaceAligned,
     });
 
     let wrongMove = result.wrongMove;
@@ -851,6 +862,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         layerTurnInProgress: stepResult.layerTurnInProgress,
         sawShapeBreak: stepResult.sawShapeBreak,
         layerTurnValidated: stepResult.layerTurnValidated,
+        holdFaceAligned,
       },
     }));
 

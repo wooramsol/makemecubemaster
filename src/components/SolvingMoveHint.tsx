@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { Move } from '../types';
-import { getFaceLayerName } from '../lib/cube/faceLayerNames';
-import { colorsForMoveFromFacelet } from '../lib/cube/moveColorProgress';
-import { getMoveRotationDisplay } from '../lib/cube/moveRotationDisplay';
-import { isDoubleMove, moveFace } from '../lib/cube/moves';
+import {
+  getFaceletFaceColors,
+} from '../lib/cube/moveColorProgress';
+import { getMoveGuidanceView } from '../lib/cube/moveGuidanceView';
+import { isDoubleMove } from '../lib/cube/moves';
+import { drawEdgeRotationArrow } from '../lib/vision/edgeRotationArrow';
 import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
@@ -27,6 +29,7 @@ interface SolvingMoveHintProps {
   layerTurnInProgress: boolean;
   sawShapeBreak: boolean;
   layerTurnValidated: boolean;
+  holdFaceAligned: boolean;
   onSkip?: () => void;
 }
 
@@ -47,8 +50,12 @@ export function SolvingMoveHint({
   layerTurnInProgress,
   sawShapeBreak,
   layerTurnValidated,
+  holdFaceAligned,
   onSkip,
 }: SolvingMoveHintProps) {
+  const arrowCanvasRef = useRef<HTMLCanvasElement>(null);
+  const guidance = useMemo(() => getMoveGuidanceView(move), [move]);
+
   const panelStyle = useMemo(() => {
     const guideRect = getSolvingScanOverlayRect(
       frameWidth,
@@ -60,33 +67,51 @@ export function SolvingMoveHint({
     return getPanelBesideGuideStyle(guideRect, viewportWidth, 220);
   }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
-  const faceId = moveFace(move);
-  const faceColors = colorsForMoveFromFacelet(move, facelet);
-  const display = getMoveRotationDisplay(move, true);
-  const layerName = getFaceLayerName(faceId);
+  const faceColors = getFaceletFaceColors(facelet, guidance.holdFace);
   const wrong = Boolean(wrongMove);
   const progressPct = Math.round(Math.max(0, Math.min(1, rotationProgress)) * 100);
   const scanPct = Math.round(scanMatch * 100);
 
+  useEffect(() => {
+    const canvas = arrowCanvasRef.current;
+    if (!canvas || !visible) return;
+    const size = 112;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, size, size);
+    drawEdgeRotationArrow(
+      ctx,
+      size,
+      size,
+      guidance.edgeSpec,
+      Math.max(0.15, rotationProgress),
+      isDoubleMove(move),
+    );
+  }, [visible, guidance.edgeSpec, rotationProgress, move]);
+
   if (!visible) return null;
 
   const actionLine = isDoubleMove(move)
-    ? `Flip the ${layerName} layer 180° (either way)`
-    : `Turn the ${layerName} layer ${display.direction.toLowerCase()}`;
+    ? `Hold ${guidance.holdFace} face — flip ${guidance.turnLayerName} layer 180° along ${guidance.axisLabel}`
+    : `Hold ${guidance.holdFace} face — turn ${guidance.turnLayerName} layer ${guidance.direction.toLowerCase()} along ${guidance.axisLabel}`;
 
-  let statusText = `Show the ${faceId} face to the camera`;
-  if (scanPct < 45) {
-    statusText = `Hold ${faceId} (${layerName}) face steady in the guide — scan ${scanPct}%`;
+  let statusText = `Show the ${guidance.holdFace} (${guidance.holdFaceName}) face — not the ${guidance.turnLayer} face`;
+  if (!holdFaceAligned) {
+    statusText = `Point the ${guidance.holdFace} face at the camera (scan ${scanPct}%)`;
+  } else if (scanPct < 45) {
+    statusText = `Hold ${guidance.holdFace} face steady in the guide — scan ${scanPct}%`;
   } else if (wrong) {
-    statusText = `Wrong turn (${wrongMove}) — need ${move} (${display.direction.toLowerCase()})`;
+    statusText = `Wrong turn (${wrongMove}) — need ${move} (${guidance.direction.toLowerCase()})`;
   } else if (handMotionDetected) {
-    statusText = 'Repositioning detected — turn one layer only, not the whole cube';
+    statusText = 'Whole-cube spin detected — turn one layer along the edge axis only';
   } else if (layerTurnValidated && rotationProgress >= 0.9) {
     statusText = `Turn recognized — hold steady (${progressPct}%)`;
   } else if (layerTurnInProgress || sawShapeBreak) {
-    statusText = 'Layer turning — cube shape shifting…';
+    statusText = 'Layer turning along edge axis…';
   } else if (rotationProgress > 0.12) {
-    statusText = `Keep turning the layer (${progressPct}%)`;
+    statusText = `Keep turning the ${guidance.turnLayerName} layer (${progressPct}%)`;
   } else if (scanPct >= 45) {
     statusText = `Scan OK (${scanPct}%) — ${actionLine}`;
   }
@@ -110,12 +135,22 @@ export function SolvingMoveHint({
 
         <div className="solving-move-hint-stage">
           {faceColors.length === 9 && (
-            <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
+            <div className="solving-move-hint-face-wrap">
+              <FaceColorGrid colors={faceColors} variant="solving" orientation="mirror" />
+              <canvas
+                ref={arrowCanvasRef}
+                className="solving-move-hint-edge-arrow"
+                width={112}
+                height={112}
+                aria-hidden
+              />
+              <span className="solving-move-hint-face-label">{guidance.holdFace}</span>
+            </div>
           )}
           <div className={`solving-move-hint-badge${wrong ? ' solving-move-hint-badge--wrong' : ''}`}>
-            <span className="solving-move-hint-symbol">{display.symbol}</span>
-            <span className="solving-move-hint-turns">{display.turns}</span>
-            <span className="solving-move-hint-direction">{display.direction}</span>
+            <span className="solving-move-hint-symbol">{guidance.symbol}</span>
+            <span className="solving-move-hint-turns">{guidance.turns}</span>
+            <span className="solving-move-hint-direction">{guidance.direction}</span>
           </div>
         </div>
 

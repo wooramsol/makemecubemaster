@@ -154,6 +154,7 @@ export default function App() {
                 layerTurnInProgress={state.solvingFeedback.layerTurnInProgress}
                 sawShapeBreak={state.solvingFeedback.sawShapeBreak}
                 layerTurnValidated={state.solvingFeedback.layerTurnValidated}
+                holdFaceAligned={state.solvingFeedback.holdFaceAligned}
                 onSkip={skipCurrentMove}
               />
             )}

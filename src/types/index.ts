@@ -112,6 +112,7 @@ export interface SolvingFeedback {
   layerTurnInProgress: boolean;
   sawShapeBreak: boolean;
   layerTurnValidated: boolean;
+  holdFaceAligned: boolean;
 }
 
 export interface QuadShapeMetrics {

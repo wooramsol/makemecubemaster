@@ -2,6 +2,7 @@ import Cube from 'cubejs';
 import { describe, expect, it } from 'vitest';
 import type { Move } from '../../types';
 import { detectWrongMoveFromColors } from './detectWrongMove';
+import { getMoveHoldFace } from './moveGuidanceView';
 import {
   applyMoveToFacelet,
   createMoveColorTrackerState,
@@ -30,7 +31,6 @@ function squareCorners(cx: number, cy: number, size: number): [Point2D, Point2D,
   ];
 }
 
-/** Skewed quad — mimics mid layer-turn shape break. */
 function skewedCorners(cx: number, cy: number, size: number): [Point2D, Point2D, Point2D, Point2D] {
   const h = size / 2;
   return [
@@ -109,22 +109,33 @@ function runSequence(inputs: SolvingFrameInput[]) {
 function colorEvalFor(
   facelet: string,
   expected: Move,
-  faceId: 'U' | 'R' | 'F' | 'D' | 'L' | 'B',
+  holdFace: 'U' | 'R' | 'F' | 'D' | 'L' | 'B',
   applied: Move | null,
   tracker = createMoveColorTrackerState(),
 ) {
+  tracker.requiredHoldFace = getMoveHoldFace(expected);
+  tracker.stepAnchorFace = holdFace;
   const colors = getFaceletFaceColors(
     applied ? applyMoveToFacelet(facelet, applied) : facelet,
-    faceId,
+    holdFace,
   );
   return evaluateThreeFaceMoveProgress(
     facelet,
     expected,
-    { [faceId]: colors },
-    faceId,
+    { [holdFace]: colors },
+    holdFace,
     tracker,
   );
 }
+
+describe('move guidance view', () => {
+  it('uses side hold face instead of turning face', () => {
+    expect(getMoveHoldFace('R')).toBe('F');
+    expect(getMoveHoldFace('U')).toBe('F');
+    expect(getMoveHoldFace('F')).toBe('R');
+    expect(getMoveHoldFace('B')).toBe('L');
+  });
+});
 
 describe('layer deformation metrics', () => {
   it('scores rigid square lower than skewed layer-turn quad', () => {
@@ -146,10 +157,11 @@ describe('layer deformation metrics', () => {
 describe('solving step policy simulation', () => {
   const facelet = Cube.random().asString();
   const expected: Move = 'R';
+  const holdFace = getMoveHoldFace(expected);
   const tracker = createMoveColorTrackerState();
 
-  it('1. completes step after shape break + correct colors', () => {
-    const before = colorEvalFor(facelet, expected, 'R', null, tracker);
+  it('1. completes step after shape break + correct colors with hold face aligned', () => {
+    const before = colorEvalFor(facelet, expected, holdFace, null, tracker);
     const alignedFrames: SolvingFrameInput[] = Array.from({ length: 4 }, () => ({
       colorEval: before,
       scanMatch: 0.82,
@@ -159,18 +171,20 @@ describe('solving step policy simulation', () => {
       wrongMove: null,
       rigidReposition: false,
       layerTurnDeform: false,
+      holdFaceAligned: true,
     }));
 
     const breakingFrames: SolvingFrameInput[] = Array.from({ length: 4 }, () => ({
-      colorEval: colorEvalFor(facelet, expected, 'R', null, tracker),
+      colorEval: colorEvalFor(facelet, expected, holdFace, null, tracker),
       scanMatch: 0.72,
       ...layerTurnFrame(),
       sawPreMoveAlignment: true,
       rejectedWholeCube: false,
       wrongMove: null,
+      holdFaceAligned: true,
     }));
 
-    const after = colorEvalFor(facelet, expected, 'R', expected, tracker);
+    const after = colorEvalFor(facelet, expected, holdFace, expected, tracker);
     expect(after.progress).toBeGreaterThan(0.55);
 
     const settleFrames: SolvingFrameInput[] = Array.from({ length: 6 }, () => ({
@@ -182,6 +196,7 @@ describe('solving step policy simulation', () => {
       wrongMove: null,
       rigidReposition: false,
       layerTurnDeform: false,
+      holdFaceAligned: true,
     }));
 
     const { last } = runSequence([...alignedFrames, ...breakingFrames, ...settleFrames]);
@@ -195,7 +210,7 @@ describe('solving step policy simulation', () => {
     const noTurnEval = {
       progress: 0,
       completed: false,
-      visibleFace: 'F' as const,
+      visibleFace: holdFace,
       comparisonFace: null,
       rejectedWholeCube: true,
     };
@@ -207,6 +222,7 @@ describe('solving step policy simulation', () => {
       sawPreMoveAlignment: false,
       rejectedWholeCube: true,
       wrongMove: null,
+      holdFaceAligned: false,
     }));
 
     const { last } = runSequence(frames);
@@ -226,17 +242,17 @@ describe('solving step policy simulation', () => {
       facelet,
       expected,
       wrongColors,
-      'R',
+      holdFace,
       true,
     );
     expect(wrongMove).toBe("R'");
 
     const tracker3 = createMoveColorTrackerState();
-    const wrongEval = colorEvalFor(facelet, expected, 'R', "R'", tracker3);
+    const wrongEval = colorEvalFor(facelet, expected, holdFace, "R'", tracker3);
 
     const frames: SolvingFrameInput[] = [
       ...Array.from({ length: 3 }, () => ({
-        colorEval: colorEvalFor(facelet, expected, 'R', null, tracker3),
+        colorEval: colorEvalFor(facelet, expected, holdFace, null, tracker3),
         scanMatch: 0.8,
         deformationScore: deformScore(squareCorners(200, 200, 140)),
         sawPreMoveAlignment: tracker3.sawPreMoveAlignment,
@@ -244,6 +260,7 @@ describe('solving step policy simulation', () => {
         wrongMove: null,
         rigidReposition: false,
         layerTurnDeform: false,
+        holdFaceAligned: true,
       })),
       ...Array.from({ length: 4 }, () => ({
         colorEval: wrongEval,
@@ -252,6 +269,7 @@ describe('solving step policy simulation', () => {
         sawPreMoveAlignment: true,
         rejectedWholeCube: false,
         wrongMove: "R'" as Move,
+        holdFaceAligned: true,
       })),
       ...Array.from({ length: 5 }, () => ({
         colorEval: wrongEval,
@@ -262,6 +280,7 @@ describe('solving step policy simulation', () => {
         wrongMove: "R'" as Move,
         rigidReposition: false,
         layerTurnDeform: false,
+        holdFaceAligned: true,
       })),
     ];
 
@@ -270,7 +289,7 @@ describe('solving step policy simulation', () => {
     expect(last.moveComplete).toBe(false);
   });
 
-  it('4. shows 0% turn progress when idle (no alignment or shape break)', () => {
+  it('4. shows 0% turn progress when idle (no hold-face alignment)', () => {
     const noisyEval = {
       progress: 0.32,
       completed: false,
@@ -289,6 +308,7 @@ describe('solving step policy simulation', () => {
         wrongMove: null,
         rigidReposition: false,
         layerTurnDeform: false,
+        holdFaceAligned: false,
       })),
     );
 
@@ -305,5 +325,24 @@ describe('solving step policy simulation', () => {
     ]);
     expect(metrics.flowMagnitude).toBe(0);
     expect(isRigidCubeReposition(metrics)).toBe(false);
+  });
+
+  it('6. does not complete when hold face is wrong even with high color progress', () => {
+    const after = colorEvalFor(facelet, expected, holdFace, expected, tracker);
+    const frames: SolvingFrameInput[] = Array.from({ length: 8 }, () => ({
+      colorEval: after,
+      scanMatch: 0.8,
+      deformationScore: 0.06,
+      sawPreMoveAlignment: true,
+      rejectedWholeCube: false,
+      wrongMove: null,
+      rigidReposition: false,
+      layerTurnDeform: false,
+      holdFaceAligned: false,
+    }));
+
+    const { last } = runSequence(frames);
+    expect(last.moveComplete).toBe(false);
+    expect(last.rotationProgress).toBe(0);
   });
 });
