@@ -13,10 +13,9 @@ export function buildFaceletString(faces: ScannedFace[]): string {
 }
 
 export function buildFaceletFromMap(map: Map<FaceId, StickerColor[]>): string {
-  const order: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
   let result = '';
 
-  for (const faceId of order) {
+  for (const faceId of FACELET_ORDER) {
     const colors = map.get(faceId);
     if (!colors || colors.length !== 9) {
       throw new Error(`Missing face data for ${faceId}`);
@@ -29,16 +28,52 @@ export function buildFaceletFromMap(map: Map<FaceId, StickerColor[]>): string {
   return result;
 }
 
+const FACELET_ORDER: FaceId[] = ['U', 'R', 'F', 'D', 'L', 'B'];
+
+const STICKER_TO_FACE_LETTER: Record<StickerColor, FaceId> = {
+  W: 'U',
+  Y: 'D',
+  R: 'R',
+  O: 'L',
+  G: 'F',
+  B: 'B',
+};
+
+const FACE_LETTER_TO_STICKER: Record<FaceId, StickerColor> = {
+  U: 'W',
+  D: 'Y',
+  R: 'R',
+  L: 'O',
+  F: 'G',
+  B: 'B',
+};
+
 function stickerToFaceLetter(color: StickerColor): FaceId {
-  const mapping: Record<StickerColor, FaceId> = {
-    W: 'U',
-    Y: 'D',
-    R: 'R',
-    O: 'L',
-    G: 'F',
-    B: 'B',
-  };
-  return mapping[color];
+  return STICKER_TO_FACE_LETTER[color];
+}
+
+/** Inverse of buildFaceletFromMap — parse a 54-char facelet into per-face color grids. */
+export function faceletToFaceMap(facelet: string): Map<FaceId, StickerColor[]> {
+  if (facelet.length !== 54) {
+    throw new Error(`Invalid facelet length: ${facelet.length}`);
+  }
+
+  const result = new Map<FaceId, StickerColor[]>();
+  for (let faceIndex = 0; faceIndex < FACELET_ORDER.length; faceIndex++) {
+    const faceId = FACELET_ORDER[faceIndex]!;
+    const start = faceIndex * 9;
+    const colors: StickerColor[] = [];
+    for (let i = 0; i < 9; i++) {
+      const letter = facelet[start + i] as FaceId;
+      const sticker = FACE_LETTER_TO_STICKER[letter];
+      if (!sticker) {
+        throw new Error(`Unknown face letter: ${letter}`);
+      }
+      colors.push(sticker);
+    }
+    result.set(faceId, colors);
+  }
+  return result;
 }
 
 /** Apply a move to internal orientation tracking (3x3 rotation matrix, row-major) */
