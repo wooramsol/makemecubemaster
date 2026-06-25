@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
 import type { Move } from '../types';
 import { getMoveGuidanceView } from '../lib/cube/moveGuidanceView';
+import { getSelfieHoldPose } from '../lib/cube/selfieHoldPose';
 import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
 } from '../lib/vision/guideOverlay';
-import { IsometricCubeGuide } from './IsometricCubeGuide';
+import { SelfieCubeGuide } from './SelfieCubeGuide';
 
 interface SolvingMoveHintProps {
   visible: boolean;
@@ -42,13 +43,11 @@ export function SolvingMoveHint({
   frameHeight,
   viewportWidth,
   viewportHeight,
-  layerTurnInProgress,
-  sawShapeBreak,
-  layerTurnValidated,
   holdFaceAligned,
   onSkip,
 }: SolvingMoveHintProps) {
   const guidance = useMemo(() => getMoveGuidanceView(move), [move]);
+  const holdPose = useMemo(() => getSelfieHoldPose(move), [move]);
 
   const panelStyle = useMemo(() => {
     const guideRect = getSolvingScanOverlayRect(
@@ -67,21 +66,17 @@ export function SolvingMoveHint({
 
   if (!visible) return null;
 
-  let statusText = `Hold ${guidance.holdFace} face toward camera`;
+  let statusText = holdPose.holdLine;
   if (!holdFaceAligned) {
-    statusText = `Point ${guidance.holdFace} face at camera`;
+    statusText = `Match this pose — ${holdPose.holdFace} face to camera`;
   } else if (wrong) {
-    statusText = `Wrong — use ${move}`;
+    statusText = `Wrong turn — need ${move}`;
   } else if (handMotionDetected) {
-    statusText = 'Turn one layer only';
-  } else if (layerTurnValidated && rotationProgress >= 0.9) {
+    statusText = 'Turn white-outlined layer only';
+  } else if (progressPct >= 90) {
     statusText = 'Hold steady…';
-  } else if (layerTurnInProgress || sawShapeBreak) {
-    statusText = 'Turning…';
-  } else if (rotationProgress > 0.12) {
-    statusText = `${progressPct}%`;
-  } else if (scanPct >= 45) {
-    statusText = `Turn highlighted ${guidance.turnLayer} ${guidance.symbol}`;
+  } else if (progressPct > 12) {
+    statusText = `Turning ${guidance.turnLayer}… ${progressPct}%`;
   }
 
   return (
@@ -91,8 +86,9 @@ export function SolvingMoveHint({
           <span className="solving-move-hint-step">
             {currentStep}/{totalSteps}
           </span>
-          <span className="solving-move-hint-move">{move}</span>
-          <span className="solving-move-hint-dir">{guidance.symbol}</span>
+          <span className="solving-move-hint-move">
+            {move} {guidance.symbol}
+          </span>
           {onSkip && (
             <button type="button" className="solving-move-hint-skip" onClick={onSkip}>
               Skip
@@ -101,7 +97,7 @@ export function SolvingMoveHint({
         </div>
 
         <div className="solving-move-hint-stage">
-          <IsometricCubeGuide move={move} facelet={facelet} />
+          <SelfieCubeGuide move={move} facelet={facelet} />
         </div>
 
         <div className="solving-move-hint-meters">
