@@ -5,7 +5,6 @@ import { getFaceletFaceColors } from '../cube/moveColorProgress';
 import { getSelfieDisplayMove } from '../cube/moveRotationDisplay';
 import { getSelfieHoldPose } from '../cube/selfieHoldPose';
 import { FACE_NORMALS, isDoubleMove, moveAngle, moveFace, isPrimeMove } from '../cube/moves';
-import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
 import { createFaceColorTexture } from './faceColorTexture';
 
 const TURNING_CELLS: Record<FaceId, Partial<Record<FaceId, number[]>>> = {
@@ -100,8 +99,7 @@ export class CubeHintRenderer {
       mesh.visible = visible;
       if (!visible) continue;
 
-      const raw = getFaceletFaceColors(facelet, faceId);
-      const colors = mirrorFaceCellsHorizontally(raw);
+      const colors = getFaceletFaceColors(facelet, faceId);
       const highlights = turning[faceId] ?? [];
 
       let tex = this.faceTextures.get(faceId);
