@@ -66,6 +66,15 @@ export function visibleFacesFor(holdFace: FaceId, turnLayer: FaceId): FaceId[] {
   return ['U', 'R', 'F'];
 }
 
+/** Selfie preview mirrors horizontally — swap L/R so the guide matches the camera. */
+export function visibleFacesForSelfie(holdFace: FaceId, turnLayer: FaceId): FaceId[] {
+  const base = visibleFacesFor(holdFace, turnLayer);
+  if (holdFace !== 'F') return base;
+  return base.map((faceId) =>
+    faceId === 'R' ? 'L' : faceId === 'L' ? 'R' : faceId,
+  ) as FaceId[];
+}
+
 const HOLD_YAW: Partial<Record<FaceId, number>> = {
   F: Math.PI / 4,
   R: -Math.PI / 4,

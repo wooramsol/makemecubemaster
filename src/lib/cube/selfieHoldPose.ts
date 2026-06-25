@@ -1,7 +1,7 @@
 import type { FaceId, Move } from '../../types';
 import { getMoveHoldFace } from './moveGuidanceView';
 import { moveFace } from './moves';
-import { visibleFacesFor } from './isometricGuide';
+import { visibleFacesForSelfie } from './isometricGuide';
 
 /**
  * How the user should hold the cube in front of a selfie camera.
@@ -23,12 +23,12 @@ export interface SelfieHoldPose {
   holdLine: string;
 }
 
-const PITCH = 0.5;
-const YAW_CORNER = 0.72;
+/** Tilt top away slightly — enough for U to peek, not so much that D edge dominates. */
+const PITCH = 0.34;
+const YAW_CORNER = 0.68;
 
-function sideFaceFor(holdFace: FaceId, turnLayer: FaceId): FaceId {
-  const visible = visibleFacesFor(holdFace, turnLayer);
-  return visible.find((f) => f !== holdFace && f !== 'U') ?? 'R';
+function sideFaceFor(visible: FaceId[]): FaceId {
+  return visible.find((f) => f !== 'F' && f !== 'U') ?? 'R';
 }
 
 function eulerForHold(holdFace: FaceId, sideFace: FaceId): [number, number, number] {
@@ -47,8 +47,8 @@ function eulerForHold(holdFace: FaceId, sideFace: FaceId): [number, number, numb
 export function getSelfieHoldPose(move: Move): SelfieHoldPose {
   const turnLayer = moveFace(move);
   const holdFace = getMoveHoldFace(move);
-  const sideFace = sideFaceFor(holdFace, turnLayer);
-  const visibleFaces = visibleFacesFor(holdFace, turnLayer);
+  const visibleFaces = visibleFacesForSelfie(holdFace, turnLayer);
+  const sideFace = sideFaceFor(visibleFaces);
 
   const holdLine =
     holdFace === 'F'
