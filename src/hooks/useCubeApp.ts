@@ -11,7 +11,7 @@ import type {
   SolvingFeedback,
   StickerColor,
 } from '../types';
-import { buildFaceletFromMap } from '../lib/cube/state';
+import { buildFaceletFromMap, faceletToFaceMap } from '../lib/cube/state';
 import { moveFace } from '../lib/cube/moves';
 import { getMoveHoldFace, isHoldFaceAligned } from '../lib/cube/moveGuidanceView';
 import {
@@ -374,6 +374,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             detectionFeedback: initialFeedback,
             solvingFeedback: initialSolvingFeedback,
             solvingFacelet: msg.facelet,
+            scannedFaceColors: scannedFacesFromMap(faceletToFaceMap(msg.facelet)),
             currentPose: lastPoseRef.current ?? s.currentPose,
           }));
           if (msg.moves.length > 0) {

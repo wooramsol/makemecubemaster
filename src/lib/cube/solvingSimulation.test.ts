@@ -1,6 +1,7 @@
 import Cube from 'cubejs';
 import { describe, expect, it } from 'vitest';
 import type { Move } from '../../types';
+import { buildFaceletFromMap, faceletToFaceMap } from './state';
 import { detectWrongMoveFromColors } from './detectWrongMove';
 import { getMoveHoldFace } from './moveGuidanceView';
 import {
@@ -344,5 +345,15 @@ describe('solving step policy simulation', () => {
     const { last } = runSequence(frames);
     expect(last.moveComplete).toBe(false);
     expect(last.rotationProgress).toBe(0);
+  });
+
+  it('7. faceletToFaceMap round-trips buildFaceletFromMap', () => {
+    const scrambled = Cube.random().asString();
+    const map = faceletToFaceMap(scrambled);
+    expect(buildFaceletFromMap(map)).toBe(scrambled);
+
+    const afterMove = applyMoveToFacelet(scrambled, 'R');
+    const movedMap = faceletToFaceMap(afterMove);
+    expect(buildFaceletFromMap(movedMap)).toBe(afterMove);
   });
 });
