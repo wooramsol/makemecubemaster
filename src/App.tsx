@@ -22,7 +22,6 @@ export default function App() {
     confirmColorLearn,
     startLiveScan,
     retryLiveScan,
-    retryColorLearn,
     startTracking,
     stopTracking,
     skipCurrentMove,
@@ -195,13 +194,8 @@ export default function App() {
             />
             <p>{state.error ?? webcamState.error}</p>
             <div className="error-actions">
-              {state.colorsCalibrated && (
-                <button type="button" className="error-button primary" onClick={retryLiveScan}>
-                  Re-scan
-                </button>
-              )}
-              <button type="button" className="error-button secondary" onClick={retryColorLearn}>
-                Re-learn colors
+              <button type="button" className="error-button primary" onClick={retryLiveScan}>
+                Re-scan
               </button>
             </div>
           </div>

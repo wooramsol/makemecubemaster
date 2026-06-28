@@ -1,5 +1,6 @@
 import type { Point2D, StickerColor } from '../../types';
-import { classifySticker } from './colorClassifier';
+import { classifyFaceRelative, classifySticker } from './colorClassifier';
+import { isColorsCalibrated } from './colorReference';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -31,14 +32,14 @@ function median(values: number[]): number {
     : Math.round((sorted[mid - 1]! + sorted[mid]!) / 2);
 }
 
-function samplePatch(
+function samplePatchRgb(
   data: Uint8ClampedArray,
   frameWidth: number,
   frameHeight: number,
   cx: number,
   cy: number,
   radius: number,
-): StickerColor {
+): [number, number, number] {
   const x0 = Math.max(0, Math.floor(cx - radius));
   const x1 = Math.min(frameWidth, Math.ceil(cx + radius));
   const y0 = Math.max(0, Math.floor(cy - radius));
@@ -65,10 +66,10 @@ function samplePatch(
     const ix = Math.max(0, Math.min(frameWidth - 1, Math.floor(cx)));
     const iy = Math.max(0, Math.min(frameHeight - 1, Math.floor(cy)));
     const i = (iy * frameWidth + ix) * 4;
-    return classifySticker(data[i]!, data[i + 1]!, data[i + 2]!);
+    return [data[i]!, data[i + 1]!, data[i + 2]!];
   }
 
-  return classifySticker(median(rs), median(gs), median(bs));
+  return [median(rs), median(gs), median(bs)];
 }
 
 /** Sample a 3×3 sticker grid from an arbitrary face quad in the camera frame. */
@@ -91,16 +92,20 @@ export function sampleColorsFromQuad(
   const imageData = ctx.getImageData(0, 0, frameWidth, frameHeight);
   const data = imageData.data;
   const patchR = Math.max(3, edge / 14);
-  const colors: StickerColor[] = [];
+  const medians: [number, number, number][] = [];
 
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const u = (col + 0.5) / 3;
       const v = (row + 0.5) / 3;
       const center = bilinearOnQuad(tl, tr, br, bl, u, v);
-      colors.push(samplePatch(data, frameWidth, frameHeight, center.x, center.y, patchR));
+      medians.push(samplePatchRgb(data, frameWidth, frameHeight, center.x, center.y, patchR));
     }
   }
 
-  return colors;
+  if (!isColorsCalibrated()) {
+    return classifyFaceRelative(medians);
+  }
+
+  return medians.map(([r, g, b]) => classifySticker(r, g, b));
 }

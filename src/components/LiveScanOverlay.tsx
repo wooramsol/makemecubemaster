@@ -24,7 +24,7 @@ export function LiveScanOverlay({
       </div>
       <p className="calibration-sub">{knownFaces.length} / 6</p>
       <p className="calibration-hint calibration-hint--muted">
-        White faces fill as you scan · same tilt each time
+        White faces fill as you scan · relative color · same tilt each time
       </p>
       {needsNewFace && (
         <p className="calibration-hint">Show a different face</p>

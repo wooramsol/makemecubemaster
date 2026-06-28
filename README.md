@@ -1,6 +1,6 @@
 # Make Me Cube Master
 
-**Version: v1.13.7** · [Live app](https://wooramsol.github.io/makemecubemaster/)
+**Version: v1.14.0** · [Live app](https://wooramsol.github.io/makemecubemaster/)
 
 웹캠으로 실제 루빅큐브를 비추면 AI가 큐브를 실시간으로 인식하고, 다음으로 돌려야 할 면에 AR 화살표를 고정하여 표시하는 웹 애플리케이션입니다. 별도 앱 설치 없이 최신 브라우저에서 실행됩니다.
 

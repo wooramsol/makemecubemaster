@@ -57,28 +57,6 @@ function labDistance(a: [number, number, number], b: [number, number, number]): 
   return Math.sqrt(dl * dl + da * da + db * db);
 }
 
-function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
-  const rn = r / 255;
-  const gn = g / 255;
-  const bn = b / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const d = max - min;
-
-  let hue = 0;
-  if (d > 0) {
-    if (max === rn) hue = ((gn - bn) / d) % 6;
-    else if (max === gn) hue = (bn - rn) / d + 2;
-    else hue = (rn - gn) / d + 4;
-    hue *= 60;
-    if (hue < 0) hue += 360;
-  }
-
-  const sat = max === 0 ? 0 : (d / max) * 255;
-  const val = max * 255;
-  return [hue, sat, val];
-}
-
 function classifyByLab(r: number, g: number, b: number): StickerColor {
   const lab = rgbToLab(r, g, b);
   const refs = labRefs();
@@ -102,76 +80,54 @@ function isGapPixel(r: number, g: number, b: number): boolean {
   return false;
 }
 
-function isWhitePixel(r: number, g: number, b: number): boolean {
+function classifyRelativeSticker(r: number, g: number, b: number): StickerColor {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
+  if (max < 42) return 'W';
+
   const chroma = max - min;
-  const avg = (r + g + b) / 3;
+  const sum = r + g + b;
+  const avg = sum / 3;
 
-  if (max < 125 || chroma > 42) return false;
-  if (b > r + 22 && b > g + 12) return false;
-  if (r > g + 22 && r > b + 22) return false;
-  if (g > r + 18 && g > b + 18) return false;
+  if (chroma < 38 || chroma / max < 0.13) {
+    if (avg > 85) return 'W';
+  }
 
-  return avg > 145 && chroma < 38;
+  const rn = r / sum;
+  const gn = g / sum;
+  const bn = b / sum;
+
+  if (bn > rn + 0.05 && bn > gn + 0.04 && bn > 0.29) return 'B';
+  if (gn > rn + 0.04 && gn > bn + 0.05 && gn > 0.31) return 'G';
+
+  if (rn > 0.28 && gn > 0.28 && bn < 0.30) {
+    if (rn > gn + 0.07) return 'O';
+    return 'Y';
+  }
+
+  if (rn > gn && rn > bn) {
+    if (gn > bn + 0.06 && gn > 0.26) return 'O';
+    return 'R';
+  }
+
+  return classifyByLab(r, g, b);
 }
 
-function scoreColor(r: number, g: number, b: number, color: StickerColor): number {
-  const lab = rgbToLab(r, g, b);
-  const dist = labDistance(lab, labRefs()[color]);
-  return 1 / (1 + dist);
+/** Classify 9 cell medians using per-cell relative chromaticity (lighting-robust). */
+export function classifyFaceRelative(
+  rgbs: ReadonlyArray<readonly [number, number, number]>,
+): StickerColor[] {
+  return rgbs.map(([r, g, b]) => classifyRelativeSticker(r, g, b));
 }
 
 export function classifySticker(r: number, g: number, b: number): StickerColor {
-  if (isGapPixel(r, g, b)) return classifyByLab(r, g, b);
+  if (isGapPixel(r, g, b)) return classifyRelativeSticker(r, g, b);
 
   if (isColorsCalibrated()) {
     return classifyByLab(r, g, b);
   }
 
-  const [h, s] = rgbToHsv(r, g, b);
-  const sn = s / 255;
-
-  if (isWhitePixel(r, g, b)) return 'W';
-
-  const scores = new Map<StickerColor, number>();
-  for (const color of ALL_COLORS) {
-    scores.set(color, scoreColor(r, g, b, color));
-  }
-
-  if (b >= r + 14 && b >= g + 10 && b > 75) {
-    scores.set('B', (scores.get('B') ?? 0) + 0.55);
-  }
-  if (r >= g + 12 && r >= b + 12 && r > 85) {
-    scores.set('R', (scores.get('R') ?? 0) + 0.45);
-  }
-  if (g >= r + 10 && g >= b + 10 && g > 70) {
-    scores.set('G', (scores.get('G') ?? 0) + 0.45);
-  }
-  if (r > 95 && g > 85 && b < Math.min(r, g) - 18) {
-    scores.set('Y', (scores.get('Y') ?? 0) + 0.55);
-  }
-  if (r > g + 8 && g > b + 5 && r > 110 && h >= 8 && h < 42) {
-    scores.set('O', (scores.get('O') ?? 0) + 0.45);
-  }
-
-  if (sn > 0.18) {
-    if (h >= 38 && h <= 72) scores.set('Y', (scores.get('Y') ?? 0) + 0.25);
-    if (h >= 10 && h < 38) scores.set('O', (scores.get('O') ?? 0) + 0.2);
-    if (h <= 12 || h >= 345) scores.set('R', (scores.get('R') ?? 0) + 0.2);
-    if (h >= 78 && h <= 155) scores.set('G', (scores.get('G') ?? 0) + 0.2);
-    if (h >= 165 && h <= 255) scores.set('B', (scores.get('B') ?? 0) + 0.3);
-  }
-
-  let best: StickerColor = 'W';
-  let bestScore = -Infinity;
-  for (const [color, score] of scores) {
-    if (score > bestScore) {
-      bestScore = score;
-      best = color;
-    }
-  }
-  return best;
+  return classifyRelativeSticker(r, g, b);
 }
 
 function median(values: number[]): number {
@@ -196,6 +152,43 @@ function pixelStickerWeight(r: number, g: number, b: number): number {
   if (chroma > 52) return 0.15;
   if (chroma > 36) return 0.55;
   return 1;
+}
+
+function sampleCellMedianRgb(
+  data: Uint8ClampedArray,
+  width: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+): [number, number, number] {
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  const cellW = x1 - x0;
+  const step = cellW > 40 ? 1 : 2;
+
+  for (let y = Math.floor(y0); y < Math.floor(y1); y += step) {
+    for (let x = Math.floor(x0); x < Math.floor(x1); x += step) {
+      const i = (y * width + x) * 4;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (isGapPixel(r, g, b)) continue;
+      rs.push(r);
+      gs.push(g);
+      bs.push(b);
+    }
+  }
+
+  if (rs.length === 0) {
+    const cx = Math.floor((x0 + x1) / 2);
+    const cy = Math.floor((y0 + y1) / 2);
+    const i = (cy * width + cx) * 4;
+    return [data[i]!, data[i + 1]!, data[i + 2]!];
+  }
+
+  return [median(rs), median(gs), median(bs)];
 }
 
 function classifyCellPixels(
@@ -259,10 +252,26 @@ export function sampleFaceColors(
 ): StickerColor[] {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
-  const colors: StickerColor[] = [];
   const cellW = width / 3;
   const cellH = height / 3;
+  const medians: [number, number, number][] = [];
 
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const margin = cellSampleMargin(row, col);
+      const x0 = col * cellW + cellW * margin;
+      const x1 = col * cellW + cellW * (1 - margin);
+      const y0 = row * cellH + cellH * margin;
+      const y1 = row * cellH + cellH * (1 - margin);
+      medians.push(sampleCellMedianRgb(data, width, x0, y0, x1, y1));
+    }
+  }
+
+  if (!isColorsCalibrated()) {
+    return classifyFaceRelative(medians);
+  }
+
+  const colors: StickerColor[] = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const margin = cellSampleMargin(row, col);

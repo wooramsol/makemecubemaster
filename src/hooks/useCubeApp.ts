@@ -40,7 +40,6 @@ import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '..
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
-  isColorsCalibrated,
   resetColorReferences,
   type ColorLearnSample,
 } from '../lib/vision/colorReference';
@@ -424,7 +423,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       liveAccumulator.current.reset();
       setState((s) => ({
         ...s,
-        phase: 'colorLearn',
+        phase: 'scanReady',
         colorLearnIndex: 0,
         colorLearnSample: null,
         colorLearnReady: false,
@@ -481,7 +480,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       beginLiveScan();
       setState((s) => ({
         ...s,
-        colorsCalibrated: true,
+        colorsCalibrated: false,
         colorLearnError: null,
       }));
       return;
@@ -538,16 +537,6 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     }
 
     if (phase === 'liveScan') {
-      if (!isColorsCalibrated()) {
-        setState((s) => ({
-          ...s,
-          phase: 'colorLearn',
-          colorsCalibrated: false,
-          colorLearnIndex: 0,
-        }));
-        return;
-      }
-
       const colors = result.detectedFace?.colors ?? null;
       const hasPose = Boolean(result.pose);
       if (result.pose) lastPoseRef.current = result.pose;
@@ -571,7 +560,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
                 phase: 'error',
                 scannedFaceColors: scannedRecord,
                 error: hint
-                  ? `Color mismatch (${hint}). Re-learn colors or re-scan.`
+                  ? `Color mismatch (${hint}). Re-scan with clearer lighting.`
                   : 'Color mismatch. Scan all 6 unique faces.',
               }));
               return;
@@ -910,30 +899,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, [clearSolveTimeout, enterScanReady]);
 
   const retryColorLearn = useCallback(() => {
-    clearSolveTimeout();
-    solveTriggeredRef.current = false;
-    liveAccumulator.current.reset();
-    lastPoseRef.current = null;
-    resetColorReferences();
-    frameProcessor.current?.disableTracking();
-    setState((s) => ({
-      ...s,
-      phase: 'colorLearn',
-      error: null,
-      solution: null,
-      knownFaces: [],
-      scannedFaceColors: {},
-      currentVisibleFace: null,
-      liveScanProgress: 0,
-      colorLearnIndex: 0,
-      colorLearnSample: null,
-      colorLearnReady: false,
-      colorLearnError: null,
-      colorsCalibrated: false,
-      detectionFeedback: initialFeedback,
-      liveScanNeedsClearerCenter: false,
-    }));
-  }, [clearSolveTimeout]);
+    retryLiveScan();
+  }, [retryLiveScan]);
 
   const skipCurrentMove = useCallback(() => {
     const solution = solutionRef.current;

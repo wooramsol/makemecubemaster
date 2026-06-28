@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Project version
 
-**Current release:** `v1.13.7`
+**Current release:** `v1.14.0`
 
 - Source of truth: `package.json` → `version`
 - Runtime: `src/lib/appVersion.ts` (`__APP_VERSION__` from Vite)

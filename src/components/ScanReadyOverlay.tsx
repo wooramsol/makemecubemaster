@@ -23,7 +23,9 @@ export function ScanReadyOverlay({
     <div className="scan-ready-overlay" aria-live="polite">
       <div className="scan-ready-panel">
         <p className="scan-ready-hint">
-          {cubeDetected ? 'Cube detected' : 'Align cube in guide'}
+          {cubeDetected
+            ? 'Cube detected — start face scan'
+            : 'Align a cube face in the guide, then start'}
         </p>
         <button type="button" className="capture-button" onClick={onStart}>
           Start scan
