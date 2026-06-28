@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-// classifyRelativeSticker is internal — test via classifySticker without calibration
 import { classifyFaceRelative, classifySticker } from './colorClassifier';
 import { resetColorReferences } from './colorReference';
+import type { ReadColor } from '../../types';
 
 describe('relative face color classification', () => {
   it('classifies warm/yellow lighting using chromaticity ratios', () => {
@@ -27,7 +27,7 @@ describe('relative face color classification', () => {
       [236, 216, 76],
       [225, 95, 85],
     ];
-    const colors = classifyFaceRelative(warmMixed);
+    const colors: ReadColor[] = classifyFaceRelative(warmMixed);
     expect(colors[4]).toBe('Y');
     expect(colors).toContain('B');
     expect(colors).toContain('R');

@@ -1,11 +1,11 @@
 import { useEffect, useRef } from 'react';
-import type { FaceId, StickerColor } from '../types';
+import type { FaceId, ReadColor } from '../types';
 import { ScanCubeRenderer } from '../lib/three/scanCubeRenderer';
 
 interface ScanCubeGuideProps {
-  scannedFaces: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaces: Partial<Record<FaceId, ReadColor[]>>;
   previewFace: FaceId | null;
-  previewColors: StickerColor[] | null;
+  previewColors: ReadColor[] | null;
 }
 
 export function ScanCubeGuide({

@@ -7,6 +7,7 @@ import type {
   FaceId,
   FaceScanInfo,
   Move,
+  ReadColor,
   SolutionProgress,
   SolvingFeedback,
   StickerColor,
@@ -36,7 +37,7 @@ import {
 import { detectWrongMoveFromColors } from '../lib/cube/detectWrongMove';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced } from '../lib/vision/cubeColorReconcile';
+import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells } from '../lib/vision/cubeColorReconcile';
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
@@ -46,13 +47,14 @@ import {
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator, canonicalizeScannedFaces } from '../lib/vision/liveFaceScan';
 import { cloneFaceColorsMap } from '../lib/vision/selfieView';
+import { isKnownColor, toStickerColors } from '../lib/vision/readColorUtils';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 
 function scannedFacesFromMap(
-  faces: Map<FaceId, StickerColor[]>,
-): Partial<Record<FaceId, StickerColor[]>> {
+  faces: Map<FaceId, ReadColor[]>,
+): Partial<Record<FaceId, ReadColor[]>> {
   return Object.fromEntries(cloneFaceColorsMap(faces)) as Partial<
-    Record<FaceId, StickerColor[]>
+    Record<FaceId, ReadColor[]>
   >;
 }
 
@@ -60,7 +62,7 @@ export interface CubeAppState {
   phase: AppPhase;
   error: string | null;
   knownFaces: FaceId[];
-  scannedFaceColors: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaceColors: Partial<Record<FaceId, ReadColor[]>>;
   currentVisibleFace: FaceId | null;
   liveScanProgress: number;
   solution: SolutionProgress | null;
@@ -85,6 +87,7 @@ const initialFeedback: DetectionFeedback = {
   detectedCenter: null,
   colorCounts: emptyColorCounts(),
   cellColors: [],
+  uncertainCells: 0,
 };
 
 const initialSolvingFeedback: SolvingFeedback = {
@@ -278,13 +281,13 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   const buildFeedback = useCallback(
     (
       hasPose: boolean,
-      colors: StickerColor[] | null,
+      colors: ReadColor[] | null,
       stableProgress: number,
       stableTarget: number,
       captured: boolean,
       needsNewFace: boolean,
     ): DetectionFeedback => {
-      const { detectedCenter, colorCounts } = getCalibrationFeedback(colors);
+      const { detectedCenter, colorCounts, uncertainCells } = getCalibrationFeedback(colors);
       const readable = isColorsReadable(colors);
 
       let status: DetectionStatus = 'searching';
@@ -294,6 +297,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         status = 'rotate';
       } else if (captured) {
         status = 'captured';
+      } else if (uncertainCells >= 4) {
+        status = 'weak-read';
       } else if (stableProgress > 0 && stableProgress < stableTarget) {
         status = 'stabilizing';
       } else {
@@ -307,6 +312,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         detectedCenter,
         colorCounts,
         cellColors: readable && colors ? [...colors] : [],
+        uncertainCells,
       };
     },
     [],
@@ -550,11 +556,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         const scannedRecord = scannedFacesFromMap(snapshotFaces);
 
         try {
-          let solveMap = snapshotFaces;
+          let solveMap = fillUncertainCells(snapshotFaces);
           if (!isCubeColorBalanced(solveMap)) {
-            solveMap = reconcileCubeFaces(snapshotFaces);
+            solveMap = reconcileCubeFaces(solveMap);
             if (!isCubeColorBalanced(solveMap)) {
-              const hint = formatImbalanceHint(snapshotFaces);
+              const hint = formatImbalanceHint(solveMap);
               setState((s) => ({
                 ...s,
                 phase: 'error',
@@ -628,9 +634,11 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     syncExpectedMove(expected ?? null);
 
-    const visibleFace = result.detectedFace?.colors[4]
-      ? identifyFaceFromCenter(result.detectedFace.colors[4]!)
-      : result.pose?.visibleFace ?? null;
+    const centerColor = result.detectedFace?.colors[4];
+    const visibleFace =
+      centerColor !== undefined && isKnownColor(centerColor)
+        ? identifyFaceFromCenter(centerColor)
+        : result.pose?.visibleFace ?? null;
     const moveFaceId = expected ? moveFace(expected) : null;
     const holdFaceId = expected ? getMoveHoldFace(expected) : null;
 
@@ -667,9 +675,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       ...result.visibleFaceColors,
     };
     if (result.detectedFace?.colors?.length === 9) {
-      if (visibleFace) turnEvalColors[visibleFace] = result.detectedFace.colors;
-      if (holdFaceId) turnEvalColors[holdFaceId] = result.detectedFace.colors;
-      if (moveFaceId) turnEvalColors[moveFaceId] = result.detectedFace.colors;
+      const stickerColors = toStickerColors(result.detectedFace.colors);
+      if (visibleFace) turnEvalColors[visibleFace] = stickerColors;
+      if (holdFaceId) turnEvalColors[holdFaceId] = stickerColors;
+      if (moveFaceId) turnEvalColors[moveFaceId] = stickerColors;
     }
 
     const colorEval =
@@ -844,7 +853,9 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         wrongMove,
         visibleFace,
         faceMatchesMove,
-        liveFaceColors: result.detectedFace?.colors ?? null,
+        liveFaceColors: result.detectedFace?.colors
+          ? toStickerColors(result.detectedFace.colors)
+          : null,
         visibleFaceColors: result.visibleFaceColors,
         visibleFaces,
         stableVisibleFaceColors,

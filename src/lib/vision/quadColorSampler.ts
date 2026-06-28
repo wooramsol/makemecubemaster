@@ -1,4 +1,4 @@
-import type { Point2D, StickerColor } from '../../types';
+import type { Point2D, ReadColor } from '../../types';
 import { classifyFaceRelative, classifySticker } from './colorClassifier';
 import { isColorsCalibrated } from './colorReference';
 
@@ -78,7 +78,7 @@ export function sampleColorsFromQuad(
   frameWidth: number,
   frameHeight: number,
   corners: [Point2D, Point2D, Point2D, Point2D],
-): StickerColor[] | null {
+): ReadColor[] | null {
   const ctx = sourceCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return null;
 

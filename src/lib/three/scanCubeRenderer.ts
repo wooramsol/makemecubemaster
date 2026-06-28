@@ -1,8 +1,9 @@
 import * as THREE from 'three';
-import type { FaceId, StickerColor } from '../../types';
+import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { CUBE_EDGES, CUBE_VERTICES } from '../vision/faceModels';
 import { REFERENCE_CORNER_VIEW } from '../cube/isometricGuide';
 import { mirrorFaceCellsHorizontally } from '../vision/selfieView';
+import { toStickerColors } from '../vision/readColorUtils';
 import { createFaceColorTexture } from './faceColorTexture';
 
 const FACE_PLANE_TRANSFORMS: Record<
@@ -70,9 +71,9 @@ export class ScanCubeRenderer {
   }
 
   setFaces(
-    scanned: Partial<Record<FaceId, StickerColor[]>>,
+    scanned: Partial<Record<FaceId, ReadColor[]>>,
     previewFace: FaceId | null,
-    previewColors: StickerColor[] | null,
+    previewColors: ReadColor[] | null,
   ): void {
     const key = JSON.stringify({ scanned, previewFace, previewColors });
     if (key === this.sceneKey) {
@@ -87,9 +88,9 @@ export class ScanCubeRenderer {
 
       let colors: StickerColor[];
       if (previewFace === faceId && previewColors && previewColors.length === 9) {
-        colors = mirrorFaceCellsHorizontally(previewColors);
+        colors = toStickerColors(mirrorFaceCellsHorizontally(previewColors));
       } else if (scanned[faceId] && scanned[faceId]!.length === 9) {
-        colors = mirrorFaceCellsHorizontally(scanned[faceId]!);
+        colors = toStickerColors(mirrorFaceCellsHorizontally(scanned[faceId]!));
       } else {
         colors = UNSCANNED;
       }

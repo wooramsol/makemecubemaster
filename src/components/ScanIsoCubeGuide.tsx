@@ -1,11 +1,11 @@
-import type { FaceId, StickerColor } from '../types';
+import type { FaceId, ReadColor } from '../types';
 import { ScanCubeGuide } from './ScanCubeGuide';
 
 interface ScanIsoCubeGuideProps {
-  scannedFaces: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaces: Partial<Record<FaceId, ReadColor[]>>;
   lastCapturedFace: FaceId | null;
   currentVisibleFace: FaceId | null;
-  previewColors: StickerColor[] | null;
+  previewColors: ReadColor[] | null;
 }
 
 export function ScanIsoCubeGuide({

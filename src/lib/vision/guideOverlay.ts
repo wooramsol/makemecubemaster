@@ -93,16 +93,21 @@ export function getSolvingScanOverlayRect(
   return getGuideOverlayRect(frameWidth, frameHeight, containerWidth, containerHeight);
 }
 
-/** Place a side panel to the right of the guide frame, vertically centered. */
+/** Place a side panel to the right of the guide frame, vertically centered in viewport. */
 export function getPanelBesideGuideStyle(
   guideRect: GuideOverlayRect,
   viewportWidth: number,
-  panelMaxWidth = 220,
-  gap = 12,
+  viewportHeight: number,
+  panelMaxWidth = 168,
+  gap = 10,
 ): { left: string; top: string; transform: string; maxWidth: string } {
-  const width = Math.min(panelMaxWidth, Math.max(200, viewportWidth * 0.42));
+  const width = Math.min(panelMaxWidth, Math.max(148, viewportWidth * 0.36));
   const left = Math.min(guideRect.left + guideRect.width + gap, viewportWidth - width - 8);
-  const top = guideRect.top + guideRect.height / 2;
+  const panelHeight = 200;
+  const idealTop = guideRect.top + guideRect.height / 2;
+  const minTop = panelHeight / 2 + 56;
+  const maxTop = Math.max(minTop, viewportHeight - panelHeight / 2 - 72);
+  const top = Math.max(minTop, Math.min(idealTop, maxTop));
   return {
     left: `${left}px`,
     top: `${top}px`,

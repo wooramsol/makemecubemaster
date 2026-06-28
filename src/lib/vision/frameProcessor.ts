@@ -13,6 +13,7 @@ import { sampleColorsFromQuad } from './quadColorSampler';
 import { computeDeformationScore } from './quadShapeMetrics';
 import { drawCameraFrame } from './selfieView';
 import { GUIDE_SIZE_RATIO } from './roi';
+import { isKnownColor, toStickerColors } from './readColorUtils';
 
 const LOST_TRACKING_THRESHOLD = 30;
 
@@ -33,7 +34,7 @@ export class FrameProcessor {
   private trackingEnabled = false;
   private processCanvas: HTMLCanvasElement;
   private processCtx: CanvasRenderingContext2D;
-  private lastColors: StickerColor[] | null = null;
+  private lastColors: import('../../types').ReadColor[] | null = null;
   private expectedMove: Move | null = null;
   private solvingScanMode = false;
   private lastSolvingPose: CubePose | null = null;
@@ -182,8 +183,8 @@ export class FrameProcessor {
       const quadColors =
         guideFace?.colors ??
         sampleColorsFromQuad(this.processCanvas, width, height, corners);
-      const hintFace = quadColors?.[4]
-        ? identifyFaceFromCenter(quadColors[4])
+      const hintFace = isKnownColor(quadColors?.[4] ?? '?')
+        ? identifyFaceFromCenter(quadColors![4] as StickerColor)
         : guideFace?.pose.visibleFace ?? this.lastSolvingPose?.visibleFace ?? null;
 
       let pose = guideFace
@@ -211,7 +212,7 @@ export class FrameProcessor {
         height,
       );
       if (quadColors && pose.visibleFace) {
-        visibleFaceColors[pose.visibleFace] = quadColors;
+        visibleFaceColors[pose.visibleFace] = toStickerColors(quadColors);
       }
       const rotation = this.rotationDetector.update(pose.rotationMatrix);
       const detectedFace: DetectedFace | null = quadColors
@@ -329,7 +330,10 @@ export class FrameProcessor {
       }
     }
 
-    const hintFace = colors?.[4] ? identifyFaceFromCenter(colors[4]) : null;
+    const hintFace =
+      colors?.[4] !== undefined && isKnownColor(colors[4])
+        ? identifyFaceFromCenter(colors[4])
+        : null;
     let pose = estimatePoseFromCorners(corners, width, height, hintFace);
     if (hintFace) pose = { ...pose, visibleFace: hintFace };
     const lostFrames = this.flowTracker.getLostFrames();
@@ -373,7 +377,7 @@ export class FrameProcessor {
     for (let i = 0; i < samples; i++) {
       const result = this.process(video);
       if (!result.detectedFace) return null;
-      readings.push(result.detectedFace.colors);
+      readings.push(toStickerColors(result.detectedFace.colors));
       lastPose = result.detectedFace.pose;
     }
 

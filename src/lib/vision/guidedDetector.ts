@@ -1,12 +1,13 @@
-import type { StickerColor } from '../../types';
+import type { ReadColor } from '../../types';
 import { sampleFaceColors } from './colorClassifier';
+import { isKnownColor } from './readColorUtils';
 
 const WARP = 256;
 
 export function sampleGuideRegionColors(
   sourceCanvas: HTMLCanvasElement,
   guide: { x: number; y: number; size: number },
-): StickerColor[] {
+): ReadColor[] {
   const temp = document.createElement('canvas');
   temp.width = WARP;
   temp.height = WARP;
@@ -56,11 +57,12 @@ export function measureColorVariance(
 
 /** 풀이 단계 — 코너 뷰·손 가림 허용 (가이드 색 검증 완화) */
 export function isRegionCubeLikeSolving(
-  colors: StickerColor[],
+  colors: ReadColor[],
   variance: number,
 ): boolean {
   if (colors.length !== 9) return false;
-  const unique = new Set(colors);
+  const known = colors.filter(isKnownColor);
+  const unique = new Set(known);
   if (variance < 25) return false;
   if (unique.size >= 2 && variance >= 40) return true;
   if (unique.size >= 3) return true;
@@ -69,12 +71,13 @@ export function isRegionCubeLikeSolving(
 
 /** 큐브 스티커가 가이드 안에 있을 때만 true (얼굴/배경만 있으면 false) */
 export function isRegionCubeLike(
-  colors: StickerColor[],
+  colors: ReadColor[],
   variance: number,
 ): boolean {
   if (colors.length !== 9) return false;
-  const unique = new Set(colors);
-  const nonWhite = colors.filter((c) => c !== 'W').length;
+  const known = colors.filter(isKnownColor);
+  const unique = new Set(known);
+  const nonWhite = known.filter((c) => c !== 'W').length;
 
   if (variance < 120) return false;
 

@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import type { DetectionFeedback, FaceId, StickerColor } from '../types';
+import type { DetectionFeedback, FaceId, ReadColor } from '../types';
 import { getGuideOverlayRect, getPanelBesideGuideStyle } from '../lib/vision/guideOverlay';
-import { ScanIsoCubeGuide } from './ScanIsoCubeGuide';
+import { FaceColorGrid } from './FaceColorGrid';
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '…',
   detected: 'OK',
+  'weak-read': 'Unclear',
   stabilizing: '…',
   captured: '✓',
   rotate: 'Rotate',
@@ -14,7 +15,7 @@ const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
 interface DetectionOverlayProps {
   feedback: DetectionFeedback;
   visible: boolean;
-  scannedFaces: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaces: Partial<Record<FaceId, ReadColor[]>>;
   lastCapturedFace: FaceId | null;
   currentVisibleFace: FaceId | null;
   frameWidth: number;
@@ -26,9 +27,7 @@ interface DetectionOverlayProps {
 export function DetectionOverlay({
   feedback,
   visible,
-  scannedFaces,
   lastCapturedFace,
-  currentVisibleFace,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -42,25 +41,34 @@ export function DetectionOverlay({
       viewportHeight,
     );
     if (!guideRect || !viewportWidth) return undefined;
-    return getPanelBesideGuideStyle(guideRect, viewportWidth, 228);
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, viewportHeight, 168);
   }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   if (!visible) return null;
 
   const previewColors =
-    feedback.cellColors.length === 9 ? (feedback.cellColors as StickerColor[]) : null;
+    feedback.cellColors.length === 9 ? feedback.cellColors : null;
 
   return (
     <div className="detection-overlay" aria-live="polite">
-      <div className="scan-ui-panel scan-ui-panel--iso" style={panelStyle}>
-        <ScanIsoCubeGuide
-          scannedFaces={scannedFaces}
-          lastCapturedFace={lastCapturedFace}
-          currentVisibleFace={currentVisibleFace}
-          previewColors={previewColors}
-        />
+      <div className="scan-ui-panel scan-ui-panel--live" style={panelStyle}>
+        {previewColors && (
+          <div className="scan-live-preview">
+            <FaceColorGrid
+              colors={previewColors}
+              variant="overlay"
+              orientation="mirror"
+            />
+            {feedback.uncertainCells > 0 && (
+              <p className="scan-live-preview-hint">
+                {feedback.uncertainCells} unclear — filled after all faces
+              </p>
+            )}
+          </div>
+        )}
 
         <div className={`detection-status ${feedback.status}`}>
+          <span className="status-dot" aria-hidden />
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
           {feedback.status === 'rotate' && (
             <span className="status-progress">New face</span>

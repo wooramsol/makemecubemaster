@@ -1,4 +1,4 @@
-import type { FaceId, StickerColor } from '../../types';
+import type { FaceId, ReadColor, StickerColor } from '../../types';
 
 export const SELFIE_CAMERA_MODE = true;
 
@@ -13,10 +13,12 @@ export function drawCameraFrame(
 }
 
 /** Mirror a 3×3 face grid left-right (camera frame → selfie preview). */
-export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[] {
+export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColor[];
+export function mirrorFaceCellsHorizontally(colors: ReadColor[]): ReadColor[];
+export function mirrorFaceCellsHorizontally(colors: ReadColor[]): ReadColor[] {
   if (colors.length !== 9) return colors;
 
-  const mirrored: StickerColor[] = [];
+  const mirrored: ReadColor[] = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 2; col >= 0; col--) {
       mirrored.push(colors[row * 3 + col]!);
@@ -26,9 +28,9 @@ export function mirrorFaceCellsHorizontally(colors: StickerColor[]): StickerColo
 }
 
 export function cloneFaceColorsMap(
-  faces: Map<FaceId, StickerColor[]>,
-): Map<FaceId, StickerColor[]> {
-  const copy = new Map<FaceId, StickerColor[]>();
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  const copy = new Map<FaceId, ReadColor[]>();
   for (const [faceId, colors] of faces) {
     copy.set(faceId, [...colors]);
   }

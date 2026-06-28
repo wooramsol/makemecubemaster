@@ -1,8 +1,8 @@
-import type { StickerColor } from '../types';
+import type { ReadColor } from '../types';
 import { FaceColorGrid } from './FaceColorGrid';
 
 interface FaceGridMiniProps {
-  colors: StickerColor[] | null;
+  colors: ReadColor[] | null;
   label: string;
   empty?: boolean;
 }

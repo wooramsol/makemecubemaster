@@ -1,5 +1,6 @@
-import type { FaceId, StickerColor } from '../../types';
+import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { emptyColorCounts } from './colorClassifier';
+import { isKnownColor } from './readColorUtils';
 
 const FACE_CENTER: Record<FaceId, StickerColor> = {
   U: 'W',
@@ -37,6 +38,48 @@ function countAllStickers(faces: Map<FaceId, StickerColor[]>): Record<StickerCol
     }
   }
   return counts;
+}
+
+/** Fill uncertain cells using global 9-per-color constraint before reconcile. */
+export function fillUncertainCells(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, StickerColor[]> {
+  const result = new Map<FaceId, StickerColor[]>();
+  const unknowns: { faceId: FaceId; index: number }[] = [];
+
+  for (const [faceId, colors] of faces) {
+    const copy: StickerColor[] = [];
+    for (let i = 0; i < 9; i++) {
+      const c = colors[i]!;
+      if (i === 4) {
+        copy.push(FACE_CENTER[faceId]);
+      } else if (isKnownColor(c)) {
+        copy.push(c);
+      } else {
+        copy.push('W');
+        unknowns.push({ faceId, index: i });
+      }
+    }
+    result.set(faceId, copy);
+  }
+
+  const counts = countAllStickers(result);
+
+  for (const cell of unknowns) {
+    const deficit = findWorstDeficit(counts);
+    if (!deficit) break;
+    result.get(cell.faceId)![cell.index] = deficit;
+    counts[deficit]++;
+  }
+
+  return result;
+}
+
+export function hasUncertainCells(faces: Map<FaceId, ReadColor[]>): boolean {
+  for (const colors of faces.values()) {
+    if (colors.some((c) => c === '?')) return true;
+  }
+  return false;
 }
 
 function getSwapCost(from: StickerColor, to: StickerColor): number {

@@ -1,5 +1,18 @@
-import type { StickerColor } from '../../types';
+import type { ReadColor, StickerColor } from '../../types';
 import { getLearnedLabRefs, isColorsCalibrated } from './colorReference';
+import { isKnownColor } from './readColorUtils';
+
+const CHROMA_REFS: Record<StickerColor, [number, number, number]> = {
+  W: [1 / 3, 1 / 3, 1 / 3],
+  Y: [0.4, 0.38, 0.22],
+  R: [0.45, 0.32, 0.23],
+  O: [0.42, 0.36, 0.22],
+  G: [0.28, 0.42, 0.3],
+  B: [0.28, 0.32, 0.4],
+};
+
+/** Min chromaticity gap between 1st and 2nd candidate to accept a read. */
+const CONFIDENCE_MARGIN = 0.016;
 
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
 
@@ -113,11 +126,60 @@ function classifyRelativeSticker(r: number, g: number, b: number): StickerColor 
   return classifyByLab(r, g, b);
 }
 
-/** Classify 9 cell medians using per-cell relative chromaticity (lighting-robust). */
+function chromaticity(r: number, g: number, b: number): [number, number, number] {
+  const sum = r + g + b;
+  if (sum < 30) return [1 / 3, 1 / 3, 1 / 3];
+  return [r / sum, g / sum, b / sum];
+}
+
+function chromaDist(a: [number, number, number], b: [number, number, number]): number {
+  const dr = a[0] - b[0];
+  const dg = a[1] - b[1];
+  const db = a[2] - b[2];
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+function classifyCellRelative(r: number, g: number, b: number): ReadColor {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 38) return '?';
+
+  const raw = chromaticity(r, g, b);
+  const scores = ALL_COLORS.map((color) => ({
+    color,
+    dist: chromaDist(raw, CHROMA_REFS[color]),
+  })).sort((a, b) => a.dist - b.dist);
+
+  const best = scores[0]!;
+  const second = scores[1]!;
+  const margin = second.dist - best.dist;
+
+  if (margin < CONFIDENCE_MARGIN) {
+    const yoTie =
+      (best.color === 'Y' || best.color === 'O') &&
+      (second.color === 'Y' || second.color === 'O');
+    if (yoTie) {
+      if (r - g > 22) return 'O';
+      if (g >= r - 20) return 'Y';
+    }
+    if (margin < CONFIDENCE_MARGIN * 0.35) return '?';
+  }
+
+  const chroma = max - min;
+  if (chroma < 30 && chroma / max < 0.13) {
+    if (best.color === 'W' && margin >= CONFIDENCE_MARGIN * 0.8) return 'W';
+    if (margin < CONFIDENCE_MARGIN * 1.25) return '?';
+  }
+
+  if (margin < CONFIDENCE_MARGIN) return '?';
+  return best.color;
+}
+
+/** Classify 9 cell medians via chromaticity (lighting-relative, not absolute RGB). */
 export function classifyFaceRelative(
   rgbs: ReadonlyArray<readonly [number, number, number]>,
-): StickerColor[] {
-  return rgbs.map(([r, g, b]) => classifyRelativeSticker(r, g, b));
+): ReadColor[] {
+  return rgbs.map(([r, g, b]) => classifyCellRelative(r, g, b));
 }
 
 export function classifySticker(r: number, g: number, b: number): StickerColor {
@@ -249,7 +311,7 @@ export function sampleFaceColors(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-): StickerColor[] {
+): ReadColor[] {
   const imageData = ctx.getImageData(0, 0, width, height);
   const data = imageData.data;
   const cellW = width / 3;
@@ -290,15 +352,16 @@ export function emptyColorCounts(): Record<StickerColor, number> {
   return { R: 0, O: 0, Y: 0, G: 0, B: 0, W: 0 };
 }
 
-export function countStickerColors(colors: StickerColor[]): Record<StickerColor, number> {
+export function countStickerColors(colors: ReadColor[]): Record<StickerColor, number> {
   const counts = emptyColorCounts();
   for (const c of colors) {
+    if (!isKnownColor(c)) continue;
     counts[c]++;
   }
   return counts;
 }
 
-export function getDominantSticker(colors: StickerColor[]): {
+export function getDominantSticker(colors: ReadColor[]): {
   dominant: StickerColor;
   count: number;
 } {
@@ -314,32 +377,36 @@ export function getDominantSticker(colors: StickerColor[]): {
   return { dominant, count };
 }
 
-export function isColorsReadable(colors: StickerColor[] | null): boolean {
-  return Boolean(colors && colors.length === 9);
+export function isColorsReadable(colors: ReadColor[] | null): boolean {
+  return Boolean(colors && colors.length === 9 && colors.some(isKnownColor));
 }
 
-export function getCalibrationFeedback(colors: StickerColor[] | null): {
+export function getCalibrationFeedback(colors: ReadColor[] | null): {
   valid: boolean;
   colorCounts: Record<StickerColor, number>;
   detectedCenter: StickerColor | null;
   uniqueColors: number;
+  uncertainCells: number;
 } {
-  if (!isColorsReadable(colors)) {
+  if (!colors || colors.length !== 9) {
     return {
       valid: false,
       colorCounts: emptyColorCounts(),
       detectedCenter: null,
       uniqueColors: 0,
+      uncertainCells: 0,
     };
   }
 
-  const colorCounts = countStickerColors(colors!);
+  const colorCounts = countStickerColors(colors);
   const uniqueColors = Object.values(colorCounts).filter((n) => n > 0).length;
+  const center = colors[4];
 
   return {
-    valid: true,
+    valid: isColorsReadable(colors),
     colorCounts,
-    detectedCenter: colors![4] ?? null,
+    detectedCenter: isKnownColor(center) ? center : null,
     uniqueColors,
+    uncertainCells: colors.filter((c) => c === '?').length,
   };
 }

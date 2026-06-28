@@ -1,11 +1,12 @@
-import type { StickerColor } from '../types';
+import type { ReadColor } from '../types';
 import { COLOR_HEX } from '../lib/vision/colorReference';
 import { mirrorFaceCellsHorizontally } from '../lib/vision/selfieView';
+import { isKnownColor } from '../lib/vision/readColorUtils';
 
 export type FaceGridOrientation = 'mirror' | 'real';
 
 interface FaceColorGridProps {
-  colors: StickerColor[];
+  colors: ReadColor[];
   cellClassName?: string;
   variant?: 'mini' | 'overlay' | 'solving';
   /** mirror = selfie preview; real = physical world (stored sensor order). */
@@ -33,8 +34,12 @@ export function FaceColorGrid({
       {displayColors.map((color, i) => (
         <span
           key={i}
-          className={resolvedCellClass}
-          style={{ background: COLOR_HEX[color] }}
+          className={`${resolvedCellClass}${!isKnownColor(color) ? ' face-cell--uncertain' : ''}`}
+          style={
+            isKnownColor(color)
+              ? { background: COLOR_HEX[color] }
+              : undefined
+          }
         />
       ))}
     </div>

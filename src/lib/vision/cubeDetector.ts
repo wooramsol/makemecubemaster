@@ -7,6 +7,7 @@ import {
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
 import { identifyFaceFromCenter } from '../cube/colors';
+import { isKnownColor, toStickerColors } from './readColorUtils';
 import { getGuideSquare, guideToCorners, translateCorners, GUIDE_SIZE_RATIO } from './roi';
 import { sampleColorsFromQuad } from './quadColorSampler';
 
@@ -118,7 +119,7 @@ function tryGuidedDetect(
     return null;
   }
 
-  return { corners: guideToCorners(guide), colors };
+  return { corners: guideToCorners(guide), colors: toStickerColors(colors) };
 }
 
 export function detectCubeCorners(
@@ -185,8 +186,9 @@ export function detectCubeFace(
   const variance = measureColorVariance(sourceCanvas, guide);
 
   const cubeLike = isRegionCubeLike(colors, variance);
-  const centerOk = Boolean(colors[4] && identifyFaceFromCenter(colors[4]));
-  const uniqueColors = new Set(colors).size;
+  const center = colors[4];
+  const centerOk = isKnownColor(center) && Boolean(identifyFaceFromCenter(center));
+  const uniqueColors = new Set(colors.filter((c) => c !== '?')).size;
   const relaxedOk =
     relaxed &&
     colors.length === 9 &&
@@ -197,7 +199,7 @@ export function detectCubeFace(
   }
 
   const corners = detectCubeCorners(sourceCanvas, frameWidth, frameHeight, guideRatio);
-  const hintFace = colors[4] ? identifyFaceFromCenter(colors[4]) : null;
+  const hintFace = isKnownColor(colors[4]) ? identifyFaceFromCenter(colors[4]) : null;
   const pose = estimatePoseFromCorners(
     corners ?? guideToCorners(guide),
     frameWidth,
@@ -221,7 +223,7 @@ export function detectSolvingFace(
   const colors = sampleColorsFromQuad(sourceCanvas, frameWidth, frameHeight, corners);
   if (!colors || colors.length !== 9) return null;
 
-  const hintFace = colors[4] ? identifyFaceFromCenter(colors[4]) : null;
+  const hintFace = isKnownColor(colors[4]) ? identifyFaceFromCenter(colors[4]) : null;
   const pose = estimatePoseFromCorners(corners, frameWidth, frameHeight, hintFace);
   pose.confidence = 0.8;
   if (hintFace) pose.visibleFace = hintFace;

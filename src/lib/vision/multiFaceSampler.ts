@@ -3,6 +3,7 @@ import { alignPoseToTrackedQuad } from './poseAlign';
 import { projectFaceCorners } from './projectFace';
 import { sampleColorsFromQuad } from './quadColorSampler';
 import { getVisibleFaces } from './visibleFaces';
+import { toStickerColors } from './readColorUtils';
 
 export function sampleVisibleFaceColors(
   sourceCanvas: HTMLCanvasElement,
@@ -19,7 +20,7 @@ export function sampleVisibleFaceColors(
     if (!corners) continue;
     const colors = sampleColorsFromQuad(sourceCanvas, frameWidth, frameHeight, corners);
     if (colors?.length === 9) {
-      result[faceId] = colors;
+      result[faceId] = toStickerColors(colors);
     }
   }
 

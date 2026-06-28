@@ -1,4 +1,4 @@
-import type { FaceId, StickerColor } from '../types';
+import type { FaceId, ReadColor } from '../types';
 import { ALL_FACES } from '../lib/cube/colors';
 import { FaceGridMini } from './FaceGridMini';
 
@@ -13,7 +13,7 @@ const FACE_CENTER_LABEL: Record<FaceId, string> = {
 
 interface ScannedFacesBarProps {
   visible: boolean;
-  scannedFaces: Partial<Record<FaceId, StickerColor[]>>;
+  scannedFaces: Partial<Record<FaceId, ReadColor[]>>;
 }
 
 export function ScannedFacesBar({ visible, scannedFaces }: ScannedFacesBarProps) {

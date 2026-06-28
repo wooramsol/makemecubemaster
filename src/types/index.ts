@@ -2,6 +2,9 @@ export type FaceId = 'U' | 'D' | 'F' | 'B' | 'L' | 'R';
 
 export type StickerColor = 'W' | 'Y' | 'R' | 'O' | 'B' | 'G';
 
+/** Uncertain sticker read during live scan — filled later via cube constraints. */
+export type ReadColor = StickerColor | '?';
+
 export type Move =
   | 'R'
   | "R'"
@@ -42,7 +45,7 @@ export interface CubePose {
 }
 
 export interface DetectedFace {
-  colors: StickerColor[];
+  colors: ReadColor[];
   pose: CubePose;
 }
 
@@ -70,6 +73,7 @@ export interface SolutionProgress {
 export type DetectionStatus =
   | 'searching'
   | 'detected'
+  | 'weak-read'
   | 'stabilizing'
   | 'captured'
   | 'rotate';
@@ -80,7 +84,8 @@ export interface DetectionFeedback {
   stableTarget: number;
   detectedCenter: StickerColor | null;
   colorCounts: Record<StickerColor, number>;
-  cellColors: StickerColor[];
+  cellColors: ReadColor[];
+  uncertainCells: number;
 }
 
 export type SolvingTrackingStatus = 'searching' | 'locked' | 'lost';
