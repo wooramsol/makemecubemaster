@@ -186,6 +186,161 @@ function toStickerFaceMap(faces: Map<FaceId, ReadColor[]>): Map<FaceId, StickerC
   return result;
 }
 
+function collectWarmSwappableCells(result: Map<FaceId, ReadColor[]>): MutableCell[] {
+  const swappable: MutableCell[] = [];
+  for (const [faceId, colors] of result) {
+    for (let i = 0; i < 9; i++) {
+      if (i === 4) continue;
+      const c = colors[i]!;
+      if (c === 'R' || c === 'O') {
+        swappable.push({ faceId, index: i, color: c });
+      }
+    }
+  }
+  return swappable;
+}
+
+function warmCap(color: StickerColor, faces: Map<FaceId, ReadColor[]>): number {
+  if (color === 'R' && !faces.has('R')) return TARGET_PER_COLOR - 1;
+  if (color === 'O' && !faces.has('L')) return TARGET_PER_COLOR - 1;
+  return TARGET_PER_COLOR;
+}
+
+function countPeripheryColor(colors: ReadColor[], color: StickerColor): number {
+  let count = 0;
+  for (let i = 0; i < 9; i++) {
+    if (i === 4) continue;
+    if (colors[i] === color) count++;
+  }
+  return count;
+}
+
+function pickWarmSwapCell(
+  cells: MutableCell[],
+  from: StickerColor,
+  to: StickerColor,
+  result: Map<FaceId, ReadColor[]>,
+): MutableCell | null {
+  let best: MutableCell | null = null;
+  let bestScore = Infinity;
+
+  for (const cell of cells) {
+    if (cell.color !== from) continue;
+    if (result.get(cell.faceId)![cell.index] !== from) continue;
+
+    let score = getSwapCost(from, to);
+    if (to === 'R' && cell.faceId === 'R') score -= 1.5;
+    if (to === 'O' && cell.faceId === 'L') score -= 1.5;
+    if (from === 'R' && cell.faceId === 'R') score += 2;
+    if (from === 'O' && cell.faceId === 'L') score += 2;
+    if (from === 'O' && to === 'R' && cell.faceId !== 'R') score += 0.25;
+    if (from === 'R' && to === 'O' && cell.faceId !== 'L') score += 0.25;
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = cell;
+    }
+  }
+
+  return best;
+}
+
+function applyWarmSwap(
+  result: Map<FaceId, ReadColor[]>,
+  cell: MutableCell,
+  to: StickerColor,
+): void {
+  cell.color = to;
+  result.get(cell.faceId)![cell.index] = to;
+}
+
+/** Re-distinguish committed R/O using partial-scan caps and R/L face context. */
+export function reconcileRedOrangeFromConstraints(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  const result = cloneReadFaces(faces);
+  for (const [faceId, colors] of result) {
+    colors[4] = FACE_CENTER[faceId];
+  }
+
+  const swappable = () => collectWarmSwappableCells(result);
+
+  for (let iter = 0; iter < 48; iter++) {
+    let changed = false;
+    const counts = countScannedStickers(result);
+    const cells = swappable();
+
+    for (const warm of WARM_COLORS) {
+      const cap = warmCap(warm, faces);
+      const other = warm === 'R' ? 'O' : 'R';
+      while (counts[warm] > cap) {
+        const cell = pickWarmSwapCell(cells, warm, other, result);
+        if (!cell) break;
+        applyWarmSwap(result, cell, other);
+        counts[warm]--;
+        counts[other]++;
+        changed = true;
+      }
+    }
+
+    if (result.has('R') && counts.R < TARGET_PER_COLOR) {
+      const rColors = result.get('R')!;
+      const oOnR = countPeripheryColor(rColors, 'O');
+      const swaps = Math.min(
+        TARGET_PER_COLOR - counts.R,
+        oOnR,
+        !faces.has('L') ? Math.max(0, counts.O - 1) : oOnR,
+      );
+      for (let i = 0; i < swaps; i++) {
+        const cell = pickWarmSwapCell(cells, 'O', 'R', result);
+        if (!cell || cell.faceId !== 'R') break;
+        applyWarmSwap(result, cell, 'R');
+        counts.O--;
+        counts.R++;
+        changed = true;
+      }
+    }
+
+    if (result.has('L') && counts.O < TARGET_PER_COLOR) {
+      const lColors = result.get('L')!;
+      const rOnL = countPeripheryColor(lColors, 'R');
+      const swaps = Math.min(
+        TARGET_PER_COLOR - counts.O,
+        rOnL,
+        !faces.has('R') ? Math.max(0, counts.R - 1) : rOnL,
+      );
+      for (let i = 0; i < swaps; i++) {
+        const cell = pickWarmSwapCell(cells, 'R', 'O', result);
+        if (!cell || cell.faceId !== 'L') break;
+        applyWarmSwap(result, cell, 'O');
+        counts.R--;
+        counts.O++;
+        changed = true;
+      }
+    }
+
+    const rSurplus = counts.R - TARGET_PER_COLOR;
+    const oSurplus = counts.O - TARGET_PER_COLOR;
+    if (rSurplus > 0 && counts.O < TARGET_PER_COLOR) {
+      const cell = pickWarmSwapCell(cells, 'R', 'O', result);
+      if (cell) {
+        applyWarmSwap(result, cell, 'O');
+        changed = true;
+      }
+    } else if (oSurplus > 0 && counts.R < TARGET_PER_COLOR) {
+      const cell = pickWarmSwapCell(cells, 'O', 'R', result);
+      if (cell) {
+        applyWarmSwap(result, cell, 'R');
+        changed = true;
+      }
+    }
+
+    if (!changed) break;
+  }
+
+  return result;
+}
+
 /** Swap similar committed colors when counts exceed 9 (misread under warm light). */
 export function reconcileMisreadColors(
   faces: Map<FaceId, ReadColor[]>,
@@ -244,7 +399,9 @@ export function reconcileLiveScanFaces(
 
   for (let pass = 0; pass < 12; pass++) {
     const previous = cloneReadFaces(current);
-    current = inferUncertainCells(reconcileMisreadColors(current));
+    current = inferUncertainCells(
+      reconcileRedOrangeFromConstraints(reconcileMisreadColors(current)),
+    );
 
     if (current.size === 6 && !hasUncertainCells(current)) {
       const counts = countScannedStickers(current);

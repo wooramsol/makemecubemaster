@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { FaceId, ReadColor } from '../../types';
-import { inferUncertainCells, reconcileLiveScanFaces, reconcileMisreadColors } from './cubeColorReconcile';
+import {
+  inferUncertainCells,
+  reconcileLiveScanFaces,
+  reconcileMisreadColors,
+  reconcileRedOrangeFromConstraints,
+} from './cubeColorReconcile';
 import {
   isAwaitingFirstWhiteCenter,
   prepareMediansForClassification,
@@ -104,5 +109,39 @@ describe('reconcileMisreadColors', () => {
     ]);
     const result = reconcileLiveScanFaces(faces);
     expect(result.get('R')![8]).toBe('R');
+  });
+});
+
+describe('reconcileRedOrangeFromConstraints', () => {
+  it('caps orange at 8 when L face is not scanned yet', () => {
+    const faces = new Map<FaceId, ReadColor[]>([
+      ['U', ['O', 'O', 'O', 'O', 'W', 'O', 'O', 'O', 'O'] as ReadColor[]],
+      ['F', Array(9).fill('G') as ReadColor[]],
+      ['R', ['O', 'O', 'O', 'O', 'R', 'O', 'O', 'O', 'O'] as ReadColor[]],
+      ['B', Array(9).fill('B') as ReadColor[]],
+      ['D', Array(9).fill('Y') as ReadColor[]],
+    ]);
+    const result = reconcileRedOrangeFromConstraints(faces);
+    let oCount = 0;
+    for (const colors of result.values()) {
+      for (const c of colors) {
+        if (c === 'O') oCount++;
+      }
+    }
+    expect(oCount).toBeLessThanOrEqual(8);
+  });
+
+  it('moves orange to red on the R face when constraints allow', () => {
+    const faces = new Map<FaceId, ReadColor[]>([
+      ['U', Array(9).fill('W') as ReadColor[]],
+      ['F', Array(9).fill('G') as ReadColor[]],
+      ['R', ['O', 'O', 'O', 'O', 'R', 'O', 'O', 'O', 'O'] as ReadColor[]],
+      ['B', Array(9).fill('B') as ReadColor[]],
+      ['D', Array(9).fill('Y') as ReadColor[]],
+    ]);
+    const result = reconcileRedOrangeFromConstraints(faces);
+    const rFace = result.get('R')!;
+    expect(rFace.filter((c) => c === 'R').length).toBeGreaterThan(1);
+    expect(rFace.some((c) => c === 'O')).toBe(true);
   });
 });
