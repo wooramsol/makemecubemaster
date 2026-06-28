@@ -74,6 +74,7 @@ export interface CubeAppState {
   colorLearnError: string | null;
   colorsCalibrated: boolean;
   liveScanNeedsClearerCenter: boolean;
+  lastCapturedFace: FaceId | null;
   solvingFeedback: SolvingFeedback;
   solvingFacelet: string;
 }
@@ -126,6 +127,7 @@ const initialState: CubeAppState = {
   colorLearnError: null,
   colorsCalibrated: false,
   liveScanNeedsClearerCenter: false,
+  lastCapturedFace: null,
   solvingFeedback: initialSolvingFeedback,
   solvingFacelet: '',
 };
@@ -323,6 +325,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
+      lastCapturedFace: null,
       detectionFeedback: initialFeedback,
       liveScanNeedsClearerCenter: false,
     }));
@@ -342,6 +345,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
+      lastCapturedFace: null,
       detectionFeedback: initialFeedback,
       liveScanNeedsClearerCenter: false,
     }));
@@ -607,6 +611,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         currentVisibleFace: snapshot.currentFace,
         liveScanProgress: snapshot.knownFaces.length / 6,
         liveScanNeedsClearerCenter: snapshot.needsClearerCenter,
+        lastCapturedFace: snapshot.newlyCaptured ?? prev.lastCapturedFace,
         detectionFeedback: buildFeedback(
           hasPose,
           colors,

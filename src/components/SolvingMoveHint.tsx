@@ -6,7 +6,7 @@ import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
 } from '../lib/vision/guideOverlay';
-import { SelfieCubeGuide } from './SelfieCubeGuide';
+import { IsometricCubeGuide } from './IsometricCubeGuide';
 
 interface SolvingMoveHintProps {
   visible: boolean;
@@ -97,7 +97,7 @@ export function SolvingMoveHint({
         </div>
 
         <div className="solving-move-hint-stage">
-          <SelfieCubeGuide move={move} facelet={facelet} />
+          <IsometricCubeGuide move={move} facelet={facelet} />
         </div>
 
         <div className="solving-move-hint-meters">

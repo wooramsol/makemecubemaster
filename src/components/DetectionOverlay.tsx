@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { DetectionFeedback, StickerColor } from '../types';
+import type { DetectionFeedback, FaceId, StickerColor } from '../types';
 import { getGuideOverlayRect, getPanelBesideGuideStyle } from '../lib/vision/guideOverlay';
-import { FaceColorGrid } from './FaceColorGrid';
+import { ScanIsoCubeGuide } from './ScanIsoCubeGuide';
 
 const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
   searching: '…',
@@ -14,6 +14,9 @@ const STATUS_LABEL: Record<DetectionFeedback['status'], string> = {
 interface DetectionOverlayProps {
   feedback: DetectionFeedback;
   visible: boolean;
+  scannedFaces: Partial<Record<FaceId, StickerColor[]>>;
+  lastCapturedFace: FaceId | null;
+  currentVisibleFace: FaceId | null;
   frameWidth: number;
   frameHeight: number;
   viewportWidth: number;
@@ -23,6 +26,9 @@ interface DetectionOverlayProps {
 export function DetectionOverlay({
   feedback,
   visible,
+  scannedFaces,
+  lastCapturedFace,
+  currentVisibleFace,
   frameWidth,
   frameHeight,
   viewportWidth,
@@ -36,16 +42,24 @@ export function DetectionOverlay({
       viewportHeight,
     );
     if (!guideRect || !viewportWidth) return undefined;
-    return getPanelBesideGuideStyle(guideRect, viewportWidth, 120);
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, 200);
   }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   if (!visible) return null;
 
-  const showGrid = feedback.cellColors.length === 9;
+  const previewColors =
+    feedback.cellColors.length === 9 ? (feedback.cellColors as StickerColor[]) : null;
 
   return (
     <div className="detection-overlay" aria-live="polite">
-      <div className="scan-ui-panel scan-ui-panel--compact" style={panelStyle}>
+      <div className="scan-ui-panel scan-ui-panel--iso" style={panelStyle}>
+        <ScanIsoCubeGuide
+          scannedFaces={scannedFaces}
+          lastCapturedFace={lastCapturedFace}
+          currentVisibleFace={currentVisibleFace}
+          previewColors={previewColors}
+        />
+
         <div className={`detection-status ${feedback.status}`}>
           <span className="status-text">{STATUS_LABEL[feedback.status]}</span>
           {feedback.status === 'rotate' && (
@@ -56,15 +70,10 @@ export function DetectionOverlay({
               {feedback.stableProgress.toFixed(1)}/{feedback.stableTarget}s
             </span>
           )}
+          {feedback.status === 'captured' && lastCapturedFace && (
+            <span className="status-progress">{lastCapturedFace} saved</span>
+          )}
         </div>
-
-        {showGrid && (
-          <FaceColorGrid
-            colors={feedback.cellColors as StickerColor[]}
-            variant="overlay"
-            orientation="mirror"
-          />
-        )}
       </div>
     </div>
   );

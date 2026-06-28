@@ -122,6 +122,9 @@ export default function App() {
             <DetectionOverlay
               feedback={state.detectionFeedback}
               visible={state.phase === 'liveScan'}
+              scannedFaces={state.scannedFaceColors}
+              lastCapturedFace={state.lastCapturedFace}
+              currentVisibleFace={state.currentVisibleFace}
               frameWidth={dimensions.width}
               frameHeight={dimensions.height}
               viewportWidth={viewportSize.width}

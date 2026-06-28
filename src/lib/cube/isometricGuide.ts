@@ -1,5 +1,6 @@
 import type { FaceId, Move, StickerColor } from '../../types';
-import { FACE_MODEL_CORNERS } from '../vision/faceModels';
+import { ALL_FACE_IDS, FACE_MODEL_CORNERS } from '../vision/faceModels';
+import { FACE_NORMALS } from './moves';
 import { getSelfieDisplayMove } from './moveRotationDisplay';
 import { isPrimeMove, moveAngle, moveFace } from './moves';
 
@@ -32,6 +33,127 @@ export interface IsoFaceOutline {
   faceId: FaceId;
   points: Point2[];
   label: Point2;
+}
+
+export interface IsoScanCell extends IsoCell {
+  depth: number;
+}
+
+export interface IsoScanCubeModel {
+  cells: IsoScanCell[];
+  faceOutlines: IsoFaceOutline[];
+  size: number;
+  visibleFaceIds: FaceId[];
+}
+
+export interface IsoScanViewAngle {
+  yaw: number;
+  pitch: number;
+}
+
+const SCAN_PITCH = -0.38;
+const SCAN_YAW_DEFAULT = Math.PI / 4;
+
+/** Isometric viewpoint that best shows each face after capture (B spins ~180°). */
+export const SCAN_VIEW_FOR_FACE: Record<FaceId, IsoScanViewAngle> = {
+  F: { yaw: SCAN_YAW_DEFAULT, pitch: SCAN_PITCH },
+  R: { yaw: -Math.PI / 4, pitch: SCAN_PITCH },
+  L: { yaw: (3 * Math.PI) / 4, pitch: SCAN_PITCH },
+  B: { yaw: SCAN_YAW_DEFAULT + Math.PI, pitch: SCAN_PITCH },
+  U: { yaw: SCAN_YAW_DEFAULT, pitch: -0.52 },
+  D: { yaw: SCAN_YAW_DEFAULT, pitch: -0.22 },
+};
+
+function transformPointYawPitch(p: Point3, yaw: number, pitch: number): Point3 {
+  return rotateX(rotateY(p, yaw), pitch);
+}
+
+function transformNormal(faceId: FaceId, yaw: number, pitch: number): Point3 {
+  const n = FACE_NORMALS[faceId];
+  return transformPointYawPitch({ x: n[0], y: n[1], z: n[2] }, yaw, pitch);
+}
+
+/** Full-cube isometric model for live scan — unscanned faces stay white. */
+export function buildIsoScanCubeModel(
+  options: {
+    yaw?: number;
+    pitch?: number;
+    size?: number;
+  } = {},
+): IsoScanCubeModel {
+  const yaw = options.yaw ?? SCAN_YAW_DEFAULT;
+  const pitch = options.pitch ?? SCAN_PITCH;
+  const size = options.size ?? 200;
+  const cx = size / 2;
+  const cy = size * 0.54;
+  const scale = size * 0.36;
+
+  const visibleFaceIds: FaceId[] = [];
+  const cells: IsoScanCell[] = [];
+  const faceOutlines: IsoFaceOutline[] = [];
+
+  for (const faceId of ALL_FACE_IDS) {
+    const normal = transformNormal(faceId, yaw, pitch);
+    if (normal.z > -0.12) continue;
+
+    visibleFaceIds.push(faceId);
+
+    const corners = FACE_MODEL_CORNERS[faceId]!.map(([x, y, z]) =>
+      isoProject(transformPointYawPitch({ x, y, z }, yaw, pitch), scale, cx, cy),
+    );
+
+    faceOutlines.push({
+      faceId,
+      points: corners,
+      label: {
+        x: corners[0]!.x + (corners[1]!.x - corners[0]!.x) * 0.08,
+        y: corners[0]!.y + (corners[1]!.y - corners[0]!.y) * 0.08 - 4,
+      },
+    });
+
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        const index = row * 3 + col;
+        const cornerPts = [0, 1, 2, 3].map((c) => {
+          const p3 = transformPointYawPitch(
+            cellCorner(faceId, row, col, c as 0 | 1 | 2 | 3),
+            yaw,
+            pitch,
+          );
+          return { p2: isoProject(p3, scale, cx, cy), z: p3.z };
+        });
+        const points = cornerPts.map((p) => p.p2);
+        const depth = cornerPts.reduce((s, p) => s + p.z, 0) / cornerPts.length;
+        cells.push({
+          faceId,
+          index,
+          points,
+          center: polygonCenter(points),
+          isTurning: false,
+          depth,
+        });
+      }
+    }
+  }
+
+  cells.sort((a, b) => b.depth - a.depth);
+
+  return { cells, faceOutlines, size, visibleFaceIds };
+}
+
+export function scanCellColor(
+  faceId: FaceId,
+  index: number,
+  scannedColors: Partial<Record<FaceId, StickerColor[]>>,
+  previewFace: FaceId | null,
+  previewColors: StickerColor[] | null,
+): StickerColor | null {
+  const scanned = scannedColors[faceId];
+  if (scanned && scanned.length === 9) return scanned[index] ?? null;
+  if (previewFace === faceId && previewColors && previewColors.length === 9) {
+    return previewColors[index] ?? null;
+  }
+  return null;
 }
 
 export interface IsoCubeGuideModel {
@@ -195,9 +317,12 @@ export function buildIsoCubeGuideModel(
   move: Move,
   holdFace: FaceId,
   size = 200,
+  selfieMirror = false,
 ): IsoCubeGuideModel {
   const turnLayer = moveFace(move);
-  const visibleFaces = visibleFacesFor(holdFace, turnLayer);
+  const visibleFaces = selfieMirror
+    ? visibleFacesForSelfie(holdFace, turnLayer)
+    : visibleFacesFor(holdFace, turnLayer);
   const cx = size / 2;
   const cy = size * 0.54;
   const scale = size * 0.36;

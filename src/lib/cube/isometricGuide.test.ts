@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildIsoCubeGuideModel, visibleFacesFor } from './isometricGuide';
+import {
+  buildIsoCubeGuideModel,
+  buildIsoScanCubeModel,
+  visibleFacesFor,
+} from './isometricGuide';
 import { getMoveHoldFace } from './moveGuidanceView';
 
 describe('isometric cube guide', () => {
@@ -35,5 +39,18 @@ describe('isometric cube guide', () => {
     const model = buildIsoCubeGuideModel('F', 'R');
     expect(model.visibleFaces).toEqual(['U', 'F', 'R']);
     expect(model.arrow?.path.startsWith('M')).toBe(true);
+  });
+
+  it('builds scan cube with three visible faces at default angle', () => {
+    const model = buildIsoScanCubeModel();
+    expect(model.cells.length).toBeGreaterThanOrEqual(27);
+    expect(model.visibleFaceIds.length).toBe(3);
+    expect(model.faceOutlines).toHaveLength(3);
+  });
+
+  it('selfie solving model swaps visible side for R move', () => {
+    const model = buildIsoCubeGuideModel('R', 'F', 200, true);
+    expect(model.visibleFaces).toEqual(['U', 'L', 'F']);
+    expect(model.arrow).not.toBeNull();
   });
 });
