@@ -51,18 +51,136 @@ export interface IsoScanViewAngle {
   pitch: number;
 }
 
-const SCAN_PITCH = -0.38;
-const SCAN_YAW_DEFAULT = Math.PI / 4;
+const SCAN_PITCH = -0.52;
+const SCAN_YAW_DEFAULT = -Math.PI / 4;
+
+/** Classic 3/4 corner view — U + two sides, vertical edge toward viewer (reference pose). */
+export const REFERENCE_CORNER_VIEW: IsoScanViewAngle = {
+  yaw: SCAN_YAW_DEFAULT,
+  pitch: SCAN_PITCH,
+};
 
 /** Isometric viewpoint that best shows each face after capture (B spins ~180°). */
 export const SCAN_VIEW_FOR_FACE: Record<FaceId, IsoScanViewAngle> = {
-  F: { yaw: SCAN_YAW_DEFAULT, pitch: SCAN_PITCH },
-  R: { yaw: -Math.PI / 4, pitch: SCAN_PITCH },
-  L: { yaw: (3 * Math.PI) / 4, pitch: SCAN_PITCH },
+  F: { ...REFERENCE_CORNER_VIEW },
+  R: { yaw: -Math.PI / 2, pitch: SCAN_PITCH },
+  L: { yaw: 0, pitch: SCAN_PITCH },
   B: { yaw: SCAN_YAW_DEFAULT + Math.PI, pitch: SCAN_PITCH },
-  U: { yaw: SCAN_YAW_DEFAULT, pitch: -0.52 },
-  D: { yaw: SCAN_YAW_DEFAULT, pitch: -0.22 },
+  U: { yaw: SCAN_YAW_DEFAULT, pitch: -0.62 },
+  D: { yaw: SCAN_YAW_DEFAULT, pitch: -0.28 },
 };
+
+export interface IsoFaceGroup {
+  faceId: FaceId;
+  depth: number;
+  cells: IsoCell[];
+  outline: IsoFaceOutline;
+}
+
+export interface CornerCubeModel {
+  faceGroups: IsoFaceGroup[];
+  size: number;
+  visibleFaceIds: FaceId[];
+}
+
+export function selectCornerFaces(yaw: number, pitch: number): FaceId[] {
+  return ALL_FACE_IDS.map((faceId) => ({
+    faceId,
+    nz: transformNormal(faceId, yaw, pitch).z,
+  }))
+    .sort((a, b) => a.nz - b.nz)
+    .slice(0, 3)
+    .map((entry) => entry.faceId);
+}
+
+function faceAvgDepth(faceId: FaceId, yaw: number, pitch: number): number {
+  const corners = FACE_MODEL_CORNERS[faceId]!;
+  let sum = 0;
+  for (const [x, y, z] of corners) {
+    sum += transformPointYawPitch({ x, y, z }, yaw, pitch).z;
+  }
+  return sum / corners.length;
+}
+
+function faceCorners2dWithView(
+  faceId: FaceId,
+  yaw: number,
+  pitch: number,
+  scale: number,
+  cx: number,
+  cy: number,
+): Point2[] {
+  return FACE_MODEL_CORNERS[faceId]!.map(([x, y, z]) =>
+    isoProject(transformPointYawPitch({ x, y, z }, yaw, pitch), scale, cx, cy),
+  );
+}
+
+/** Build a 3-face corner cube mesh with correct depth ordering. */
+export function buildCornerCubeModel(
+  options: {
+    yaw: number;
+    pitch: number;
+    size?: number;
+    faceIds?: FaceId[];
+    turningByFace?: Partial<Record<FaceId, number[]>>;
+  },
+): CornerCubeModel {
+  const yaw = options.yaw;
+  const pitch = options.pitch;
+  const size = options.size ?? 200;
+  const cx = size / 2;
+  const cy = size * 0.56;
+  const scale = size * 0.38;
+  const visibleFaceIds = options.faceIds ?? selectCornerFaces(yaw, pitch);
+  const turningByFace = options.turningByFace ?? {};
+
+  const faceGroups: IsoFaceGroup[] = visibleFaceIds
+    .map((faceId) => {
+      const corners = faceCorners2dWithView(faceId, yaw, pitch, scale, cx, cy);
+      const outline: IsoFaceOutline = {
+        faceId,
+        points: corners,
+        label: {
+          x: corners[0]!.x + (corners[1]!.x - corners[0]!.x) * 0.08,
+          y: corners[0]!.y + (corners[1]!.y - corners[0]!.y) * 0.08 - 4,
+        },
+      };
+
+      const turningIndices = new Set(turningByFace[faceId] ?? []);
+      const cells: IsoCell[] = [];
+
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          const index = row * 3 + col;
+          const points = [0, 1, 2, 3].map((c) => {
+            const p3 = transformPointYawPitch(
+              cellCorner(faceId, row, col, c as 0 | 1 | 2 | 3),
+              yaw,
+              pitch,
+            );
+            return isoProject(p3, scale, cx, cy);
+          });
+          cells.push({
+            faceId,
+            index,
+            points,
+            center: polygonCenter(points),
+            isTurning: turningIndices.has(index),
+          });
+        }
+      }
+
+      return {
+        faceId,
+        depth: faceAvgDepth(faceId, yaw, pitch),
+        cells,
+        outline,
+      };
+    })
+    .sort((a, b) => b.depth - a.depth);
+
+  return { faceGroups, size, visibleFaceIds };
+}
 
 function transformPointYawPitch(p: Point3, yaw: number, pitch: number): Point3 {
   return rotateX(rotateY(p, yaw), pitch);
@@ -73,7 +191,7 @@ function transformNormal(faceId: FaceId, yaw: number, pitch: number): Point3 {
   return transformPointYawPitch({ x: n[0], y: n[1], z: n[2] }, yaw, pitch);
 }
 
-/** Full-cube isometric model for live scan — unscanned faces stay white. */
+/** Full-cube perspective model for live scan — always 3 visible faces, depth-sorted. */
 export function buildIsoScanCubeModel(
   options: {
     yaw?: number;
@@ -84,61 +202,16 @@ export function buildIsoScanCubeModel(
   const yaw = options.yaw ?? SCAN_YAW_DEFAULT;
   const pitch = options.pitch ?? SCAN_PITCH;
   const size = options.size ?? 200;
-  const cx = size / 2;
-  const cy = size * 0.54;
-  const scale = size * 0.36;
-
-  const visibleFaceIds: FaceId[] = [];
-  const cells: IsoScanCell[] = [];
-  const faceOutlines: IsoFaceOutline[] = [];
-
-  for (const faceId of ALL_FACE_IDS) {
-    const normal = transformNormal(faceId, yaw, pitch);
-    if (normal.z > -0.12) continue;
-
-    visibleFaceIds.push(faceId);
-
-    const corners = FACE_MODEL_CORNERS[faceId]!.map(([x, y, z]) =>
-      isoProject(transformPointYawPitch({ x, y, z }, yaw, pitch), scale, cx, cy),
-    );
-
-    faceOutlines.push({
-      faceId,
-      points: corners,
-      label: {
-        x: corners[0]!.x + (corners[1]!.x - corners[0]!.x) * 0.08,
-        y: corners[0]!.y + (corners[1]!.y - corners[0]!.y) * 0.08 - 4,
-      },
-    });
-
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        const index = row * 3 + col;
-        const cornerPts = [0, 1, 2, 3].map((c) => {
-          const p3 = transformPointYawPitch(
-            cellCorner(faceId, row, col, c as 0 | 1 | 2 | 3),
-            yaw,
-            pitch,
-          );
-          return { p2: isoProject(p3, scale, cx, cy), z: p3.z };
-        });
-        const points = cornerPts.map((p) => p.p2);
-        const depth = cornerPts.reduce((s, p) => s + p.z, 0) / cornerPts.length;
-        cells.push({
-          faceId,
-          index,
-          points,
-          center: polygonCenter(points),
-          isTurning: false,
-          depth,
-        });
-      }
-    }
-  }
-
-  cells.sort((a, b) => b.depth - a.depth);
-
-  return { cells, faceOutlines, size, visibleFaceIds };
+  const corner = buildCornerCubeModel({ yaw, pitch, size });
+  const cells: IsoScanCell[] = corner.faceGroups.flatMap((group) =>
+    group.cells.map((cell) => ({ ...cell, depth: group.depth })),
+  );
+  return {
+    cells,
+    faceOutlines: corner.faceGroups.map((group) => group.outline),
+    size: corner.size,
+    visibleFaceIds: corner.visibleFaceIds,
+  };
 }
 
 export function scanCellColor(
@@ -166,7 +239,8 @@ export interface IsoCubeGuideModel {
   size: number;
 }
 
-const ISO = 0.92;
+const ISO = 0.866;
+const ISO_DEPTH = 0.5;
 
 const TURNING_CELLS: Record<FaceId, Partial<Record<FaceId, number[]>>> = {
   R: { R: [0, 1, 2, 3, 4, 5, 6, 7, 8], F: [2, 5, 8], B: [0, 3, 6], U: [2, 5, 8], D: [2, 5, 8] },
@@ -197,12 +271,6 @@ export function visibleFacesForSelfie(holdFace: FaceId, turnLayer: FaceId): Face
   ) as FaceId[];
 }
 
-const HOLD_YAW: Partial<Record<FaceId, number>> = {
-  F: Math.PI / 4,
-  R: -Math.PI / 4,
-  L: (3 * Math.PI) / 4,
-};
-
 function rotateY(p: Point3, yaw: number): Point3 {
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
@@ -215,15 +283,10 @@ function rotateX(p: Point3, pitch: number): Point3 {
   return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
 }
 
-function transformPoint(p: Point3, holdFace: FaceId): Point3 {
-  const yaw = HOLD_YAW[holdFace] ?? Math.PI / 4;
-  return rotateX(rotateY(p, yaw), -0.38);
-}
-
 function isoProject(p: Point3, scale: number, cx: number, cy: number): Point2 {
   return {
     x: cx + (p.x - p.z) * ISO * scale,
-    y: cy - p.y * scale + (p.x + p.z) * ISO * 0.5 * scale,
+    y: cy - p.y * scale + (p.x + p.z) * ISO_DEPTH * scale,
   };
 }
 
@@ -257,22 +320,17 @@ function polygonCenter(points: Point2[]): Point2 {
   };
 }
 
-function faceCorners2d(faceId: FaceId, holdFace: FaceId, scale: number, cx: number, cy: number): Point2[] {
-  return FACE_MODEL_CORNERS[faceId]!.map(([x, y, z]) =>
-    isoProject(transformPoint({ x, y, z }, holdFace), scale, cx, cy),
-  );
-}
-
 function buildArrow(
   move: Move,
   arrowFace: FaceId,
-  holdFace: FaceId,
+  yaw: number,
+  pitch: number,
   scale: number,
   cx: number,
   cy: number,
 ): IsoArrow | null {
   const effective = getSelfieDisplayMove(move);
-  const corners = faceCorners2d(arrowFace, holdFace, scale, cx, cy);
+  const corners = faceCorners2dWithView(arrowFace, yaw, pitch, scale, cx, cy);
   const center = polygonCenter(corners);
   const u = { x: corners[1]!.x - corners[0]!.x, y: corners[1]!.y - corners[0]!.y };
   const v = { x: corners[3]!.x - corners[0]!.x, y: corners[3]!.y - corners[0]!.y };
@@ -313,60 +371,44 @@ function buildArrow(
   };
 }
 
+export interface IsoCubeView {
+  yaw: number;
+  pitch: number;
+  visibleFaces: FaceId[];
+}
+
 export function buildIsoCubeGuideModel(
   move: Move,
-  holdFace: FaceId,
+  view: IsoCubeView,
   size = 200,
-  selfieMirror = false,
 ): IsoCubeGuideModel {
   const turnLayer = moveFace(move);
-  const visibleFaces = selfieMirror
-    ? visibleFacesForSelfie(holdFace, turnLayer)
-    : visibleFacesFor(holdFace, turnLayer);
   const cx = size / 2;
-  const cy = size * 0.54;
-  const scale = size * 0.36;
+  const cy = size * 0.56;
+  const scale = size * 0.38;
   const turningByFace = TURNING_CELLS[turnLayer] ?? {};
 
-  const cells: IsoCell[] = [];
-  for (const faceId of visibleFaces) {
-    const turningIndices = new Set(turningByFace[faceId] ?? []);
-    for (let row = 0; row < 3; row++) {
-      for (let col = 0; col < 3; col++) {
-        const index = row * 3 + col;
-        const points = [0, 1, 2, 3].map((c) => {
-          const p3 = transformPoint(cellCorner(faceId, row, col, c as 0 | 1 | 2 | 3), holdFace);
-          return isoProject(p3, scale, cx, cy);
-        });
-        cells.push({
-          faceId,
-          index,
-          points,
-          center: polygonCenter(points),
-          isTurning: turningIndices.has(index),
-        });
-      }
-    }
-  }
-
-  const faceOutlines: IsoFaceOutline[] = visibleFaces.map((faceId) => {
-    const points = faceCorners2d(faceId, holdFace, scale, cx, cy);
-    const label = {
-      x: points[0]!.x + (points[1]!.x - points[0]!.x) * 0.08,
-      y: points[0]!.y + (points[1]!.y - points[0]!.y) * 0.08 - 4,
-    };
-    return { faceId, points, label };
+  const corner = buildCornerCubeModel({
+    yaw: view.yaw,
+    pitch: view.pitch,
+    size,
+    faceIds: view.visibleFaces,
+    turningByFace,
   });
 
-  const arrowFace = visibleFaces.includes(turnLayer) ? turnLayer : visibleFaces[1]!;
+  const cells = corner.faceGroups.flatMap((group) => group.cells);
+  const faceOutlines = corner.faceGroups.map((group) => group.outline);
+  const arrowFace = view.visibleFaces.includes(turnLayer)
+    ? turnLayer
+    : view.visibleFaces[1]!;
 
   return {
-    holdFace,
+    holdFace: view.visibleFaces.find((faceId) => faceId !== 'U') ?? 'F',
     turnLayer,
-    visibleFaces,
+    visibleFaces: view.visibleFaces,
     cells,
     faceOutlines,
-    arrow: buildArrow(move, arrowFace, holdFace, scale, cx, cy),
+    arrow: buildArrow(move, arrowFace, view.yaw, view.pitch, scale, cx, cy),
     size,
   };
 }

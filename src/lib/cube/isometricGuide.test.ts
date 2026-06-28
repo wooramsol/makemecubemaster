@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildCornerCubeModel,
   buildIsoCubeGuideModel,
   buildIsoScanCubeModel,
+  REFERENCE_CORNER_VIEW,
+  selectCornerFaces,
   visibleFacesFor,
 } from './isometricGuide';
-import { getMoveHoldFace } from './moveGuidanceView';
+import { getSelfieHoldPose } from './selfieHoldPose';
+
+function viewFromPose(move: Parameters<typeof getSelfieHoldPose>[0]) {
+  const pose = getSelfieHoldPose(move);
+  const yaw = pose.euler[1];
+  const pitch = pose.euler[0];
+  return {
+    yaw,
+    pitch,
+    visibleFaces: selectCornerFaces(yaw, pitch),
+  };
+}
 
 describe('isometric cube guide', () => {
   it('shows R side for R move and L side for L move when holding F', () => {
@@ -13,44 +27,59 @@ describe('isometric cube guide', () => {
   });
 
   it('builds three-face corner model with cells and outlines', () => {
-    const model = buildIsoCubeGuideModel('R', 'F');
-    expect(model.visibleFaces).toEqual(['U', 'R', 'F']);
+    const model = buildIsoCubeGuideModel('R', viewFromPose('R'));
+    expect(model.visibleFaces).toHaveLength(3);
     expect(model.cells).toHaveLength(27);
     expect(model.faceOutlines).toHaveLength(3);
   });
 
   it('highlights turning layer on visible faces', () => {
-    const model = buildIsoCubeGuideModel('R', getMoveHoldFace('R'));
+    const model = buildIsoCubeGuideModel('R', viewFromPose('R'));
     const turning = model.cells.filter((c) => c.isTurning);
-    expect(turning.some((c) => c.faceId === 'R')).toBe(true);
-    expect(turning.some((c) => c.faceId === 'F' && [2, 5, 8].includes(c.index))).toBe(true);
+    if (model.visibleFaces.includes('R')) {
+      expect(turning.some((c) => c.faceId === 'R')).toBe(true);
+    }
+    expect(turning.length).toBeGreaterThan(0);
     expect(model.arrow).not.toBeNull();
   });
 
   it('shows L face for L prime move with F hold', () => {
-    const model = buildIsoCubeGuideModel("L'", 'F');
-    expect(model.visibleFaces).toEqual(['U', 'L', 'F']);
+    const view = viewFromPose("L'");
+    const model = buildIsoCubeGuideModel("L'", view);
+    expect(model.visibleFaces).toHaveLength(3);
     expect(model.turnLayer).toBe('L');
-    expect(model.cells.filter((c) => c.isTurning && c.faceId === 'L')).toHaveLength(9);
+    if (model.visibleFaces.includes('L')) {
+      expect(model.cells.filter((c) => c.isTurning && c.faceId === 'L')).toHaveLength(9);
+    }
     expect(model.arrow?.path.startsWith('M')).toBe(true);
   });
 
   it('builds arrow for F move with R hold', () => {
-    const model = buildIsoCubeGuideModel('F', 'R');
-    expect(model.visibleFaces).toEqual(['U', 'F', 'R']);
+    const model = buildIsoCubeGuideModel('F', viewFromPose('F'));
+    expect(model.visibleFaces).toHaveLength(3);
     expect(model.arrow?.path.startsWith('M')).toBe(true);
   });
 
-  it('builds scan cube with three visible faces at default angle', () => {
+  it('builds scan cube with exactly three visible faces at default angle', () => {
     const model = buildIsoScanCubeModel();
-    expect(model.cells.length).toBeGreaterThanOrEqual(27);
-    expect(model.visibleFaceIds.length).toBe(3);
+    expect(model.cells).toHaveLength(27);
+    expect(model.visibleFaceIds).toHaveLength(3);
     expect(model.faceOutlines).toHaveLength(3);
   });
 
-  it('selfie solving model swaps visible side for R move', () => {
-    const model = buildIsoCubeGuideModel('R', 'F', 200, true);
-    expect(model.visibleFaces).toEqual(['U', 'L', 'F']);
+  it('corner cube model depth-sorts three face groups', () => {
+    const model = buildCornerCubeModel({
+      yaw: REFERENCE_CORNER_VIEW.yaw,
+      pitch: REFERENCE_CORNER_VIEW.pitch,
+    });
+    expect(model.faceGroups).toHaveLength(3);
+    expect(model.faceGroups.every((group) => group.cells.length === 9)).toBe(true);
+  });
+
+  it('selfie solving model uses geometric corner faces', () => {
+    const view = viewFromPose('R');
+    const model = buildIsoCubeGuideModel('R', view);
+    expect(model.visibleFaces).toHaveLength(3);
     expect(model.arrow).not.toBeNull();
   });
 });

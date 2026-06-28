@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FaceId, StickerColor } from '../types';
-import { COLOR_HEX } from '../lib/vision/colorReference';
-import { pathFromPoints } from '../lib/cube/isoCubeSvg';
 import {
   SCAN_VIEW_FOR_FACE,
-  buildIsoScanCubeModel,
-  scanCellColor,
+  REFERENCE_CORNER_VIEW,
+  buildCornerCubeModel,
 } from '../lib/cube/isometricGuide';
 import { mirrorFaceCellsHorizontally } from '../lib/vision/selfieView';
+import { PerspectiveCubeSvg, scanCellStyle } from './PerspectiveCubeSvg';
 
-const WHITE_FACE = '#f8fafc';
-const PREVIEW_FACE = 'rgba(248, 250, 252, 0.55)';
 const ANIM_MS = 720;
 
 function easeOutCubic(t: number): number {
@@ -37,11 +34,11 @@ export function ScanIsoCubeGuide({
   currentVisibleFace,
   previewColors,
 }: ScanIsoCubeGuideProps) {
-  const [yaw, setYaw] = useState(SCAN_VIEW_FOR_FACE.F.yaw);
-  const [pitch, setPitch] = useState(SCAN_VIEW_FOR_FACE.F.pitch);
+  const [yaw, setYaw] = useState(REFERENCE_CORNER_VIEW.yaw);
+  const [pitch, setPitch] = useState(REFERENCE_CORNER_VIEW.pitch);
   const [showBackCaption, setShowBackCaption] = useState(false);
   const animRef = useRef<number>(0);
-  const viewRef = useRef({ yaw: SCAN_VIEW_FOR_FACE.F.yaw, pitch: SCAN_VIEW_FOR_FACE.F.pitch });
+  const viewRef = useRef({ yaw: REFERENCE_CORNER_VIEW.yaw, pitch: REFERENCE_CORNER_VIEW.pitch });
 
   useEffect(() => {
     if (lastCapturedFace === 'B') {
@@ -55,7 +52,7 @@ export function ScanIsoCubeGuide({
   useEffect(() => {
     const target = lastCapturedFace
       ? SCAN_VIEW_FOR_FACE[lastCapturedFace]
-      : SCAN_VIEW_FOR_FACE.F;
+      : REFERENCE_CORNER_VIEW;
     const startYaw = viewRef.current.yaw;
     const startPitch = viewRef.current.pitch;
     const deltaYaw = shortestYawDelta(startYaw, target.yaw);
@@ -90,7 +87,7 @@ export function ScanIsoCubeGuide({
   }, [scannedFaces]);
 
   const model = useMemo(
-    () => buildIsoScanCubeModel({ yaw, pitch, size: 196 }),
+    () => buildCornerCubeModel({ yaw, pitch, size: 196 }),
     [yaw, pitch],
   );
 
@@ -104,57 +101,14 @@ export function ScanIsoCubeGuide({
       className={`iso-scan-cube-wrap${showBackCaption ? ' iso-scan-cube-wrap--back' : ''}`}
       aria-label="Scan progress cube"
     >
-      <svg
+      <PerspectiveCubeSvg
+        model={model}
         className="iso-cube-guide-svg iso-cube-guide-svg--scan"
-        viewBox={`0 0 ${model.size} ${model.size}`}
-        width={model.size}
-        height={model.size}
-      >
-        {model.faceOutlines.map((face) => (
-          <path
-            key={`bg-${face.faceId}`}
-            d={pathFromPoints(face.points)}
-            className="iso-cube-guide-face-bg"
-          />
-        ))}
-
-        {model.cells.map((cell) => {
-          const raw = scanCellColor(
-            cell.faceId,
-            cell.index,
-            mirroredScanned,
-            previewFace,
-            mirroredPreview,
-          );
-          const isPreview =
-            previewFace === cell.faceId && !mirroredScanned[cell.faceId] && raw !== null;
-          const fill = raw ? COLOR_HEX[raw] : isPreview ? PREVIEW_FACE : WHITE_FACE;
-          const scanned = Boolean(mirroredScanned[cell.faceId]);
-          return (
-            <path
-              key={`${cell.faceId}-${cell.index}`}
-              d={pathFromPoints(cell.points)}
-              className={
-                scanned
-                  ? 'iso-cube-guide-cell iso-cube-guide-cell--scanned'
-                  : isPreview
-                    ? 'iso-cube-guide-cell iso-cube-guide-cell--preview'
-                    : 'iso-cube-guide-cell iso-cube-guide-cell--empty'
-              }
-              fill={fill}
-            />
-          );
-        })}
-
-        {model.faceOutlines.map((face) => (
-          <path
-            key={`outline-${face.faceId}`}
-            d={pathFromPoints(face.points)}
-            className="iso-cube-guide-face-outline"
-            fill="none"
-          />
-        ))}
-      </svg>
+        ariaLabel="Cube scan progress"
+        cellStyle={(faceId, index) =>
+          scanCellStyle(faceId, index, mirroredScanned, previewFace, mirroredPreview)
+        }
+      />
       {showBackCaption && (
         <p className="iso-scan-cube-caption">Back face captured — cube rotated</p>
       )}
