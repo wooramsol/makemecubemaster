@@ -15,13 +15,30 @@ const CHROMA_REFS: Record<StickerColor, [number, number, number]> = {
 /** Min chromaticity gap between 1st and 2nd candidate to accept a read. */
 const CONFIDENCE_MARGIN = 0.016;
 
-/** R/O chroma refs are very close — require a wider gap before committing under warm light. */
-const RED_ORANGE_MARGIN = 0.042;
-
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
 
-function isRedOrangePair(a: StickerColor, b: StickerColor): boolean {
-  return (a === 'R' || a === 'O') && (b === 'R' || b === 'O') && a !== b;
+let lastCenterWarm = false;
+
+/** Center pixel was in the red/orange hue band (face ID deferred until constraints allow). */
+export function wasLastCenterWarm(): boolean {
+  return lastCenterWarm;
+}
+
+export function resetLastCenterWarm(): void {
+  lastCenterWarm = false;
+}
+
+/** Warm red-orange band — used for R/L face capture, not for committing sticker color. */
+export function isWarmRedOrangeHue(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max < 55) return false;
+  if (max - min < 28) return false;
+  return r > b + 12 && r >= g - 30;
+}
+
+export function deferRedOrangeInReads(colors: ReadColor[]): ReadColor[] {
+  return colors.map((c) => (c === 'R' || c === 'O' ? '?' : c));
 }
 
 const FALLBACK_LAB: Record<StickerColor, [number, number, number]> = {
@@ -162,22 +179,12 @@ function classifyCellRelative(r: number, g: number, b: number): ReadColor {
   const second = scores[1]!;
   const margin = second.dist - best.dist;
 
-  if (isRedOrangePair(best.color, second.color)) {
-    if (margin < RED_ORANGE_MARGIN) return '?';
-  }
-
-  if (best.color === 'R' || best.color === 'O') {
-    const other = best.color === 'R' ? 'O' : 'R';
-    const otherScore = scores.find((s) => s.color === other);
-    if (otherScore && best.dist - otherScore.dist < RED_ORANGE_MARGIN) return '?';
-  }
-
   if (margin < CONFIDENCE_MARGIN) {
     const yoTie =
       (best.color === 'Y' || best.color === 'O') &&
       (second.color === 'Y' || second.color === 'O');
     if (yoTie) {
-      if (r - g > 22) return 'O';
+      if (r - g > 22) return '?';
       if (g >= r - 20) return 'Y';
     }
     if (margin < CONFIDENCE_MARGIN * 0.35) return '?';
@@ -190,6 +197,10 @@ function classifyCellRelative(r: number, g: number, b: number): ReadColor {
   }
 
   if (margin < CONFIDENCE_MARGIN) return '?';
+
+  // Never commit red/orange from camera — infer later from cube constraints.
+  if (best.color === 'R' || best.color === 'O') return '?';
+
   return best.color;
 }
 
@@ -349,7 +360,9 @@ export function sampleFaceColors(
 
   if (!isColorsCalibrated()) {
     const adjusted = prepareMediansForClassification(medians);
-    return classifyFaceRelative(adjusted);
+    const center = adjusted[4]!;
+    lastCenterWarm = isWarmRedOrangeHue(center[0], center[1], center[2]);
+    return deferRedOrangeInReads(classifyFaceRelative(adjusted));
   }
 
   const colors: StickerColor[] = [];

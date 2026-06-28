@@ -12,10 +12,21 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
 };
 
 const STICKER_COLORS: StickerColor[] = ['W', 'Y', 'R', 'O', 'G', 'B'];
+const WARM_COLORS: StickerColor[] = ['R', 'O'];
 const TARGET_PER_COLOR = 9;
 
 function possibleColors(counts: Record<StickerColor, number>): StickerColor[] {
   return STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+}
+
+function feasibleColorsForCell(
+  counts: Record<StickerColor, number>,
+  cell: { faceId: FaceId; index: number },
+): StickerColor[] {
+  const options = possibleColors(counts);
+  const center = FACE_CENTER[cell.faceId];
+  if (cell.index === 4) return [center];
+  return options;
 }
 
 function collectCountsAndUnknowns(result: Map<FaceId, ReadColor[]>): {
@@ -138,9 +149,9 @@ export function inferUncertainCells(
     }
 
     for (const cell of unknowns) {
-      const possible = possibleColors(counts);
-      if (possible.length === 1) {
-        assign(cell, possible[0]!);
+      const feasible = feasibleColorsForCell(counts, cell);
+      if (feasible.length === 1) {
+        assign(cell, feasible[0]!);
       }
     }
     if (changed) continue;
@@ -160,27 +171,16 @@ export function inferUncertainCells(
     }
     if (changed) continue;
 
-    const rDeficit = TARGET_PER_COLOR - counts.R;
-    const oDeficit = TARGET_PER_COLOR - counts.O;
     const warmUnknowns = unknowns.filter((cell) => {
       if (result.get(cell.faceId)![cell.index] !== '?') return false;
-      const center = FACE_CENTER[cell.faceId];
-      return center === 'R' || center === 'O';
+      const feasible = feasibleColorsForCell(counts, cell);
+      return feasible.every((c) => WARM_COLORS.includes(c));
     });
-    if (rDeficit === 0 && oDeficit > 0) {
-      for (const cell of warmUnknowns) {
-        if (result.get(cell.faceId)![cell.index] !== '?') continue;
-        if (oDeficit === 1 && warmUnknowns.length === 1) {
-          assign(cell, 'O');
-        }
-      }
-    } else if (oDeficit === 0 && rDeficit > 0) {
-      for (const cell of warmUnknowns) {
-        if (result.get(cell.faceId)![cell.index] !== '?') continue;
-        if (rDeficit === 1 && warmUnknowns.length === 1) {
-          assign(cell, 'R');
-        }
-      }
+    const rDeficit = TARGET_PER_COLOR - counts.R;
+    const oDeficit = TARGET_PER_COLOR - counts.O;
+    if (warmUnknowns.length === 1) {
+      if (rDeficit === 1 && oDeficit === 0) assign(warmUnknowns[0]!, 'R');
+      else if (oDeficit === 1 && rDeficit === 0) assign(warmUnknowns[0]!, 'O');
     }
     if (changed) continue;
 
@@ -202,7 +202,9 @@ export function inferUncertainCells(
         }
       }
       if (dominantCount >= 7 && counts[dominant] < TARGET_PER_COLOR) {
-        assign(cell, dominant);
+        if (dominant !== 'R' && dominant !== 'O') {
+          assign(cell, dominant);
+        }
       }
     }
   }

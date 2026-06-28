@@ -2,6 +2,7 @@ import { identifyFaceFromCenter, getFaceCenterColor } from '../cube/colors';
 import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
 import { inferUncertainCells } from './cubeColorReconcile';
+import { wasLastCenterWarm } from './colorClassifier';
 
 /** Periphery cells only — center is used for face ID and may jitter */
 const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
@@ -22,6 +23,7 @@ export interface LiveScanSnapshot {
   newlyCaptured: FaceId | null;
   needsNewFace: boolean;
   needsClearerCenter: boolean;
+  needsDeferredWarmFace: boolean;
 }
 
 function countMatchingPeriphery(a: ReadColor[], b: ReadColor[]): number {
@@ -81,18 +83,15 @@ function majorityVoteCells(readings: ReadColor[][]): ReadColor[] {
     let best: StickerColor = 'W';
     let bestCount = 0;
     for (const [color, count] of votes) {
+      if (color === 'R' || color === 'O') continue;
       if (count > bestCount) {
         bestCount = count;
         best = color;
       }
     }
-    const rVotes = votes.get('R') ?? 0;
-    const oVotes = votes.get('O') ?? 0;
-    const redOrangeSplit =
-      rVotes > 0 && oVotes > 0 && Math.abs(rVotes - oVotes) < 3;
 
     const confidentReadings = readings.length - uncertainCount;
-    if (bestCount < 2 || bestCount < confidentReadings * 0.45 || redOrangeSplit) {
+    if (bestCount < 2 || bestCount < confidentReadings * 0.45) {
       result.push('?');
     } else {
       result.push(best);
@@ -120,6 +119,14 @@ function majorityVoteCenter(readings: ReadColor[][]): StickerColor | null {
   return bestCount >= 2 ? best : null;
 }
 
+function pickMissingWarmFace(faces: Map<FaceId, ReadColor[]>): FaceId | null {
+  const needR = !faces.has('R');
+  const needL = !faces.has('L');
+  if (needR && !needL) return 'R';
+  if (needL && !needR) return 'L';
+  return null;
+}
+
 function pickFaceIdForCapture(
   voted: ReadColor[],
   faces: Map<FaceId, ReadColor[]>,
@@ -135,6 +142,11 @@ function pickFaceIdForCapture(
     if (center === null || !isKnownColor(center)) continue;
     const faceId = identifyFaceFromCenter(center);
     if (faceId && !faces.has(faceId)) return faceId;
+  }
+
+  if (wasLastCenterWarm()) {
+    const warmFace = pickMissingWarmFace(faces);
+    if (warmFace) return warmFace;
   }
 
   return null;
@@ -203,6 +215,7 @@ export class LiveFaceAccumulator {
       newlyCaptured: null,
       needsNewFace: false,
       needsClearerCenter: false,
+      needsDeferredWarmFace: false,
     };
 
     if (!colors || colors.length !== 9) {
@@ -244,6 +257,7 @@ export class LiveFaceAccumulator {
 
     let newlyCaptured: FaceId | null = null;
     let needsClearerCenter = false;
+    let needsDeferredWarmFace = false;
 
     if (stableMs >= STABLE_DURATION_MS) {
       const history = [...this.pendingReadings, [...colors]];
@@ -265,6 +279,8 @@ export class LiveFaceAccumulator {
         this.pendingReadings = [];
       } else {
         needsClearerCenter = true;
+        needsDeferredWarmFace =
+          wasLastCenterWarm() && !this.faces.has('R') && !this.faces.has('L');
         this.stableSinceMs = nowMs - STABLE_DURATION_MS + 400;
       }
     }
@@ -281,6 +297,7 @@ export class LiveFaceAccumulator {
       newlyCaptured,
       needsNewFace: false,
       needsClearerCenter,
+      needsDeferredWarmFace,
     };
   }
 }

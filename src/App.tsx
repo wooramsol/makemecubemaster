@@ -136,6 +136,7 @@ export default function App() {
               progress={state.liveScanProgress}
               needsNewFace={state.detectionFeedback.status === 'rotate'}
               needsClearerCenter={state.liveScanNeedsClearerCenter}
+              needsDeferredWarmFace={state.liveScanNeedsDeferredWarmFace}
             />
 
             {isSolving && currentMove && (

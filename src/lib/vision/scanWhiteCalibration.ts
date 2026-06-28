@@ -4,6 +4,7 @@ import {
   resetWhiteBalance,
   setWhiteBalanceFromSample,
 } from './whiteBalance';
+import { resetLastCenterWarm } from './colorClassifier';
 
 let awaitingFirstWhiteCenter = true;
 
@@ -11,6 +12,7 @@ let awaitingFirstWhiteCenter = true;
 export function resetScanWhiteCalibration(): void {
   awaitingFirstWhiteCenter = true;
   resetWhiteBalance();
+  resetLastCenterWarm();
 }
 
 export function isAwaitingFirstWhiteCenter(): boolean {

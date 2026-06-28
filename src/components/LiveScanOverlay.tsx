@@ -7,6 +7,7 @@ interface LiveScanOverlayProps {
   progress: number;
   needsNewFace?: boolean;
   needsClearerCenter?: boolean;
+  needsDeferredWarmFace?: boolean;
 }
 
 export function LiveScanOverlay({
@@ -15,6 +16,7 @@ export function LiveScanOverlay({
   progress,
   needsNewFace = false,
   needsClearerCenter = false,
+  needsDeferredWarmFace = false,
 }: LiveScanOverlayProps) {
   if (phase !== 'liveScan') return null;
 
@@ -32,13 +34,16 @@ export function LiveScanOverlay({
         </p>
       ) : (
         <p className="calibration-hint calibration-hint--muted">
-          ? cells fill as other faces scan — red/orange deferred under warm light
+          ? cells fill as other faces scan — red/orange never read from camera
         </p>
       )}
       {needsNewFace && (
         <p className="calibration-hint">Show a different face</p>
       )}
-      {needsClearerCenter && !needsNewFace && !awaitingWhite && (
+      {needsDeferredWarmFace && (
+        <p className="calibration-hint">Scan white / yellow / green / blue faces first</p>
+      )}
+      {needsClearerCenter && !needsNewFace && !awaitingWhite && !needsDeferredWarmFace && (
         <p className="calibration-hint">Hold steady — reading colors</p>
       )}
     </div>

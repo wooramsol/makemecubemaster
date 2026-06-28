@@ -37,7 +37,7 @@ describe('relative face color classification', () => {
     expect(colors.some((c) => c === 'R' || c === '?')).toBe(true);
   });
 
-  it('defers red vs orange under yellow light instead of guessing', () => {
+  it('never reads red or orange from camera — always deferred', () => {
     resetColorReferences();
     const warmOrange: [number, number, number] = [235, 140, 75];
     const warmRed: [number, number, number] = [220, 90, 80];
