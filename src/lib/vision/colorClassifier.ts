@@ -15,7 +15,14 @@ const CHROMA_REFS: Record<StickerColor, [number, number, number]> = {
 /** Min chromaticity gap between 1st and 2nd candidate to accept a read. */
 const CONFIDENCE_MARGIN = 0.016;
 
+/** R/O chroma refs are very close — require a wider gap before committing under warm light. */
+const RED_ORANGE_MARGIN = 0.042;
+
 const ALL_COLORS: StickerColor[] = ['R', 'O', 'Y', 'G', 'B', 'W'];
+
+function isRedOrangePair(a: StickerColor, b: StickerColor): boolean {
+  return (a === 'R' || a === 'O') && (b === 'R' || b === 'O') && a !== b;
+}
 
 const FALLBACK_LAB: Record<StickerColor, [number, number, number]> = {
   W: [95, 0, 0],
@@ -154,6 +161,16 @@ function classifyCellRelative(r: number, g: number, b: number): ReadColor {
   const best = scores[0]!;
   const second = scores[1]!;
   const margin = second.dist - best.dist;
+
+  if (isRedOrangePair(best.color, second.color)) {
+    if (margin < RED_ORANGE_MARGIN) return '?';
+  }
+
+  if (best.color === 'R' || best.color === 'O') {
+    const other = best.color === 'R' ? 'O' : 'R';
+    const otherScore = scores.find((s) => s.color === other);
+    if (otherScore && best.dist - otherScore.dist < RED_ORANGE_MARGIN) return '?';
+  }
 
   if (margin < CONFIDENCE_MARGIN) {
     const yoTie =

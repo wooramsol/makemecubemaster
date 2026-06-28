@@ -160,6 +160,30 @@ export function inferUncertainCells(
     }
     if (changed) continue;
 
+    const rDeficit = TARGET_PER_COLOR - counts.R;
+    const oDeficit = TARGET_PER_COLOR - counts.O;
+    const warmUnknowns = unknowns.filter((cell) => {
+      if (result.get(cell.faceId)![cell.index] !== '?') return false;
+      const center = FACE_CENTER[cell.faceId];
+      return center === 'R' || center === 'O';
+    });
+    if (rDeficit === 0 && oDeficit > 0) {
+      for (const cell of warmUnknowns) {
+        if (result.get(cell.faceId)![cell.index] !== '?') continue;
+        if (oDeficit === 1 && warmUnknowns.length === 1) {
+          assign(cell, 'O');
+        }
+      }
+    } else if (oDeficit === 0 && rDeficit > 0) {
+      for (const cell of warmUnknowns) {
+        if (result.get(cell.faceId)![cell.index] !== '?') continue;
+        if (rDeficit === 1 && warmUnknowns.length === 1) {
+          assign(cell, 'R');
+        }
+      }
+    }
+    if (changed) continue;
+
     for (const cell of unknowns) {
       if (result.get(cell.faceId)![cell.index] !== '?') continue;
 

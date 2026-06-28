@@ -4,6 +4,10 @@ import { classifyFaceRelative, classifySticker } from './colorClassifier';
 import { resetColorReferences } from './colorReference';
 import type { ReadColor } from '../../types';
 
+function classifyCell(r: number, g: number, b: number): ReadColor {
+  return classifyFaceRelative([[r, g, b]])[0]!;
+}
+
 describe('relative face color classification', () => {
   it('classifies warm/yellow lighting using chromaticity ratios', () => {
     resetColorReferences();
@@ -30,6 +34,14 @@ describe('relative face color classification', () => {
     const colors: ReadColor[] = classifyFaceRelative(warmMixed);
     expect(colors[4]).toBe('Y');
     expect(colors).toContain('B');
-    expect(colors).toContain('R');
+    expect(colors.some((c) => c === 'R' || c === '?')).toBe(true);
+  });
+
+  it('defers red vs orange under yellow light instead of guessing', () => {
+    resetColorReferences();
+    const warmOrange: [number, number, number] = [235, 140, 75];
+    const warmRed: [number, number, number] = [220, 90, 80];
+    expect(classifyCell(...warmOrange)).toBe('?');
+    expect(classifyCell(...warmRed)).toBe('?');
   });
 });

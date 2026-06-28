@@ -32,7 +32,7 @@ export function LiveScanOverlay({
         </p>
       ) : (
         <p className="calibration-hint calibration-hint--muted">
-          ? cells fill automatically as other faces scan — no re-scan needed
+          ? cells fill as other faces scan — red/orange deferred under warm light
         </p>
       )}
       {needsNewFace && (

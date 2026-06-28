@@ -86,8 +86,13 @@ function majorityVoteCells(readings: ReadColor[][]): ReadColor[] {
         best = color;
       }
     }
+    const rVotes = votes.get('R') ?? 0;
+    const oVotes = votes.get('O') ?? 0;
+    const redOrangeSplit =
+      rVotes > 0 && oVotes > 0 && Math.abs(rVotes - oVotes) < 3;
+
     const confidentReadings = readings.length - uncertainCount;
-    if (bestCount < 2 || bestCount < confidentReadings * 0.45) {
+    if (bestCount < 2 || bestCount < confidentReadings * 0.45 || redOrangeSplit) {
       result.push('?');
     } else {
       result.push(best);

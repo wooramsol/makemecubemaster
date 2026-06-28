@@ -47,4 +47,20 @@ describe('inferUncertainCells', () => {
     const result = inferUncertainCells(faces);
     expect(result.get('F')![8]).toBe('G');
   });
+
+  it('resolves deferred red/orange when only one warm color remains', () => {
+    const faces = new Map<FaceId, ReadColor[]>([
+      ['U', Array(9).fill('W') as ReadColor[]],
+      ['D', Array(9).fill('Y') as ReadColor[]],
+      ['F', Array(9).fill('G') as ReadColor[]],
+      ['B', Array(9).fill('B') as ReadColor[]],
+      [
+        'R',
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', '?'] as ReadColor[],
+      ],
+      ['L', Array(9).fill('O') as ReadColor[]],
+    ]);
+    const result = inferUncertainCells(faces);
+    expect(result.get('R')![8]).toBe('R');
+  });
 });
