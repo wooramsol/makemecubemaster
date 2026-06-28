@@ -1236,6 +1236,10 @@ body,
   overflow: visible;
 }
 
+.solving-move-hint-stage .selfie-cube-guide {
+  height: 196px;
+}
+
 .solving-move-hint-stage .iso-cube-guide-svg {
   max-width: 100%;
   background: #111827;

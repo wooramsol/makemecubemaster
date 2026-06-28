@@ -87,7 +87,7 @@ export function ScanIsoCubeGuide({
   }, [scannedFaces]);
 
   const model = useMemo(
-    () => buildCornerCubeModel({ yaw, pitch, size: 196 }),
+    () => buildCornerCubeModel({ yaw, pitch, size: 196, faceIds: ['U', 'F', 'R'] }),
     [yaw, pitch],
   );
 

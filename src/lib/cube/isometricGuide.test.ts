@@ -4,19 +4,16 @@ import {
   buildIsoCubeGuideModel,
   buildIsoScanCubeModel,
   REFERENCE_CORNER_VIEW,
-  selectCornerFaces,
   visibleFacesFor,
 } from './isometricGuide';
 import { getSelfieHoldPose } from './selfieHoldPose';
 
 function viewFromPose(move: Parameters<typeof getSelfieHoldPose>[0]) {
   const pose = getSelfieHoldPose(move);
-  const yaw = pose.euler[1];
-  const pitch = pose.euler[0];
   return {
-    yaw,
-    pitch,
-    visibleFaces: selectCornerFaces(yaw, pitch),
+    yaw: pose.euler[1],
+    pitch: pose.euler[0],
+    visibleFaces: pose.visibleFaces,
   };
 }
 
@@ -141,5 +138,16 @@ describe('isometric cube guide', () => {
         }
       }
     }
+  });
+
+  it('uses hold-pose visible faces for B move (shows F, not back B)', () => {
+    const pose = getSelfieHoldPose('B');
+    expect(pose.visibleFaces).toEqual(['U', 'F', 'L']);
+    const model = buildCornerCubeModel({
+      yaw: pose.euler[1],
+      pitch: pose.euler[0],
+      faceIds: pose.visibleFaces,
+    });
+    expect(model.faceGroups.map((g) => g.faceId).sort()).toEqual(['F', 'L', 'U']);
   });
 });

@@ -3,7 +3,7 @@ import type { FaceId, Move, StickerColor } from '../types';
 import { getFaceletFaceColors } from '../lib/cube/moveColorProgress';
 import { getMoveGuidanceView } from '../lib/cube/moveGuidanceView';
 import { getSelfieHoldPose } from '../lib/cube/selfieHoldPose';
-import { buildCornerCubeModel, buildIsoCubeGuideModel, selectCornerFaces } from '../lib/cube/isometricGuide';
+import { buildCornerCubeModel, buildIsoCubeGuideModel } from '../lib/cube/isometricGuide';
 import { mirrorFaceCellsHorizontally } from '../lib/vision/selfieView';
 import { moveFace } from '../lib/cube/moves';
 import { PerspectiveCubeSvg, solveCellStyle } from './PerspectiveCubeSvg';
@@ -25,15 +25,14 @@ interface IsometricCubeGuideProps {
 export function IsometricCubeGuide({ move, facelet }: IsometricCubeGuideProps) {
   const guidance = useMemo(() => getMoveGuidanceView(move), [move]);
   const holdPose = useMemo(() => getSelfieHoldPose(move), [move]);
-  const view = useMemo(() => {
-    const yaw = holdPose.euler[1];
-    const pitch = holdPose.euler[0];
-    return {
-      yaw,
-      pitch,
-      visibleFaces: selectCornerFaces(yaw, pitch),
-    };
-  }, [holdPose]);
+  const view = useMemo(
+    () => ({
+      yaw: holdPose.euler[1],
+      pitch: holdPose.euler[0],
+      visibleFaces: holdPose.visibleFaces,
+    }),
+    [holdPose],
+  );
 
   const guide = useMemo(() => buildIsoCubeGuideModel(move, view), [move, view]);
 
