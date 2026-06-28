@@ -100,7 +100,7 @@ export function getPanelBesideGuideStyle(
   panelMaxWidth = 220,
   gap = 12,
 ): { left: string; top: string; transform: string; maxWidth: string } {
-  const width = Math.min(panelMaxWidth, Math.max(140, viewportWidth * 0.38));
+  const width = Math.min(panelMaxWidth, Math.max(200, viewportWidth * 0.42));
   const left = Math.min(guideRect.left + guideRect.width + gap, viewportWidth - width - 8);
   const top = guideRect.top + guideRect.height / 2;
   return {

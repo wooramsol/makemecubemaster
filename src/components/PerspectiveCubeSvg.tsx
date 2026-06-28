@@ -40,8 +40,6 @@ export function PerspectiveCubeSvg({
     const size = model.size;
     canvas.width = Math.round(size * dpr);
     canvas.height = Math.round(size * dpr);
-    canvas.style.width = `${size}px`;
-    canvas.style.height = `${size}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;

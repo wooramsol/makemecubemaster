@@ -42,7 +42,7 @@ export function DetectionOverlay({
       viewportHeight,
     );
     if (!guideRect || !viewportWidth) return undefined;
-    return getPanelBesideGuideStyle(guideRect, viewportWidth, 200);
+    return getPanelBesideGuideStyle(guideRect, viewportWidth, 228);
   }, [frameWidth, frameHeight, viewportWidth, viewportHeight]);
 
   if (!visible) return null;

@@ -1115,6 +1115,7 @@ body,
   background: #111827;
   border-radius: 8px;
   padding: 4px;
+  width: 100%;
 }
 
 .iso-scan-cube-wrap--back .iso-cube-guide-svg--scan {
@@ -1148,10 +1149,11 @@ body,
   margin: 0 auto;
   background: #111827;
   border-radius: 4px;
+  aspect-ratio: 1;
 }
 
 .iso-cube-guide-svg--scan {
-  max-width: 196px;
+  max-width: 100%;
 }
 
 .iso-cube-guide-face-bg {
@@ -1207,13 +1209,15 @@ body,
   fill: #ffffff;
 }
 
-.scan-ui-panel--iso {
-  min-width: 168px;
+.scan-ui-panel.scan-ui-panel--iso {
+  max-width: min(48vw, 228px);
+  min-width: 200px;
   padding: 10px 10px 8px;
   background: rgba(17, 24, 39, 0.94);
   border-radius: 12px;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  overflow: visible;
 }
 
 .solving-move-hint-stage .iso-cube-guide-svg {
