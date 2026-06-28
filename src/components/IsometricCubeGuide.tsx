@@ -4,7 +4,6 @@ import { getFaceletFaceColors } from '../lib/cube/moveColorProgress';
 import { getMoveGuidanceView } from '../lib/cube/moveGuidanceView';
 import { getSelfieHoldPose } from '../lib/cube/selfieHoldPose';
 import { buildCornerCubeModel, buildIsoCubeGuideModel, selectCornerFaces } from '../lib/cube/isometricGuide';
-import { arrowHead } from '../lib/cube/isoCubeSvg';
 import { mirrorFaceCellsHorizontally } from '../lib/vision/selfieView';
 import { moveFace } from '../lib/cube/moves';
 import { PerspectiveCubeSvg, solveCellStyle } from './PerspectiveCubeSvg';
@@ -66,17 +65,7 @@ export function IsometricCubeGuide({ move, facelet }: IsometricCubeGuideProps) {
       model={model}
       ariaLabel={`Turn ${guidance.turnLayer} layer ${guidance.direction.toLowerCase()}`}
       cellStyle={(faceId, index, cell) => solveCellStyle(faceId, index, cell, faceColors)}
-      arrow={
-        guide.arrow && (
-          <g className="iso-cube-guide-arrow">
-            <path d={guide.arrow.path} className="iso-cube-guide-arrow-path" fill="none" />
-            <path
-              d={arrowHead(guide.arrow.head, guide.arrow.headAngle, 11)}
-              className="iso-cube-guide-arrow-head"
-            />
-          </g>
-        )
-      }
+      arrow={guide.arrow}
     />
   );
 }

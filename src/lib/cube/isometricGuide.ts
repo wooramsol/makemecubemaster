@@ -241,7 +241,7 @@ export function buildCornerCubeModel(
         gridLines: buildFaceGridLines(rawCorners),
       };
     })
-    .sort((a, b) => b.depth - a.depth);
+    .sort((a, b) => a.depth - b.depth);
 
   return { faceGroups, size, visibleFaceIds };
 }

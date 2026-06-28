@@ -84,6 +84,18 @@ describe('isometric cube guide', () => {
     expect(model.arrow).not.toBeNull();
   });
 
+  it('depth-sorts face groups far-to-near for painter order', () => {
+    const model = buildCornerCubeModel({
+      yaw: REFERENCE_CORNER_VIEW.yaw,
+      pitch: REFERENCE_CORNER_VIEW.pitch,
+    });
+    expect(model.faceGroups.length).toBe(3);
+    for (let i = 1; i < model.faceGroups.length; i++) {
+      expect(model.faceGroups[i]!.depth).toBeGreaterThanOrEqual(model.faceGroups[i - 1]!.depth);
+    }
+    expect(model.faceGroups[model.faceGroups.length - 1]!.faceId).toBe('U');
+  });
+
   it('orders face quads counter-clockwise in screen space', () => {
     const model = buildCornerCubeModel({
       yaw: REFERENCE_CORNER_VIEW.yaw,

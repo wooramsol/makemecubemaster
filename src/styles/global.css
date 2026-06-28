@@ -1146,6 +1146,8 @@ body,
   height: auto;
   max-width: 200px;
   margin: 0 auto;
+  background: #111827;
+  border-radius: 4px;
 }
 
 .iso-cube-guide-svg--scan {

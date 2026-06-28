@@ -1,12 +1,10 @@
-import { useId, type ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FaceId, StickerColor } from '../types';
 import { COLOR_HEX } from '../lib/vision/colorReference';
-import type { CornerCubeModel, IsoCell } from '../lib/cube/isometricGuide';
-import { pathFromPoints, pointsToAttr } from '../lib/cube/isoCubeSvg';
+import type { CornerCubeModel, IsoArrow, IsoCell } from '../lib/cube/isometricGuide';
+import { drawPerspectiveCube } from '../lib/cube/perspectiveCubeCanvas';
 
 const WHITE_FACE = '#f8fafc';
-const FRAME_BLACK = '#0a0a0a';
-const SVG_BG = '#111827';
 
 export interface PerspectiveCellStyle {
   fill: string;
@@ -20,8 +18,7 @@ interface PerspectiveCubeSvgProps {
   cellStyle: CellStyleFn;
   className?: string;
   ariaLabel?: string;
-  arrow?: ReactNode;
-  /** Solid fill under the 3×3 grid — prevents see-through gaps. */
+  arrow?: IsoArrow | null;
   faceBaseFill?: string;
 }
 
@@ -30,88 +27,41 @@ export function PerspectiveCubeSvg({
   cellStyle,
   className = 'iso-cube-guide-svg',
   ariaLabel,
-  arrow,
+  arrow = null,
   faceBaseFill = WHITE_FACE,
 }: PerspectiveCubeSvgProps) {
-  const uid = useId().replace(/:/g, '');
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const size = model.size;
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawPerspectiveCube(ctx, model, (faceId, index, cell) => cellStyle(faceId, index, cell), {
+      faceBaseFill,
+      arrow,
+    });
+  }, [model, cellStyle, faceBaseFill, arrow]);
 
   return (
-    <svg
+    <canvas
+      ref={canvasRef}
       className={className}
-      viewBox={`0 0 ${model.size} ${model.size}`}
       width={model.size}
       height={model.size}
       role="img"
       aria-label={ariaLabel}
-      shapeRendering="geometricPrecision"
-    >
-      <defs>
-        {model.faceGroups.map((group) => (
-          <clipPath key={`clip-def-${group.faceId}`} id={`${uid}-clip-${group.faceId}`}>
-            <polygon points={pointsToAttr(group.outline.points)} />
-          </clipPath>
-        ))}
-      </defs>
-
-      <rect x={0} y={0} width={model.size} height={model.size} fill={SVG_BG} />
-
-      {model.faceGroups.map((group) => {
-        const clipId = `${uid}-clip-${group.faceId}`;
-        return (
-          <g key={`face-${group.faceId}`} clipPath={`url(#${clipId})`}>
-            <rect
-              x={0}
-              y={0}
-              width={model.size}
-              height={model.size}
-              fill={faceBaseFill}
-              style={{ fill: faceBaseFill, fillOpacity: 1 }}
-            />
-            {group.cells.map((cell) => {
-              const style = cellStyle(group.faceId, cell.index, cell);
-              return (
-                <polygon
-                  key={`${group.faceId}-${cell.index}`}
-                  points={pointsToAttr(cell.points)}
-                  className={style.className}
-                  fill={style.fill}
-                  style={{ fill: style.fill, fillOpacity: 1 }}
-                  stroke={style.fill}
-                  strokeWidth={0.5}
-                  strokeLinejoin="miter"
-                />
-              );
-            })}
-          </g>
-        );
-      })}
-
-      {model.faceGroups.map((group) => (
-        <g key={`grid-${group.faceId}`} className="iso-cube-guide-grid" pointerEvents="none">
-          {group.gridLines.map((line, index) => (
-            <path
-              key={`${group.faceId}-grid-${index}`}
-              d={line}
-              fill="none"
-              stroke={FRAME_BLACK}
-              strokeWidth={1.2}
-              strokeLinecap="square"
-            />
-          ))}
-        </g>
-      ))}
-
-      {model.faceGroups.map((group) => (
-        <path
-          key={`outline-${group.faceId}`}
-          d={pathFromPoints(group.outline.points)}
-          className="iso-cube-guide-face-outline"
-          fill="none"
-        />
-      ))}
-
-      {arrow}
-    </svg>
+    />
   );
 }
 
