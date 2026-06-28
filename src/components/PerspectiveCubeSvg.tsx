@@ -20,6 +20,8 @@ interface PerspectiveCubeSvgProps {
   className?: string;
   ariaLabel?: string;
   arrow?: ReactNode;
+  /** Solid fill under the 3×3 grid — prevents see-through gaps. */
+  faceBaseFill?: string;
 }
 
 export function PerspectiveCubeSvg({
@@ -28,6 +30,7 @@ export function PerspectiveCubeSvg({
   className = 'iso-cube-guide-svg',
   ariaLabel,
   arrow,
+  faceBaseFill = WHITE_FACE,
 }: PerspectiveCubeSvgProps) {
   return (
     <svg
@@ -43,6 +46,7 @@ export function PerspectiveCubeSvg({
           <path
             d={pathFromPoints(group.outline.points)}
             className="iso-cube-guide-face-bg"
+            fill={faceBaseFill}
           />
           {group.cells.map((cell) => {
             const style = cellStyle(group.faceId, cell.index, cell);
