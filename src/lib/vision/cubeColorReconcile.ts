@@ -82,6 +82,80 @@ export function hasUncertainCells(faces: Map<FaceId, ReadColor[]>): boolean {
   return false;
 }
 
+/** Fill ? cells when cube color counts force a unique assignment. */
+export function inferUncertainCells(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  const result = new Map<FaceId, ReadColor[]>();
+  for (const [faceId, colors] of faces) {
+    result.set(faceId, [...colors]);
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    const counts = emptyColorCounts();
+    const unknowns: { faceId: FaceId; index: number }[] = [];
+
+    for (const [faceId, colors] of result) {
+      for (let i = 0; i < 9; i++) {
+        const c = colors[i]!;
+        if (i === 4) {
+          counts[FACE_CENTER[faceId]]++;
+        } else if (isKnownColor(c)) {
+          counts[c]++;
+        } else if (c === '?') {
+          unknowns.push({ faceId, index: i });
+        }
+      }
+    }
+
+    if (unknowns.length === 1) {
+      const deficits = STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+      if (deficits.length === 1) {
+        const fill = deficits[0]!;
+        const cell = unknowns[0]!;
+        result.get(cell.faceId)![cell.index] = fill;
+        changed = true;
+        continue;
+      }
+    }
+
+    for (const cell of unknowns) {
+      const possible = STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+      if (possible.length === 1) {
+        const fill = possible[0]!;
+        result.get(cell.faceId)![cell.index] = fill;
+        counts[fill]++;
+        changed = true;
+        continue;
+      }
+
+      const faceColors = result.get(cell.faceId)!;
+      const knownOnFace = faceColors.filter(isKnownColor);
+      if (knownOnFace.length >= 7) {
+        const tallies = emptyColorCounts();
+        for (const c of knownOnFace) tallies[c]++;
+        let dominant: StickerColor = knownOnFace[0]!;
+        let dominantCount = 0;
+        for (const color of STICKER_COLORS) {
+          if (tallies[color] > dominantCount) {
+            dominantCount = tallies[color];
+            dominant = color;
+          }
+        }
+        if (dominantCount >= 7 && counts[dominant] < TARGET_PER_COLOR) {
+          result.get(cell.faceId)![cell.index] = dominant;
+          counts[dominant]++;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 function getSwapCost(from: StickerColor, to: StickerColor): number {
   return SWAP_COST[from][to] ?? 6;
 }

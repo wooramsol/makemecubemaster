@@ -1,6 +1,7 @@
 import type { Point2D, ReadColor } from '../../types';
 import { classifyFaceRelative, classifySticker } from './colorClassifier';
 import { isColorsCalibrated } from './colorReference';
+import { prepareMediansForClassification } from './scanWhiteCalibration';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -104,7 +105,8 @@ export function sampleColorsFromQuad(
   }
 
   if (!isColorsCalibrated()) {
-    return classifyFaceRelative(medians);
+    const adjusted = prepareMediansForClassification(medians);
+    return classifyFaceRelative(adjusted);
   }
 
   return medians.map(([r, g, b]) => classifySticker(r, g, b));

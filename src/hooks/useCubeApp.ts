@@ -47,6 +47,7 @@ import {
 import { FrameProcessor } from '../lib/vision/frameProcessor';
 import { LiveFaceAccumulator, canonicalizeScannedFaces } from '../lib/vision/liveFaceScan';
 import { cloneFaceColorsMap } from '../lib/vision/selfieView';
+import { resetScanWhiteCalibration } from '../lib/vision/scanWhiteCalibration';
 import { isKnownColor, toStickerColors } from '../lib/vision/readColorUtils';
 import { loadOpenCV } from '../lib/vision/opencvLoader';
 
@@ -339,6 +340,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
   }, []);
 
   const beginLiveScan = useCallback(() => {
+    resetScanWhiteCalibration();
     liveAccumulator.current.reset();
     solveTriggeredRef.current = false;
     lastPoseRef.current = null;

@@ -1,6 +1,7 @@
 import type { ReadColor, StickerColor } from '../../types';
 import { getLearnedLabRefs, isColorsCalibrated } from './colorReference';
 import { isKnownColor } from './readColorUtils';
+import { prepareMediansForClassification } from './scanWhiteCalibration';
 
 const CHROMA_REFS: Record<StickerColor, [number, number, number]> = {
   W: [1 / 3, 1 / 3, 1 / 3],
@@ -330,7 +331,8 @@ export function sampleFaceColors(
   }
 
   if (!isColorsCalibrated()) {
-    return classifyFaceRelative(medians);
+    const adjusted = prepareMediansForClassification(medians);
+    return classifyFaceRelative(adjusted);
   }
 
   const colors: StickerColor[] = [];

@@ -1,4 +1,5 @@
 import type { AppPhase, FaceId } from '../types';
+import { isAwaitingFirstWhiteCenter } from '../lib/vision/scanWhiteCalibration';
 
 interface LiveScanOverlayProps {
   phase: AppPhase;
@@ -17,20 +18,28 @@ export function LiveScanOverlay({
 }: LiveScanOverlayProps) {
   if (phase !== 'liveScan') return null;
 
+  const awaitingWhite = knownFaces.length === 0 && isAwaitingFirstWhiteCenter();
+
   return (
     <div className="calibration-overlay live-scan-overlay">
       <div className="calibration-bar">
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">{knownFaces.length} / 6</p>
-      <p className="calibration-hint calibration-hint--muted">
-        White faces fill as you scan · relative color · same tilt each time
-      </p>
+      {awaitingWhite ? (
+        <p className="calibration-hint">
+          First scan: center the <strong>white</strong> sticker in the guide
+        </p>
+      ) : (
+        <p className="calibration-hint calibration-hint--muted">
+          Unclear cells stay empty · filled as more faces scan
+        </p>
+      )}
       {needsNewFace && (
         <p className="calibration-hint">Show a different face</p>
       )}
-      {needsClearerCenter && !needsNewFace && (
-        <p className="calibration-hint">Center the face color in the guide</p>
+      {needsClearerCenter && !needsNewFace && !awaitingWhite && (
+        <p className="calibration-hint">Hold steady — reading colors</p>
       )}
     </div>
   );

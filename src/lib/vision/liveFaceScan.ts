@@ -1,6 +1,8 @@
-import { identifyFaceFromCenter } from '../cube/colors';
+import { identifyFaceFromCenter, getFaceCenterColor } from '../cube/colors';
 import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
+import { inferUncertainCells } from './cubeColorReconcile';
+import { isAwaitingFirstWhiteCenter } from './scanWhiteCalibration';
 
 /** Periphery cells only — center is used for face ID and may jitter */
 const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
@@ -121,6 +123,10 @@ function pickFaceIdForCapture(
 ): FaceId | null {
   if (findStoredMatch(voted, faces)) return null;
 
+  if (faces.size === 0 && !isAwaitingFirstWhiteCenter()) {
+    return 'U';
+  }
+
   const centerCandidates: (ReadColor | null)[] = [
     majorityVoteCenter(history),
     voted[4] ?? '?',
@@ -174,6 +180,10 @@ export class LiveFaceAccumulator {
     this.pendingReadings = [];
     this.stableSinceMs = null;
     this.stabilityAnchor = null;
+  }
+
+  getFaces(): Map<FaceId, ReadColor[]> {
+    return this.faces;
   }
 
   update(colors: ReadColor[] | null, nowMs = Date.now()): LiveScanSnapshot {
@@ -240,8 +250,11 @@ export class LiveFaceAccumulator {
 
       if (resolvedFaceId) {
         const isNew = !this.faces.has(resolvedFaceId);
-        this.faces.set(resolvedFaceId, [...voted]);
+        const stored = [...voted];
+        stored[4] = getFaceCenterColor(resolvedFaceId);
+        this.faces.set(resolvedFaceId, stored);
         if (isNew) newlyCaptured = resolvedFaceId;
+        this.faces = inferUncertainCells(this.faces);
         this.stableSinceMs = null;
         this.stabilityAnchor = null;
         this.pendingReadings = [];
