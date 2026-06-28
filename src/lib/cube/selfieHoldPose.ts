@@ -23,10 +23,10 @@ export interface SelfieHoldPose {
   holdLine: string;
 }
 
-/** Match perspective cube reference view (U + two sides, corner toward viewer). */
+/** Match perspective cube reference view (U + F + R corner). */
 const PITCH = -0.52;
-const YAW_F_SIDE = -Math.PI / 4;
-const YAW_F_OTHER = 0;
+const YAW_F_R = (3 * Math.PI) / 4;
+const YAW_F_L = (-3 * Math.PI) / 4;
 
 function sideFaceFor(visible: FaceId[]): FaceId {
   return visible.find((f) => f !== 'F' && f !== 'U') ?? 'R';
@@ -34,15 +34,15 @@ function sideFaceFor(visible: FaceId[]): FaceId {
 
 function eulerForHold(holdFace: FaceId, sideFace: FaceId): [number, number, number] {
   if (holdFace === 'F') {
-    return sideFace === 'L' ? [PITCH, YAW_F_OTHER, 0] : [PITCH, YAW_F_SIDE, 0];
+    return sideFace === 'L' ? [PITCH, YAW_F_L, 0] : [PITCH, YAW_F_R, 0];
   }
   if (holdFace === 'R') {
-    return [PITCH, -Math.PI / 2 + YAW_F_SIDE, 0];
+    return [PITCH, Math.PI / 2, 0];
   }
   if (holdFace === 'L') {
-    return [PITCH, Math.PI / 2 + YAW_F_OTHER, 0];
+    return [PITCH, -Math.PI / 2, 0];
   }
-  return [PITCH, YAW_F_SIDE, 0];
+  return [PITCH, YAW_F_R, 0];
 }
 
 export function getSelfieHoldPose(move: Move): SelfieHoldPose {

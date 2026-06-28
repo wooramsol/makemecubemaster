@@ -73,6 +73,7 @@ describe('isometric cube guide', () => {
       pitch: REFERENCE_CORNER_VIEW.pitch,
     });
     expect(model.faceGroups).toHaveLength(3);
+    expect(model.visibleFaceIds).toEqual(expect.arrayContaining(['U', 'F', 'R']));
     expect(model.faceGroups.every((group) => group.cells.length === 9)).toBe(true);
   });
 

@@ -52,7 +52,8 @@ export interface IsoScanViewAngle {
 }
 
 const SCAN_PITCH = -0.52;
-const SCAN_YAW_DEFAULT = -Math.PI / 4;
+/** F–R–U corner toward viewer (not B–L–U). */
+const SCAN_YAW_DEFAULT = (3 * Math.PI) / 4;
 
 /** Classic 3/4 corner view — U + two sides, vertical edge toward viewer (reference pose). */
 export const REFERENCE_CORNER_VIEW: IsoScanViewAngle = {
@@ -63,9 +64,9 @@ export const REFERENCE_CORNER_VIEW: IsoScanViewAngle = {
 /** Isometric viewpoint that best shows each face after capture (B spins ~180°). */
 export const SCAN_VIEW_FOR_FACE: Record<FaceId, IsoScanViewAngle> = {
   F: { ...REFERENCE_CORNER_VIEW },
-  R: { yaw: -Math.PI / 2, pitch: SCAN_PITCH },
-  L: { yaw: 0, pitch: SCAN_PITCH },
-  B: { yaw: SCAN_YAW_DEFAULT + Math.PI, pitch: SCAN_PITCH },
+  R: { yaw: Math.PI / 2, pitch: SCAN_PITCH },
+  L: { yaw: -Math.PI / 2, pitch: SCAN_PITCH },
+  B: { yaw: -Math.PI / 4, pitch: SCAN_PITCH },
   U: { yaw: SCAN_YAW_DEFAULT, pitch: -0.62 },
   D: { yaw: SCAN_YAW_DEFAULT, pitch: -0.28 },
 };
@@ -84,13 +85,14 @@ export interface CornerCubeModel {
 }
 
 export function selectCornerFaces(yaw: number, pitch: number): FaceId[] {
-  return ALL_FACE_IDS.map((faceId) => ({
+  const scored = ALL_FACE_IDS.map((faceId) => ({
     faceId,
     nz: transformNormal(faceId, yaw, pitch).z,
-  }))
-    .sort((a, b) => a.nz - b.nz)
-    .slice(0, 3)
-    .map((entry) => entry.faceId);
+  })).sort((a, b) => a.nz - b.nz);
+
+  const facing = scored.filter((entry) => entry.nz < -0.05);
+  const picked = (facing.length >= 3 ? facing : scored).slice(0, 3);
+  return picked.map((entry) => entry.faceId);
 }
 
 function faceAvgDepth(faceId: FaceId, yaw: number, pitch: number): number {
