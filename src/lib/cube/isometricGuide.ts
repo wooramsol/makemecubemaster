@@ -106,6 +106,18 @@ function faceAvgDepth(faceId: FaceId, yaw: number, pitch: number): number {
   return sum / corners.length;
 }
 
+export function orderQuadCornersCCW(points: Point2[]): [Point2, Point2, Point2, Point2] {
+  const pts = [...points] as Point2[];
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const p = pts[i]!;
+    const q = pts[(i + 1) % 4]!;
+    area += p.x * q.y - q.x * p.y;
+  }
+  if (area < 0) pts.reverse();
+  return pts as [Point2, Point2, Point2, Point2];
+}
+
 function faceCorners2dWithView(
   faceId: FaceId,
   yaw: number,
@@ -193,7 +205,8 @@ export function buildCornerCubeModel(
 
   const faceGroups: IsoFaceGroup[] = visibleFaceIds
     .map((faceId) => {
-      const corners = faceCorners2dWithView(faceId, yaw, pitch, scale, cx, cy, mirrorX);
+      const rawCorners = faceCorners2dWithView(faceId, yaw, pitch, scale, cx, cy, mirrorX);
+      const corners = orderQuadCornersCCW(rawCorners);
       const outline: IsoFaceOutline = {
         faceId,
         points: corners,
@@ -209,7 +222,7 @@ export function buildCornerCubeModel(
       for (let row = 0; row < 3; row++) {
         for (let col = 0; col < 3; col++) {
           const index = row * 3 + col;
-          const points = faceCellCorners2d(corners, row, col);
+          const points = faceCellCorners2d(rawCorners, row, col);
           cells.push({
             faceId,
             index,
@@ -225,7 +238,7 @@ export function buildCornerCubeModel(
         depth: faceAvgDepth(faceId, yaw, pitch),
         cells,
         outline,
-        gridLines: buildFaceGridLines(corners),
+        gridLines: buildFaceGridLines(rawCorners),
       };
     })
     .sort((a, b) => b.depth - a.depth);

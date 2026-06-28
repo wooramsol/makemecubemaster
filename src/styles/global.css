@@ -1112,6 +1112,9 @@ body,
   align-items: center;
   gap: 4px;
   margin-bottom: 8px;
+  background: #111827;
+  border-radius: 8px;
+  padding: 4px;
 }
 
 .iso-scan-cube-wrap--back .iso-cube-guide-svg--scan {
@@ -1205,6 +1208,10 @@ body,
 .scan-ui-panel--iso {
   min-width: 168px;
   padding: 10px 10px 8px;
+  background: rgba(17, 24, 39, 0.94);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .solving-move-hint-stage .iso-cube-guide-svg {

@@ -84,6 +84,23 @@ describe('isometric cube guide', () => {
     expect(model.arrow).not.toBeNull();
   });
 
+  it('orders face quads counter-clockwise in screen space', () => {
+    const model = buildCornerCubeModel({
+      yaw: REFERENCE_CORNER_VIEW.yaw,
+      pitch: REFERENCE_CORNER_VIEW.pitch,
+    });
+    for (const group of model.faceGroups) {
+      const pts = group.outline.points;
+      let area = 0;
+      for (let i = 0; i < 4; i++) {
+        const p = pts[i]!;
+        const q = pts[(i + 1) % 4]!;
+        area += p.x * q.y - q.x * p.y;
+      }
+      expect(area).toBeGreaterThan(0);
+    }
+  });
+
   it('cells tile without gaps on each face', () => {
     const model = buildCornerCubeModel({
       yaw: REFERENCE_CORNER_VIEW.yaw,

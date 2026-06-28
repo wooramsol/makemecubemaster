@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import type { FaceId, StickerColor } from '../types';
 import { COLOR_HEX } from '../lib/vision/colorReference';
 import type { CornerCubeModel, IsoCell } from '../lib/cube/isometricGuide';
-import { pathFromPoints } from '../lib/cube/isoCubeSvg';
+import { pathFromPoints, pointsToAttr } from '../lib/cube/isoCubeSvg';
 
 const WHITE_FACE = '#f8fafc';
 const FRAME_BLACK = '#0a0a0a';
@@ -33,6 +33,8 @@ export function PerspectiveCubeSvg({
   arrow,
   faceBaseFill = WHITE_FACE,
 }: PerspectiveCubeSvgProps) {
+  const uid = useId().replace(/:/g, '');
+
   return (
     <svg
       className={className}
@@ -41,35 +43,48 @@ export function PerspectiveCubeSvg({
       height={model.size}
       role="img"
       aria-label={ariaLabel}
+      shapeRendering="geometricPrecision"
     >
+      <defs>
+        {model.faceGroups.map((group) => (
+          <clipPath key={`clip-def-${group.faceId}`} id={`${uid}-clip-${group.faceId}`}>
+            <polygon points={pointsToAttr(group.outline.points)} />
+          </clipPath>
+        ))}
+      </defs>
+
       <rect x={0} y={0} width={model.size} height={model.size} fill={SVG_BG} />
 
-      {model.faceGroups.map((group) => (
-        <g key={`face-${group.faceId}`}>
-          <path
-            d={pathFromPoints(group.outline.points)}
-            className="iso-cube-guide-face-bg"
-            fill={faceBaseFill}
-            fillOpacity={1}
-            stroke="none"
-          />
-          {group.cells.map((cell) => {
-            const style = cellStyle(group.faceId, cell.index, cell);
-            return (
-              <path
-                key={`${group.faceId}-${cell.index}`}
-                d={pathFromPoints(cell.points)}
-                className={style.className}
-                fill={style.fill}
-                fillOpacity={1}
-                stroke={style.fill}
-                strokeWidth={0.35}
-                strokeLinejoin="miter"
-              />
-            );
-          })}
-        </g>
-      ))}
+      {model.faceGroups.map((group) => {
+        const clipId = `${uid}-clip-${group.faceId}`;
+        return (
+          <g key={`face-${group.faceId}`} clipPath={`url(#${clipId})`}>
+            <rect
+              x={0}
+              y={0}
+              width={model.size}
+              height={model.size}
+              fill={faceBaseFill}
+              style={{ fill: faceBaseFill, fillOpacity: 1 }}
+            />
+            {group.cells.map((cell) => {
+              const style = cellStyle(group.faceId, cell.index, cell);
+              return (
+                <polygon
+                  key={`${group.faceId}-${cell.index}`}
+                  points={pointsToAttr(cell.points)}
+                  className={style.className}
+                  fill={style.fill}
+                  style={{ fill: style.fill, fillOpacity: 1 }}
+                  stroke={style.fill}
+                  strokeWidth={0.5}
+                  strokeLinejoin="miter"
+                />
+              );
+            })}
+          </g>
+        );
+      })}
 
       {model.faceGroups.map((group) => (
         <g key={`grid-${group.faceId}`} className="iso-cube-guide-grid" pointerEvents="none">
@@ -79,7 +94,7 @@ export function PerspectiveCubeSvg({
               d={line}
               fill="none"
               stroke={FRAME_BLACK}
-              strokeWidth={1.1}
+              strokeWidth={1.2}
               strokeLinecap="square"
             />
           ))}

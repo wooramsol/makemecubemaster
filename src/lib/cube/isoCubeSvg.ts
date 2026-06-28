@@ -1,5 +1,9 @@
 import type { Point2 } from './isometricGuide';
 
+export function pointsToAttr(points: Point2[]): string {
+  return points.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+}
+
 export function pathFromPoints(points: Point2[]): string {
   const [first, ...rest] = points;
   return `M ${first!.x.toFixed(1)} ${first!.y.toFixed(1)} ${rest.map((p) => `L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')} Z`;
