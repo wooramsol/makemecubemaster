@@ -13,11 +13,20 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    {
+      name: 'inject-app-version',
+      transformIndexHtml(html) {
+        return html.replace(
+          /<title>.*?<\/title>/,
+          `<title>Make Me Cube Master v${pkg.version}</title>`,
+        );
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
       manifest: {
-        name: 'Make Me Cube Master',
+        name: `Make Me Cube Master v${pkg.version}`,
         short_name: 'Cube Master',
         description: "Scan a Rubik's cube and solve it with AR move hints.",
         theme_color: '#000000',
