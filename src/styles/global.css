@@ -1143,7 +1143,6 @@ body,
   height: auto;
   max-width: 200px;
   margin: 0 auto;
-  transform: scaleX(-1);
 }
 
 .iso-cube-guide-svg--scan {
@@ -1152,6 +1151,12 @@ body,
 
 .iso-cube-guide-face-bg {
   fill: #f8fafc;
+  fill-opacity: 1;
+}
+
+.iso-cube-guide-grid path {
+  stroke: rgba(10, 10, 10, 0.85);
+  stroke-width: 1.1;
 }
 
 .iso-cube-guide-face-outline {
@@ -1161,21 +1166,21 @@ body,
 }
 
 .iso-cube-guide-cell {
-  stroke: rgba(15, 23, 42, 0.35);
-  stroke-width: 0.6;
+  fill-opacity: 1;
+  stroke-opacity: 1;
 }
 
 .iso-cube-guide-cell--empty {
   fill: #f8fafc;
+  stroke: #f8fafc;
 }
 
 .iso-cube-guide-cell--preview {
-  stroke: rgba(255, 255, 255, 0.45);
-  stroke-width: 1;
+  stroke-width: 0.35;
 }
 
 .iso-cube-guide-cell--scanned {
-  stroke: rgba(15, 23, 42, 0.45);
+  stroke-width: 0.35;
 }
 
 .iso-cube-guide-cell--turn {

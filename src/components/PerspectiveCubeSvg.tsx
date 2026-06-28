@@ -6,6 +6,7 @@ import { pathFromPoints } from '../lib/cube/isoCubeSvg';
 
 const WHITE_FACE = '#f8fafc';
 const FRAME_BLACK = '#0a0a0a';
+const SVG_BG = '#111827';
 
 export interface PerspectiveCellStyle {
   fill: string;
@@ -41,12 +42,16 @@ export function PerspectiveCubeSvg({
       role="img"
       aria-label={ariaLabel}
     >
+      <rect x={0} y={0} width={model.size} height={model.size} fill={SVG_BG} />
+
       {model.faceGroups.map((group) => (
         <g key={`face-${group.faceId}`}>
           <path
             d={pathFromPoints(group.outline.points)}
             className="iso-cube-guide-face-bg"
             fill={faceBaseFill}
+            fillOpacity={1}
+            stroke="none"
           />
           {group.cells.map((cell) => {
             const style = cellStyle(group.faceId, cell.index, cell);
@@ -56,19 +61,40 @@ export function PerspectiveCubeSvg({
                 d={pathFromPoints(cell.points)}
                 className={style.className}
                 fill={style.fill}
-                stroke={FRAME_BLACK}
-                strokeWidth={1.4}
+                fillOpacity={1}
+                stroke={style.fill}
+                strokeWidth={0.35}
                 strokeLinejoin="miter"
               />
             );
           })}
-          <path
-            d={pathFromPoints(group.outline.points)}
-            className="iso-cube-guide-face-outline"
-            fill="none"
-          />
         </g>
       ))}
+
+      {model.faceGroups.map((group) => (
+        <g key={`grid-${group.faceId}`} className="iso-cube-guide-grid" pointerEvents="none">
+          {group.gridLines.map((line, index) => (
+            <path
+              key={`${group.faceId}-grid-${index}`}
+              d={line}
+              fill="none"
+              stroke={FRAME_BLACK}
+              strokeWidth={1.1}
+              strokeLinecap="square"
+            />
+          ))}
+        </g>
+      ))}
+
+      {model.faceGroups.map((group) => (
+        <path
+          key={`outline-${group.faceId}`}
+          d={pathFromPoints(group.outline.points)}
+          className="iso-cube-guide-face-outline"
+          fill="none"
+        />
+      ))}
+
       {arrow}
     </svg>
   );

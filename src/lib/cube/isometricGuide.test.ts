@@ -83,4 +83,34 @@ describe('isometric cube guide', () => {
     expect(model.visibleFaces).toHaveLength(3);
     expect(model.arrow).not.toBeNull();
   });
+
+  it('cells tile without gaps on each face', () => {
+    const model = buildCornerCubeModel({
+      yaw: REFERENCE_CORNER_VIEW.yaw,
+      pitch: REFERENCE_CORNER_VIEW.pitch,
+    });
+    for (const group of model.faceGroups) {
+      expect(group.gridLines).toHaveLength(4);
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 2; col++) {
+          const left = group.cells[row * 3 + col]!;
+          const right = group.cells[row * 3 + col + 1]!;
+          expect(left.points[1]!.x).toBeCloseTo(right.points[0]!.x, 5);
+          expect(left.points[1]!.y).toBeCloseTo(right.points[0]!.y, 5);
+          expect(left.points[2]!.x).toBeCloseTo(right.points[3]!.x, 5);
+          expect(left.points[2]!.y).toBeCloseTo(right.points[3]!.y, 5);
+        }
+      }
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          const top = group.cells[row * 3 + col]!;
+          const bottom = group.cells[(row + 1) * 3 + col]!;
+          expect(top.points[3]!.x).toBeCloseTo(bottom.points[0]!.x, 5);
+          expect(top.points[3]!.y).toBeCloseTo(bottom.points[0]!.y, 5);
+          expect(top.points[2]!.x).toBeCloseTo(bottom.points[1]!.x, 5);
+          expect(top.points[2]!.y).toBeCloseTo(bottom.points[1]!.y, 5);
+        }
+      }
+    }
+  });
 });

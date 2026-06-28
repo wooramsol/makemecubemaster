@@ -76,6 +76,8 @@ export interface IsoFaceGroup {
   depth: number;
   cells: IsoCell[];
   outline: IsoFaceOutline;
+  /** Interior grid segments (screen-space, gap-free). */
+  gridLines: string[];
 }
 
 export interface CornerCubeModel {
@@ -111,10 +113,60 @@ function faceCorners2dWithView(
   scale: number,
   cx: number,
   cy: number,
+  mirrorX: boolean,
 ): Point2[] {
   return FACE_MODEL_CORNERS[faceId]!.map(([x, y, z]) =>
-    isoProject(transformPointYawPitch({ x, y, z }, yaw, pitch), scale, cx, cy),
+    isoProject(transformPointYawPitch({ x, y, z }, yaw, pitch), scale, cx, cy, mirrorX),
   );
+}
+
+/** Bilinear subdivision in screen space — adjacent cells share edges exactly. */
+export function bilinearFacePoint(
+  corners: [Point2, Point2, Point2, Point2],
+  u: number,
+  v: number,
+): Point2 {
+  const [tl, tr, br, bl] = corners;
+  const top = lerp2(tl, tr, u);
+  const bottom = lerp2(bl, br, u);
+  return lerp2(top, bottom, v);
+}
+
+function faceCellCorners2d(
+  corners: Point2[],
+  row: number,
+  col: number,
+): Point2[] {
+  const quad = corners as [Point2, Point2, Point2, Point2];
+  const u0 = col / 3;
+  const u1 = (col + 1) / 3;
+  const v0 = row / 3;
+  const v1 = (row + 1) / 3;
+  return [
+    bilinearFacePoint(quad, u0, v0),
+    bilinearFacePoint(quad, u1, v0),
+    bilinearFacePoint(quad, u1, v1),
+    bilinearFacePoint(quad, u0, v1),
+  ];
+}
+
+function buildFaceGridLines(corners: Point2[]): string[] {
+  const quad = corners as [Point2, Point2, Point2, Point2];
+  const lines: string[] = [];
+  for (let i = 1; i < 3; i++) {
+    const t = i / 3;
+    const hStart = bilinearFacePoint(quad, 0, t);
+    const hEnd = bilinearFacePoint(quad, 1, t);
+    lines.push(
+      `M ${hStart.x.toFixed(1)} ${hStart.y.toFixed(1)} L ${hEnd.x.toFixed(1)} ${hEnd.y.toFixed(1)}`,
+    );
+    const vStart = bilinearFacePoint(quad, t, 0);
+    const vEnd = bilinearFacePoint(quad, t, 1);
+    lines.push(
+      `M ${vStart.x.toFixed(1)} ${vStart.y.toFixed(1)} L ${vEnd.x.toFixed(1)} ${vEnd.y.toFixed(1)}`,
+    );
+  }
+  return lines;
 }
 
 /** Build a 3-face corner cube mesh with correct depth ordering. */
@@ -125,6 +177,8 @@ export function buildCornerCubeModel(
     size?: number;
     faceIds?: FaceId[];
     turningByFace?: Partial<Record<FaceId, number[]>>;
+    /** Horizontal mirror in projection (selfie preview parity without CSS scaleX). */
+    mirrorX?: boolean;
   },
 ): CornerCubeModel {
   const yaw = options.yaw;
@@ -133,12 +187,13 @@ export function buildCornerCubeModel(
   const cx = size / 2;
   const cy = size * 0.56;
   const scale = size * 0.38;
+  const mirrorX = options.mirrorX ?? true;
   const visibleFaceIds = options.faceIds ?? selectCornerFaces(yaw, pitch);
   const turningByFace = options.turningByFace ?? {};
 
   const faceGroups: IsoFaceGroup[] = visibleFaceIds
     .map((faceId) => {
-      const corners = faceCorners2dWithView(faceId, yaw, pitch, scale, cx, cy);
+      const corners = faceCorners2dWithView(faceId, yaw, pitch, scale, cx, cy, mirrorX);
       const outline: IsoFaceOutline = {
         faceId,
         points: corners,
@@ -154,14 +209,7 @@ export function buildCornerCubeModel(
       for (let row = 0; row < 3; row++) {
         for (let col = 0; col < 3; col++) {
           const index = row * 3 + col;
-          const points = [0, 1, 2, 3].map((c) => {
-            const p3 = transformPointYawPitch(
-              cellCorner(faceId, row, col, c as 0 | 1 | 2 | 3),
-              yaw,
-              pitch,
-            );
-            return isoProject(p3, scale, cx, cy);
-          });
+          const points = faceCellCorners2d(corners, row, col);
           cells.push({
             faceId,
             index,
@@ -177,6 +225,7 @@ export function buildCornerCubeModel(
         depth: faceAvgDepth(faceId, yaw, pitch),
         cells,
         outline,
+        gridLines: buildFaceGridLines(corners),
       };
     })
     .sort((a, b) => b.depth - a.depth);
@@ -285,9 +334,16 @@ function rotateX(p: Point3, pitch: number): Point3 {
   return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
 }
 
-function isoProject(p: Point3, scale: number, cx: number, cy: number): Point2 {
+function isoProject(
+  p: Point3,
+  scale: number,
+  cx: number,
+  cy: number,
+  mirrorX: boolean,
+): Point2 {
+  const rawX = (p.x - p.z) * ISO * scale;
   return {
-    x: cx + (p.x - p.z) * ISO * scale,
+    x: cx + (mirrorX ? -rawX : rawX),
     y: cy - p.y * scale + (p.x + p.z) * ISO_DEPTH * scale,
   };
 }
@@ -296,23 +352,8 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function lerp3(a: Point3, b: Point3, t: number): Point3 {
-  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) };
-}
-
-function cellCorner(faceId: FaceId, row: number, col: number, corner: 0 | 1 | 2 | 3): Point3 {
-  const [tl, tr, br, bl] = FACE_MODEL_CORNERS[faceId]!.map(
-    ([x, y, z]) => ({ x, y, z }),
-  ) as [Point3, Point3, Point3, Point3];
-  const top = lerp3(tl, tr, col / 3);
-  const bottom = lerp3(bl, br, col / 3);
-  const topNext = lerp3(tl, tr, (col + 1) / 3);
-  const bottomNext = lerp3(bl, br, (col + 1) / 3);
-  const left = lerp3(top, bottom, row / 3);
-  const right = lerp3(topNext, bottomNext, row / 3);
-  const leftNext = lerp3(top, bottom, (row + 1) / 3);
-  const rightNext = lerp3(topNext, bottomNext, (row + 1) / 3);
-  return [left, right, rightNext, leftNext][corner]!;
+function lerp2(a: Point2, b: Point2, t: number): Point2 {
+  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
 }
 
 function polygonCenter(points: Point2[]): Point2 {
@@ -332,7 +373,7 @@ function buildArrow(
   cy: number,
 ): IsoArrow | null {
   const effective = getSelfieDisplayMove(move);
-  const corners = faceCorners2dWithView(arrowFace, yaw, pitch, scale, cx, cy);
+  const corners = faceCorners2dWithView(arrowFace, yaw, pitch, scale, cx, cy, true);
   const center = polygonCenter(corners);
   const u = { x: corners[1]!.x - corners[0]!.x, y: corners[1]!.y - corners[0]!.y };
   const v = { x: corners[3]!.x - corners[0]!.x, y: corners[3]!.y - corners[0]!.y };
