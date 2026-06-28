@@ -37,7 +37,7 @@ import {
 import { detectWrongMoveFromColors } from '../lib/cube/detectWrongMove';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells, inferUncertainCells } from '../lib/vision/cubeColorReconcile';
+import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells, reconcileLiveScanFaces } from '../lib/vision/cubeColorReconcile';
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
@@ -62,7 +62,7 @@ function scannedFacesFromMap(
 function scannedFacesForDisplay(
   faces: Map<FaceId, ReadColor[]>,
 ): Partial<Record<FaceId, ReadColor[]>> {
-  const inferred = inferUncertainCells(canonicalizeScannedFaces(cloneFaceColorsMap(faces)));
+  const inferred = reconcileLiveScanFaces(canonicalizeScannedFaces(cloneFaceColorsMap(faces)));
   return scannedFacesFromMap(inferred);
 }
 

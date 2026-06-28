@@ -120,6 +120,146 @@ export function hasUncertainCells(faces: Map<FaceId, ReadColor[]>): boolean {
   return false;
 }
 
+function countScannedStickers(faces: Map<FaceId, ReadColor[]>): Record<StickerColor, number> {
+  const counts = emptyColorCounts();
+  for (const [faceId, colors] of faces) {
+    for (let i = 0; i < 9; i++) {
+      if (i === 4) {
+        counts[FACE_CENTER[faceId]]++;
+      } else if (isKnownColor(colors[i]!)) {
+        counts[colors[i] as StickerColor]++;
+      }
+    }
+  }
+  return counts;
+}
+
+function hasImpossibleSurplus(counts: Record<StickerColor, number>): boolean {
+  return STICKER_COLORS.some((color) => counts[color] > TARGET_PER_COLOR);
+}
+
+function findCheapestSwapTarget(
+  from: StickerColor,
+  counts: Record<StickerColor, number>,
+): StickerColor | null {
+  let best: StickerColor | null = null;
+  let bestCost = Infinity;
+  for (const to of STICKER_COLORS) {
+    if (to === from) continue;
+    if (counts[to] >= TARGET_PER_COLOR) continue;
+    const cost = getSwapCost(from, to);
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = to;
+    }
+  }
+  return best;
+}
+
+function cloneReadFaces(faces: Map<FaceId, ReadColor[]>): Map<FaceId, ReadColor[]> {
+  const result = new Map<FaceId, ReadColor[]>();
+  for (const [faceId, colors] of faces) {
+    result.set(faceId, [...colors]);
+  }
+  return result;
+}
+
+function readFacesEqual(a: Map<FaceId, ReadColor[]>, b: Map<FaceId, ReadColor[]>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [faceId, colors] of a) {
+    const other = b.get(faceId);
+    if (!other || other.length !== colors.length) return false;
+    for (let i = 0; i < colors.length; i++) {
+      if (colors[i] !== other[i]) return false;
+    }
+  }
+  return true;
+}
+
+function toStickerFaceMap(faces: Map<FaceId, ReadColor[]>): Map<FaceId, StickerColor[]> {
+  const result = new Map<FaceId, StickerColor[]>();
+  for (const [faceId, colors] of faces) {
+    const row = colors.map((c) => (isKnownColor(c) ? c : 'W'));
+    row[4] = FACE_CENTER[faceId];
+    result.set(faceId, row);
+  }
+  return result;
+}
+
+/** Swap similar committed colors when counts exceed 9 (misread under warm light). */
+export function reconcileMisreadColors(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  const result = cloneReadFaces(faces);
+
+  for (const [faceId, colors] of result) {
+    colors[4] = FACE_CENTER[faceId];
+  }
+
+  const swappable: MutableCell[] = [];
+  for (const [faceId, colors] of result) {
+    for (let i = 0; i < 9; i++) {
+      if (i === 4) continue;
+      const c = colors[i]!;
+      if (isKnownColor(c)) {
+        swappable.push({ faceId, index: i, color: c });
+      }
+    }
+  }
+
+  for (let iter = 0; iter < 64; iter++) {
+    const counts = countScannedStickers(result);
+    if (!hasImpossibleSurplus(counts)) break;
+
+    const over = findWorstSurplus(counts);
+    if (!over) break;
+
+    const under = findCheapestSwapTarget(over, counts);
+    if (!under) break;
+
+    let bestCell: MutableCell | null = null;
+    let bestCost = Infinity;
+    for (const cell of swappable) {
+      if (cell.color !== over) continue;
+      const cost = getSwapCost(over, under);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestCell = cell;
+      }
+    }
+    if (!bestCell) break;
+
+    bestCell.color = under;
+    result.get(bestCell.faceId)![bestCell.index] = under;
+  }
+
+  return result;
+}
+
+/** Infer ? cells, fix impossible counts via similar-color swaps, repeat until stable. */
+export function reconcileLiveScanFaces(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  let current = cloneReadFaces(faces);
+
+  for (let pass = 0; pass < 12; pass++) {
+    const previous = cloneReadFaces(current);
+    current = inferUncertainCells(reconcileMisreadColors(current));
+
+    if (current.size === 6 && !hasUncertainCells(current)) {
+      const counts = countScannedStickers(current);
+      if (!isBalanced(counts)) {
+        const balanced = reconcileCubeFaces(toStickerFaceMap(current));
+        current = cloneReadFaces(balanced);
+      }
+    }
+
+    if (readFacesEqual(previous, current)) break;
+  }
+
+  return current;
+}
+
 /** Fill ? cells when cube color counts force a unique assignment. */
 export function inferUncertainCells(
   faces: Map<FaceId, ReadColor[]>,

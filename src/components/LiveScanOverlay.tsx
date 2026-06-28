@@ -34,7 +34,7 @@ export function LiveScanOverlay({
         </p>
       ) : (
         <p className="calibration-hint calibration-hint--muted">
-          ? cells fill as other faces scan — red/orange never read from camera
+          ? cells fill as other faces scan — misreads auto-correct via similar colors
         </p>
       )}
       {needsNewFace && (

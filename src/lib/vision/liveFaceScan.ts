@@ -1,7 +1,7 @@
 import { identifyFaceFromCenter, getFaceCenterColor } from '../cube/colors';
 import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
-import { inferUncertainCells } from './cubeColorReconcile';
+import { reconcileLiveScanFaces } from './cubeColorReconcile';
 import { wasLastCenterWarm } from './colorClassifier';
 
 /** Periphery cells only — center is used for face ID and may jitter */
@@ -200,7 +200,7 @@ export class LiveFaceAccumulator {
 
   private refreshInferredFaces(): void {
     if (this.faces.size === 0) return;
-    this.faces = inferUncertainCells(this.faces);
+    this.faces = reconcileLiveScanFaces(this.faces);
   }
 
   update(colors: ReadColor[] | null, nowMs = Date.now()): LiveScanSnapshot {

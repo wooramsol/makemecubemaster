@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FaceId, ReadColor } from '../../types';
-import { inferUncertainCells } from './cubeColorReconcile';
+import { inferUncertainCells, reconcileLiveScanFaces, reconcileMisreadColors } from './cubeColorReconcile';
 import {
   isAwaitingFirstWhiteCenter,
   prepareMediansForClassification,
@@ -61,6 +61,48 @@ describe('inferUncertainCells', () => {
       ['L', Array(9).fill('O') as ReadColor[]],
     ]);
     const result = inferUncertainCells(faces);
+    expect(result.get('R')![8]).toBe('R');
+  });
+});
+
+describe('reconcileMisreadColors', () => {
+  it('swaps surplus red to orange when too many reds were committed', () => {
+    const faces = new Map<FaceId, ReadColor[]>([
+      ['U', Array(9).fill('W') as ReadColor[]],
+      [
+        'F',
+        ['R', 'R', 'R', 'R', 'G', 'R', 'R', 'R', 'R'] as ReadColor[],
+      ],
+      [
+        'R',
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', 'R'] as ReadColor[],
+      ],
+    ]);
+    const result = reconcileMisreadColors(faces);
+    const counts = { R: 0, O: 0, Y: 0, G: 0, B: 0, W: 0 };
+    for (const colors of result.values()) {
+      for (let i = 0; i < 9; i++) {
+        const c = colors[i]!;
+        if (c !== '?') counts[c as keyof typeof counts]++;
+      }
+    }
+    expect(counts.R).toBeLessThanOrEqual(9);
+    expect(counts.R).toBeGreaterThan(0);
+  });
+
+  it('reconciles live scan faces iteratively', () => {
+    const faces = new Map<FaceId, ReadColor[]>([
+      ['U', Array(9).fill('W') as ReadColor[]],
+      ['F', Array(9).fill('G') as ReadColor[]],
+      ['B', Array(9).fill('B') as ReadColor[]],
+      ['D', Array(9).fill('Y') as ReadColor[]],
+      ['L', Array(9).fill('O') as ReadColor[]],
+      [
+        'R',
+        ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'R', '?'] as ReadColor[],
+      ],
+    ]);
+    const result = reconcileLiveScanFaces(faces);
     expect(result.get('R')![8]).toBe('R');
   });
 });
