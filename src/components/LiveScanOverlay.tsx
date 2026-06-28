@@ -28,11 +28,11 @@ export function LiveScanOverlay({
       <p className="calibration-sub">{knownFaces.length} / 6</p>
       {awaitingWhite ? (
         <p className="calibration-hint">
-          First scan: center the <strong>white</strong> sticker in the guide
+          First face: center <strong>white</strong> sticker — all 9 colors scan using it as reference
         </p>
       ) : (
         <p className="calibration-hint calibration-hint--muted">
-          Unclear cells stay empty · filled as more faces scan
+          ? cells fill automatically as other faces scan — no re-scan needed
         </p>
       )}
       {needsNewFace && (

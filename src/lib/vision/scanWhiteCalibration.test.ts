@@ -38,13 +38,11 @@ describe('scan white calibration', () => {
 });
 
 describe('inferUncertainCells', () => {
-  it('fills ? when only one color remains possible', () => {
+  it('fills ? when a color needs exactly one more sticker', () => {
     const faces = new Map<FaceId, ReadColor[]>([
       ['U', Array(9).fill('W') as ReadColor[]],
-      [
-        'F',
-        ['G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', '?'] as ReadColor[],
-      ],
+      ['F', ['G', 'G', 'G', 'G', 'G', 'G', 'G', 'G', '?'] as ReadColor[]],
+      ['R', Array(9).fill('R') as ReadColor[]],
     ]);
     const result = inferUncertainCells(faces);
     expect(result.get('F')![8]).toBe('G');

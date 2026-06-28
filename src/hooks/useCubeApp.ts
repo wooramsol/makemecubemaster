@@ -37,7 +37,7 @@ import {
 import { detectWrongMoveFromColors } from '../lib/cube/detectWrongMove';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells } from '../lib/vision/cubeColorReconcile';
+import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells, inferUncertainCells } from '../lib/vision/cubeColorReconcile';
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
@@ -57,6 +57,13 @@ function scannedFacesFromMap(
   return Object.fromEntries(cloneFaceColorsMap(faces)) as Partial<
     Record<FaceId, ReadColor[]>
   >;
+}
+
+function scannedFacesForDisplay(
+  faces: Map<FaceId, ReadColor[]>,
+): Partial<Record<FaceId, ReadColor[]>> {
+  const inferred = inferUncertainCells(canonicalizeScannedFaces(cloneFaceColorsMap(faces)));
+  return scannedFacesFromMap(inferred);
 }
 
 export interface CubeAppState {
@@ -555,7 +562,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {
         solveTriggeredRef.current = true;
         const snapshotFaces = canonicalizeScannedFaces(cloneFaceColorsMap(snapshot.faces));
-        const scannedRecord = scannedFacesFromMap(snapshotFaces);
+        const scannedRecord = scannedFacesForDisplay(snapshot.faces);
 
         try {
           let solveMap = fillUncertainCells(snapshotFaces);
@@ -602,9 +609,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         ...prev,
         currentPose: result.pose,
         knownFaces: snapshot.knownFaces,
-        scannedFaceColors: scannedFacesFromMap(
-          canonicalizeScannedFaces(snapshot.faces),
-        ),
+        scannedFaceColors: scannedFacesForDisplay(snapshot.faces),
         currentVisibleFace: snapshot.currentFace,
         liveScanProgress: snapshot.knownFaces.length / 6,
         liveScanNeedsClearerCenter: snapshot.needsClearerCenter,

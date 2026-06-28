@@ -61,7 +61,7 @@ export function DetectionOverlay({
             />
             {feedback.uncertainCells > 0 && (
               <p className="scan-live-preview-hint">
-                {feedback.uncertainCells} unclear — filled after all faces
+                {feedback.uncertainCells} unclear — auto-fill as you scan other faces
               </p>
             )}
           </div>

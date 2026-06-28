@@ -14,6 +14,33 @@ const FACE_CENTER: Record<FaceId, StickerColor> = {
 const STICKER_COLORS: StickerColor[] = ['W', 'Y', 'R', 'O', 'G', 'B'];
 const TARGET_PER_COLOR = 9;
 
+function possibleColors(counts: Record<StickerColor, number>): StickerColor[] {
+  return STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+}
+
+function collectCountsAndUnknowns(result: Map<FaceId, ReadColor[]>): {
+  counts: Record<StickerColor, number>;
+  unknowns: { faceId: FaceId; index: number }[];
+} {
+  const counts = emptyColorCounts();
+  const unknowns: { faceId: FaceId; index: number }[] = [];
+
+  for (const [faceId, colors] of result) {
+    for (let i = 0; i < 9; i++) {
+      const c = colors[i]!;
+      if (i === 4) {
+        counts[FACE_CENTER[faceId]]++;
+      } else if (isKnownColor(c)) {
+        counts[c]++;
+      } else if (c === '?') {
+        unknowns.push({ faceId, index: i });
+      }
+    }
+  }
+
+  return { counts, unknowns };
+}
+
 /** 색상 간 혼동 비용 (낮을수록 바꾸기 쉬움) */
 const SWAP_COST: Record<StickerColor, Record<StickerColor, number>> = {
   W: { W: 0, Y: 1, O: 2, R: 4, G: 5, B: 5 },
@@ -94,61 +121,64 @@ export function inferUncertainCells(
   let changed = true;
   while (changed) {
     changed = false;
-    const counts = emptyColorCounts();
-    const unknowns: { faceId: FaceId; index: number }[] = [];
+    const { counts, unknowns } = collectCountsAndUnknowns(result);
+    if (unknowns.length === 0) break;
 
-    for (const [faceId, colors] of result) {
-      for (let i = 0; i < 9; i++) {
-        const c = colors[i]!;
-        if (i === 4) {
-          counts[FACE_CENTER[faceId]]++;
-        } else if (isKnownColor(c)) {
-          counts[c]++;
-        } else if (c === '?') {
-          unknowns.push({ faceId, index: i });
-        }
-      }
-    }
+    const assign = (cell: { faceId: FaceId; index: number }, color: StickerColor) => {
+      result.get(cell.faceId)![cell.index] = color;
+      changed = true;
+    };
 
     if (unknowns.length === 1) {
-      const deficits = STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+      const deficits = possibleColors(counts);
       if (deficits.length === 1) {
-        const fill = deficits[0]!;
-        const cell = unknowns[0]!;
-        result.get(cell.faceId)![cell.index] = fill;
-        changed = true;
+        assign(unknowns[0]!, deficits[0]!);
         continue;
       }
     }
 
     for (const cell of unknowns) {
-      const possible = STICKER_COLORS.filter((color) => counts[color] < TARGET_PER_COLOR);
+      const possible = possibleColors(counts);
       if (possible.length === 1) {
-        const fill = possible[0]!;
-        result.get(cell.faceId)![cell.index] = fill;
-        counts[fill]++;
-        changed = true;
-        continue;
+        assign(cell, possible[0]!);
       }
+    }
+    if (changed) continue;
+
+    for (const color of STICKER_COLORS) {
+      const deficit = TARGET_PER_COLOR - counts[color];
+      if (deficit <= 0) continue;
+
+      const eligible = unknowns.filter((cell) => {
+        if (result.get(cell.faceId)![cell.index] !== '?') return false;
+        return possibleColors(counts).includes(color);
+      });
+
+      if (deficit === 1 && eligible.length === 1) {
+        assign(eligible[0]!, color);
+      }
+    }
+    if (changed) continue;
+
+    for (const cell of unknowns) {
+      if (result.get(cell.faceId)![cell.index] !== '?') continue;
 
       const faceColors = result.get(cell.faceId)!;
       const knownOnFace = faceColors.filter(isKnownColor);
-      if (knownOnFace.length >= 7) {
-        const tallies = emptyColorCounts();
-        for (const c of knownOnFace) tallies[c]++;
-        let dominant: StickerColor = knownOnFace[0]!;
-        let dominantCount = 0;
-        for (const color of STICKER_COLORS) {
-          if (tallies[color] > dominantCount) {
-            dominantCount = tallies[color];
-            dominant = color;
-          }
+      if (knownOnFace.length < 7) continue;
+
+      const tallies = emptyColorCounts();
+      for (const c of knownOnFace) tallies[c]++;
+      let dominant: StickerColor = knownOnFace[0]!;
+      let dominantCount = 0;
+      for (const color of STICKER_COLORS) {
+        if (tallies[color] > dominantCount) {
+          dominantCount = tallies[color];
+          dominant = color;
         }
-        if (dominantCount >= 7 && counts[dominant] < TARGET_PER_COLOR) {
-          result.get(cell.faceId)![cell.index] = dominant;
-          counts[dominant]++;
-          changed = true;
-        }
+      }
+      if (dominantCount >= 7 && counts[dominant] < TARGET_PER_COLOR) {
+        assign(cell, dominant);
       }
     }
   }

@@ -7,7 +7,7 @@ import {
 
 let awaitingFirstWhiteCenter = true;
 
-/** Reset per-scan white reference (first face center = white). */
+/** Reset per-scan white reference (first face center sticker calibrates all colors). */
 export function resetScanWhiteCalibration(): void {
   awaitingFirstWhiteCenter = true;
   resetWhiteBalance();
@@ -17,7 +17,7 @@ export function isAwaitingFirstWhiteCenter(): boolean {
   return awaitingFirstWhiteCenter;
 }
 
-/** Calibrate from center cell RGB on first face, then apply WB gains to all medians. */
+/** Calibrate from center sticker on first face, then WB-correct all 9 cell medians. */
 export function prepareMediansForClassification(
   medians: ReadonlyArray<readonly [number, number, number]>,
 ): [number, number, number][] {
