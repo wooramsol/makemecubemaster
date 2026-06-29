@@ -1,0 +1,10 @@
+# Blinktype auto-deploy
+
+After user-facing changes in `/home/ubuntu/blinktype`:
+
+1. Run `bash scripts/deploy.sh "your commit message"`
+2. That pushes to `makemecubemaster` → `blinktype-import` branch
+3. GitHub Actions (`publish-blinktype.yml` on makemecubemaster) mirrors to `wooramsol/blinktype` `main`
+4. `blinktype` `deploy.yml` builds and publishes https://wooramsol.github.io/blinktype/
+
+Requires `BLINKTYPE_SYNC_TOKEN` secret on makemecubemaster (one-time PAT setup).
