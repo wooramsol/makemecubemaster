@@ -1,0 +1,30 @@
+name: Publish blinktype
+
+on:
+  push:
+    branches: [blinktype-import]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-blinktype
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push source to blinktype repository
+        env:
+          SYNC_TOKEN: ${{ secrets.BLINKTYPE_SYNC_TOKEN }}
+        run: |
+          if [ -z "$SYNC_TOKEN" ]; then
+            echo "::error::Add BLINKTYPE_SYNC_TOKEN to makemecubemaster repository secrets (classic PAT with repo scope)."
+            exit 1
+          fi
+          git remote add blinktype "https://x-access-token:${SYNC_TOKEN}@github.com/wooramsol/blinktype.git"
+          git push blinktype HEAD:main --force
