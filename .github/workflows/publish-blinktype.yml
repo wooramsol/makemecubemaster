@@ -4,6 +4,8 @@ on:
   push:
     branches: [blinktype-import]
   workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
 
 permissions:
   contents: read
