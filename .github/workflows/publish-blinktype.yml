@@ -2,7 +2,7 @@ name: Publish blinktype
 
 on:
   push:
-    branches: [blinktype-import]
+    branches: [main, blinktype-import]
   workflow_dispatch:
   schedule:
     - cron: '*/10 * * * *'
