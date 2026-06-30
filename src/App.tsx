@@ -9,6 +9,7 @@ import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingMoveHint } from './components/SolvingMoveHint';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
+import { SolveCubeViewer } from './components/SolveCubeViewer';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
@@ -77,10 +78,14 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
+  const showSolveViewer =
+    (state.phase === 'solving' || state.phase === 'solved') &&
+    Boolean(state.solution?.moves.length);
+
   return (
     <main className="app">
       <div
-        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}`}
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}${showSolveViewer ? ' viewport--solve-viewer' : ''}`}
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
@@ -139,6 +144,14 @@ export default function App() {
               needsDeferredWarmFace={state.liveScanNeedsDeferredWarmFace}
             />
 
+            <SolveCubeViewer
+              visible={showSolveViewer}
+              facelet={state.solvingFacelet || null}
+              moves={state.solution?.moves ?? []}
+              currentIndex={state.solution?.currentIndex ?? 0}
+              solved={state.phase === 'solved'}
+            />
+
             {isSolving && currentMove && (
               <SolvingMoveHint
                 visible
@@ -162,7 +175,7 @@ export default function App() {
               />
             )}
 
-            {state.phase === 'solved' && (
+            {state.phase === 'solved' && !showSolveViewer && (
               <div className="solved-banner">
                 <p>Done</p>
               </div>
