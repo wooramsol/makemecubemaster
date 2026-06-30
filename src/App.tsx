@@ -3,6 +3,7 @@ import { AROverlay } from './components/AROverlay';
 import { CalibrationOverlay } from './components/CalibrationOverlay';
 import { CameraView } from './components/CameraView';
 import { LoadingScreen } from './components/LoadingScreen';
+import { SolveCubeViewer } from './components/SolveCubeViewer';
 import { StepIndicator } from './components/StepIndicator';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
@@ -46,9 +47,13 @@ export default function App() {
   const currentStep = (state.solution?.currentIndex ?? 0) + 1;
   const trackingActive = state.phase === 'solving' || state.phase === 'calibrating';
 
+  const showSolveViewer =
+    (state.phase === 'solving' || state.phase === 'solved') &&
+    Boolean(state.solution?.moves.length);
+
   return (
     <main className="app">
-      <div className="viewport">
+      <div className={`viewport${showSolveViewer ? ' viewport--solve-viewer' : ''}`}>
         <CameraView videoRef={videoRef} onDimensions={handleDimensions} />
         <AROverlay
           pose={state.currentPose}
@@ -59,6 +64,15 @@ export default function App() {
         />
 
         <StepIndicator phase={state.phase} currentStep={currentStep} totalSteps={totalSteps} />
+
+        <SolveCubeViewer
+          visible={showSolveViewer}
+          facelet={state.solveFacelet}
+          moves={state.solution?.moves ?? []}
+          currentIndex={state.solution?.currentIndex ?? 0}
+          solved={state.phase === 'solved'}
+        />
+
         <CalibrationOverlay
           phase={state.phase}
           hint={state.calibrationHint}
@@ -71,7 +85,7 @@ export default function App() {
           </button>
         )}
 
-        {state.phase === 'solved' && (
+        {state.phase === 'solved' && !showSolveViewer && (
           <div className="solved-banner">
             <p>완료!</p>
           </div>

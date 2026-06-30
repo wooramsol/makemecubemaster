@@ -16,6 +16,7 @@ export interface CubeAppState {
   currentCalibrationFace: FaceId | null;
   calibrationProgress: number;
   solution: SolutionProgress | null;
+  solveFacelet: string | null;
   currentPose: CubePose | null;
   solverReady: boolean;
   calibrationHint: string;
@@ -28,6 +29,7 @@ const initialState: CubeAppState = {
   currentCalibrationFace: CALIBRATION_ORDER[0] ?? null,
   calibrationProgress: 0,
   solution: null,
+  solveFacelet: null,
   currentPose: null,
   solverReady: false,
   calibrationHint: '',
@@ -92,6 +94,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             ...s,
             phase: 'solving',
             solution: { moves: msg.moves, currentIndex: 0 },
+            solveFacelet: faceletRef.current || null,
             calibrationHint: '',
           }));
           frameProcessor.current?.enableTracking();
