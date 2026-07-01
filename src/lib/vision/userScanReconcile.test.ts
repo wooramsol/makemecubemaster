@@ -2,38 +2,46 @@ import { describe, it, expect } from 'vitest';
 import type { FaceId, StickerColor } from '../../types';
 import {
   reconcileLiveScanFaces,
-  getStickerImbalance,
-  isCubeColorBalanced,
   detectSuspiciousScanFaces,
-  formatScanQualityHint,
+  recoverSuspiciousFaces,
+  getStickerImbalance,
 } from './cubeColorReconcile';
+import { applyFaceAwareReads } from './colorClassifier';
 
-describe('misread scan like user screenshot', () => {
-  const rawFaces = new Map<FaceId, StickerColor[]>([
-    ['U', ['G', 'W', 'B', 'G', 'W', 'R', 'G', 'W', 'R']],
-    ['F', ['W', 'W', 'R', 'W', 'G', 'W', 'W', 'R', 'W']],
-    ['R', ['B', 'W', 'B', 'B', 'R', 'O', 'B', 'O', 'B']],
-    ['B', ['Y', 'O', 'Y', 'Y', 'B', 'Y', 'Y', 'R', 'Y']],
-    ['L', ['G', 'O', 'G', 'G', 'O', 'O', 'G', 'W', 'G']],
-    ['D', ['R', 'Y', 'G', 'R', 'Y', 'B', 'R', 'Y', 'B']],
+describe('warm light misread recovery', () => {
+  const warmLightScan = new Map<FaceId, StickerColor[]>([
+    ['U', ['O', 'W', 'O', 'G', 'W', 'G', 'G', 'B', 'G']],
+    ['F', ['W', 'G', 'R', 'W', 'G', 'R', 'W', 'W', 'W']],
+    ['R', ['B', 'Y', 'B', 'R', 'R', 'R', 'R', 'W', 'R']],
+    ['B', ['Y', 'Y', 'Y', 'Y', 'B', 'Y', 'Y', 'Y', 'Y']],
+    ['L', ['B', 'G', 'R', 'W', 'O', 'O', 'B', 'O', 'B']],
+    ['D', ['R', 'Y', 'R', 'B', 'G', 'B', 'B', 'Y', 'B']],
   ]);
 
-  it('raw scan is globally imbalanced', () => {
-    const stickerMap = new Map(rawFaces);
-    expect(isCubeColorBalanced(stickerMap)).toBe(false);
-    expect(getStickerImbalance(stickerMap)).toMatchObject({ W: 2, G: 1, O: -3 });
+  it('applyFaceAwareReads caps yellow on blue face', () => {
+    const colors = warmLightScan.get('B')!;
+    const adjusted = applyFaceAwareReads(colors, 'B');
+    const yellows = adjusted.filter((c) => c === 'Y').length;
+    expect(yellows).toBeLessThanOrEqual(3);
   });
 
-  it('flags green face with too many whites even after global reconcile', () => {
-    const reconciled = reconcileLiveScanFaces(rawFaces);
-    const stickerMap = new Map<FaceId, StickerColor[]>();
+  it('clears suspicious face patterns after recovery pass', () => {
+    let reconciled = reconcileLiveScanFaces(warmLightScan);
+    let solveMap = new Map<FaceId, StickerColor[]>();
     for (const [id, colors] of reconciled) {
-      stickerMap.set(id, colors as StickerColor[]);
+      solveMap.set(id, colors as StickerColor[]);
     }
 
-    expect(isCubeColorBalanced(stickerMap)).toBe(true);
-    const issues = detectSuspiciousScanFaces(stickerMap);
-    expect(issues.some((issue) => issue.label === 'G')).toBe(true);
-    expect(formatScanQualityHint(issues)).toContain('G');
+    const issues = detectSuspiciousScanFaces(solveMap);
+    expect(issues.length).toBeGreaterThan(0);
+
+    reconciled = reconcileLiveScanFaces(recoverSuspiciousFaces(reconciled, issues));
+    solveMap = new Map<FaceId, StickerColor[]>();
+    for (const [id, colors] of reconciled) {
+      solveMap.set(id, colors as StickerColor[]);
+    }
+
+    expect(detectSuspiciousScanFaces(solveMap).length).toBe(0);
+    expect(getStickerImbalance(solveMap).W).toBeLessThanOrEqual(2);
   });
 });

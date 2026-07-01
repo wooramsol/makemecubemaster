@@ -2,7 +2,7 @@ import { identifyFaceFromCenter, getFaceCenterColor } from '../cube/colors';
 import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
 import { reconcileLiveScanFaces } from './cubeColorReconcile';
-import { wasLastCenterWarm } from './colorClassifier';
+import { wasLastCenterWarm, applyFaceAwareReads } from './colorClassifier';
 import { isColorsCalibrated } from './colorReference';
 
 /** Periphery cells only — center is used for face ID and may jitter */
@@ -313,7 +313,7 @@ export class LiveFaceAccumulator {
 
       if (resolvedFaceId) {
         const isNew = !this.faces.has(resolvedFaceId);
-        const stored = [...voted];
+        const stored = applyFaceAwareReads([...voted], resolvedFaceId);
         stored[4] = getFaceCenterColor(resolvedFaceId);
         this.faces.set(resolvedFaceId, stored);
         if (isNew) newlyCaptured = resolvedFaceId;

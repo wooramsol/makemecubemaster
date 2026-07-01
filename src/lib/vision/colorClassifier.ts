@@ -1,4 +1,4 @@
-import type { ReadColor, StickerColor } from '../../types';
+import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { getLearnedLabRefs, isColorsCalibrated } from './colorReference';
 import { isKnownColor } from './readColorUtils';
 import { prepareMediansForClassification } from './scanWhiteCalibration';
@@ -98,16 +98,32 @@ function labDistance(a: [number, number, number], b: [number, number, number]): 
 function classifyByLab(r: number, g: number, b: number): StickerColor {
   const lab = rgbToLab(r, g, b);
   const refs = labRefs();
-  let best: StickerColor = 'W';
-  let bestDist = Infinity;
-  for (const color of ALL_COLORS) {
-    const dist = labDistance(lab, refs[color]);
-    if (dist < bestDist) {
-      bestDist = dist;
-      best = color;
-    }
+  const scored = ALL_COLORS.map((color) => ({
+    color,
+    dist: labDistance(lab, refs[color]),
+  })).sort((a, b) => a.dist - b.dist);
+
+  const best = scored[0]!;
+  const blue = scored.find((s) => s.color === 'B')!;
+  const green = scored.find((s) => s.color === 'G')!;
+  const white = scored.find((s) => s.color === 'W')!;
+
+  // Warm/yellow light: blue often misread as yellow.
+  if (best.color === 'Y' && b > r + 10 && b >= g - 12 && blue.dist < best.dist + 14) {
+    return 'B';
   }
-  return best;
+
+  // Green stickers washed out to white under bright light.
+  if (best.color === 'W' && g >= r - 6 && g > b + 4 && green.dist < best.dist + 12) {
+    return 'G';
+  }
+
+  // Yellow vs white on pale stickers.
+  if (best.color === 'Y' && white.dist < best.dist + 8 && r + g > b + 40) {
+    return 'W';
+  }
+
+  return best.color;
 }
 
 function isGapPixel(r: number, g: number, b: number): boolean {
@@ -204,6 +220,7 @@ function classifyCellRelative(r: number, g: number, b: number): ReadColor {
   return best.color;
 }
 
+/** Classify 9 cell medians via chromaticity (lighting-relative, not absolute RGB). */
 /** Classify 9 cell medians via chromaticity (lighting-relative, not absolute RGB). */
 export function classifyFaceRelative(
   rgbs: ReadonlyArray<readonly [number, number, number]>,
@@ -378,6 +395,39 @@ export function sampleFaceColors(
   }
 
   return colors;
+}
+
+const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+
+interface FaceMisreadGuard {
+  suspect: StickerColor;
+  maxPeriphery: number;
+}
+
+const FACE_MISREAD_GUARDS: Record<FaceId, FaceMisreadGuard[]> = {
+  U: [{ suspect: 'Y', maxPeriphery: 3 }],
+  D: [{ suspect: 'W', maxPeriphery: 3 }],
+  F: [{ suspect: 'W', maxPeriphery: 3 }, { suspect: 'Y', maxPeriphery: 3 }],
+  B: [{ suspect: 'Y', maxPeriphery: 3 }],
+  R: [{ suspect: 'O', maxPeriphery: 4 }],
+  L: [{ suspect: 'R', maxPeriphery: 4 }],
+};
+
+/** Cap common lighting misreads on a known face before storing the scan. */
+export function applyFaceAwareReads(colors: ReadColor[], faceId: FaceId): ReadColor[] {
+  const result = [...colors];
+  const guards = FACE_MISREAD_GUARDS[faceId];
+  if (!guards) return result;
+
+  for (const guard of guards) {
+    const hits = PERIPHERY_INDICES.filter((i) => result[i] === guard.suspect);
+    if (hits.length <= guard.maxPeriphery) continue;
+    for (let n = guard.maxPeriphery; n < hits.length; n++) {
+      result[hits[n]!] = '?';
+    }
+  }
+
+  return result;
 }
 
 export function emptyColorCounts(): Record<StickerColor, number> {

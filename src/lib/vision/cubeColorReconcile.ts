@@ -1,5 +1,5 @@
 import type { FaceId, ReadColor, StickerColor } from '../../types';
-import { emptyColorCounts } from './colorClassifier';
+import { emptyColorCounts, applyFaceAwareReads } from './colorClassifier';
 import { isKnownColor } from './readColorUtils';
 
 const FACE_CENTER: Record<FaceId, StickerColor> = {
@@ -395,7 +395,7 @@ export function reconcileMisreadColors(
 export function reconcileLiveScanFaces(
   faces: Map<FaceId, ReadColor[]>,
 ): Map<FaceId, ReadColor[]> {
-  let current = cloneReadFaces(faces);
+  let current = sanitizeDominantMisreads(cloneReadFaces(faces));
 
   for (let pass = 0; pass < 12; pass++) {
     const previous = cloneReadFaces(current);
@@ -506,6 +506,34 @@ export function inferUncertainCells(
     }
   }
 
+  return result;
+}
+
+/** Clear common per-face lighting misreads before global reconcile. */
+export function sanitizeDominantMisreads(
+  faces: Map<FaceId, ReadColor[]>,
+): Map<FaceId, ReadColor[]> {
+  const result = new Map<FaceId, ReadColor[]>();
+  for (const [faceId, colors] of faces) {
+    result.set(faceId, applyFaceAwareReads(colors, faceId));
+  }
+  return result;
+}
+
+/** Mark suspect colors on flagged faces uncertain, then re-run reconcileLiveScanFaces. */
+export function recoverSuspiciousFaces(
+  faces: Map<FaceId, ReadColor[]>,
+  issues: ScanQualityIssue[],
+): Map<FaceId, ReadColor[]> {
+  const result = cloneReadFaces(faces);
+  for (const issue of issues) {
+    const colors = result.get(issue.faceId);
+    if (!colors) continue;
+    for (let i = 0; i < 9; i++) {
+      if (i === 4) continue;
+      if (colors[i] === issue.suspectColor) colors[i] = '?';
+    }
+  }
   return result;
 }
 
@@ -636,6 +664,7 @@ export interface ScanQualityIssue {
   faceId: FaceId;
   label: string;
   message: string;
+  suspectColor: StickerColor;
 }
 
 /** Detect impossible local patterns (e.g. 6 whites on the green face). */
@@ -661,17 +690,20 @@ export function detectSuspiciousScanFaces(
         faceId,
         label,
         message: `${label} face: too many white stickers detected`,
+        suspectColor: 'W',
       });
       continue;
     }
 
     for (const color of STICKER_COLORS) {
       if (color === center) continue;
-      if (tallies[color] >= 5) {
+      const threshold = faceId === 'B' && color === 'Y' ? 4 : 5;
+      if (tallies[color] >= threshold) {
         issues.push({
           faceId,
           label,
           message: `${label} face: unlikely ${color} count (${tallies[color]}/8)`,
+          suspectColor: color,
         });
         break;
       }

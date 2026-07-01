@@ -37,7 +37,7 @@ import {
 import { detectWrongMoveFromColors } from '../lib/cube/detectWrongMove';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { formatImbalanceHint, isCubeColorBalanced, reconcileLiveScanFaces, hasUncertainCells, detectSuspiciousScanFaces, formatScanQualityHint } from '../lib/vision/cubeColorReconcile';
+import { formatImbalanceHint, isCubeColorBalanced, reconcileLiveScanFaces, hasUncertainCells, detectSuspiciousScanFaces, formatScanQualityHint, recoverSuspiciousFaces } from '../lib/vision/cubeColorReconcile';
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
@@ -597,7 +597,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         const scannedRecord = scannedFacesForDisplay(snapshot.faces);
 
         try {
-          const reconciled = reconcileLiveScanFaces(snapshotFaces);
+          let reconciled = reconcileLiveScanFaces(snapshotFaces);
 
           if (hasUncertainCells(reconciled)) {
             setState((s) => ({
@@ -609,12 +609,30 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
             return;
           }
 
-          const solveMap = new Map<FaceId, StickerColor[]>();
+          let solveMap = new Map<FaceId, StickerColor[]>();
           for (const [faceId, colors] of reconciled) {
             solveMap.set(faceId, colors as StickerColor[]);
           }
 
-          const qualityIssues = detectSuspiciousScanFaces(solveMap);
+          let qualityIssues = detectSuspiciousScanFaces(solveMap);
+          if (qualityIssues.length > 0) {
+            const recovered = reconcileLiveScanFaces(
+              recoverSuspiciousFaces(reconciled, qualityIssues),
+            );
+            if (!hasUncertainCells(recovered)) {
+              const retryMap = new Map<FaceId, StickerColor[]>();
+              for (const [faceId, colors] of recovered) {
+                retryMap.set(faceId, colors as StickerColor[]);
+              }
+              const retryIssues = detectSuspiciousScanFaces(retryMap);
+              if (retryIssues.length === 0) {
+                reconciled = recovered;
+                solveMap = retryMap;
+                qualityIssues = [];
+              }
+            }
+          }
+
           if (qualityIssues.length > 0) {
             setState((s) => ({
               ...s,
