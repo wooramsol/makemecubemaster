@@ -25,6 +25,7 @@ export interface LiveScanSnapshot {
   needsNewFace: boolean;
   needsClearerCenter: boolean;
   needsDeferredWarmFace: boolean;
+  rescanTarget: FaceId | null;
 }
 
 function countMatchingPeriphery(a: ReadColor[], b: ReadColor[]): number {
@@ -133,8 +134,11 @@ function pickFaceIdForCapture(
   voted: ReadColor[],
   faces: Map<FaceId, ReadColor[]>,
   history: ReadColor[][],
+  rescanTarget: FaceId | null,
 ): FaceId | null {
   if (findStoredMatch(voted, faces)) return null;
+
+  let candidate: FaceId | null = null;
 
   const centerCandidates: (ReadColor | null)[] = [
     majorityVoteCenter(history),
@@ -143,15 +147,29 @@ function pickFaceIdForCapture(
   for (const center of centerCandidates) {
     if (center === null || !isKnownColor(center)) continue;
     const faceId = identifyFaceFromCenter(center);
-    if (faceId && !faces.has(faceId)) return faceId;
+    if (faceId && !faces.has(faceId)) {
+      candidate = faceId;
+      break;
+    }
   }
 
-  if (wasLastCenterWarm()) {
-    const warmFace = pickMissingWarmFace(faces);
-    if (warmFace) return warmFace;
+  if (!candidate && wasLastCenterWarm()) {
+    candidate = pickMissingWarmFace(faces);
   }
 
-  return null;
+  if (rescanTarget) {
+    if (candidate === rescanTarget) return rescanTarget;
+    if (
+      (rescanTarget === 'R' || rescanTarget === 'L') &&
+      wasLastCenterWarm() &&
+      !faces.has(rescanTarget)
+    ) {
+      return rescanTarget;
+    }
+    return null;
+  }
+
+  return candidate;
 }
 
 export function canonicalizeScannedFaces(
@@ -188,12 +206,35 @@ export class LiveFaceAccumulator {
   private pendingReadings: ReadColor[][] = [];
   private stableSinceMs: number | null = null;
   private stabilityAnchor: ReadColor[] | null = null;
+  private rescanTarget: FaceId | null = null;
 
   reset(): void {
     this.faces.clear();
     this.pendingReadings = [];
     this.stableSinceMs = null;
     this.stabilityAnchor = null;
+    this.rescanTarget = null;
+  }
+
+  removeFace(faceId: FaceId): void {
+    this.faces.delete(faceId);
+    this.pendingReadings = [];
+    this.stableSinceMs = null;
+    this.stabilityAnchor = null;
+    if (this.faces.size > 0) {
+      this.refreshInferredFaces();
+    }
+  }
+
+  setRescanTarget(faceId: FaceId | null): void {
+    this.rescanTarget = faceId;
+    this.pendingReadings = [];
+    this.stableSinceMs = null;
+    this.stabilityAnchor = null;
+  }
+
+  getRescanTarget(): FaceId | null {
+    return this.rescanTarget;
   }
 
   getFaces(): Map<FaceId, ReadColor[]> {
@@ -218,6 +259,7 @@ export class LiveFaceAccumulator {
       needsNewFace: false,
       needsClearerCenter: false,
       needsDeferredWarmFace: false,
+      rescanTarget: this.rescanTarget,
     };
 
     if (!colors || colors.length !== 9) {
@@ -235,7 +277,7 @@ export class LiveFaceAccumulator {
       this.stableSinceMs = null;
       this.stabilityAnchor = null;
       this.pendingReadings = [];
-      return { ...empty, currentFace: storedMatch, needsNewFace: true };
+      return { ...empty, currentFace: storedMatch, needsNewFace: true, rescanTarget: this.rescanTarget };
     }
 
     const anchorMatch = this.stabilityAnchor
@@ -267,7 +309,7 @@ export class LiveFaceAccumulator {
       this.pendingReadings = history;
 
       const voted = majorityVoteCells(history);
-      const resolvedFaceId = pickFaceIdForCapture(voted, this.faces, history);
+      const resolvedFaceId = pickFaceIdForCapture(voted, this.faces, history, this.rescanTarget);
 
       if (resolvedFaceId) {
         const isNew = !this.faces.has(resolvedFaceId);
@@ -275,6 +317,9 @@ export class LiveFaceAccumulator {
         stored[4] = getFaceCenterColor(resolvedFaceId);
         this.faces.set(resolvedFaceId, stored);
         if (isNew) newlyCaptured = resolvedFaceId;
+        if (this.rescanTarget === resolvedFaceId) {
+          this.rescanTarget = null;
+        }
         this.refreshInferredFaces();
         this.stableSinceMs = null;
         this.stabilityAnchor = null;
@@ -300,6 +345,7 @@ export class LiveFaceAccumulator {
       needsNewFace: false,
       needsClearerCenter,
       needsDeferredWarmFace,
+      rescanTarget: this.rescanTarget,
     };
   }
 }

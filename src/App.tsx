@@ -23,6 +23,7 @@ export default function App() {
     confirmColorLearn,
     startLiveScan,
     retryLiveScan,
+    requestRescanFace,
     startTracking,
     stopTracking,
     skipCurrentMove,
@@ -121,6 +122,9 @@ export default function App() {
             <ScannedFacesBar
               visible={showScannedFaces}
               scannedFaces={state.scannedFaceColors}
+              interactive={state.phase === 'liveScan'}
+              onRescanFace={requestRescanFace}
+              rescanTargetFace={state.rescanTargetFace}
             />
 
             <DetectionOverlay
@@ -139,6 +143,7 @@ export default function App() {
               phase={state.phase}
               knownFaces={state.knownFaces}
               progress={state.liveScanProgress}
+              rescanTargetFace={state.rescanTargetFace}
               needsNewFace={state.detectionFeedback.status === 'rotate'}
               needsClearerCenter={state.liveScanNeedsClearerCenter}
               needsDeferredWarmFace={state.liveScanNeedsDeferredWarmFace}

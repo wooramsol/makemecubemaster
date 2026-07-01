@@ -260,6 +260,18 @@ body,
   pointer-events: none;
 }
 
+.scanned-faces-bar--interactive {
+  pointer-events: auto;
+}
+
+.scanned-faces-bar-hint {
+  margin: 0 0 4px;
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
 .scanned-faces-bar-title {
   margin: 0 0 4px;
   font-size: 10px;
@@ -284,6 +296,32 @@ body,
   flex-direction: column;
   align-items: center;
   gap: 3px;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.face-grid-mini--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 2px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.face-grid-mini--clickable:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.face-grid-mini--clickable:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.face-grid-mini--selected {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.95);
+  background: rgba(96, 165, 250, 0.12);
 }
 
 .face-grid-mini--empty {

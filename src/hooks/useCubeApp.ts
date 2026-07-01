@@ -84,6 +84,7 @@ export interface CubeAppState {
   colorsCalibrated: boolean;
   liveScanNeedsClearerCenter: boolean;
   liveScanNeedsDeferredWarmFace: boolean;
+  rescanTargetFace: FaceId | null;
   lastCapturedFace: FaceId | null;
   solvingFeedback: SolvingFeedback;
   solvingFacelet: string;
@@ -139,6 +140,7 @@ const initialState: CubeAppState = {
   colorsCalibrated: false,
   liveScanNeedsClearerCenter: false,
   liveScanNeedsDeferredWarmFace: false,
+  rescanTargetFace: null,
   lastCapturedFace: null,
   solvingFeedback: initialSolvingFeedback,
   solvingFacelet: '',
@@ -352,6 +354,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       detectionFeedback: initialFeedback,
       liveScanNeedsClearerCenter: false,
       liveScanNeedsDeferredWarmFace: false,
+      rescanTargetFace: null,
     }));
     frameProcessor.current?.disableTracking();
     expectedMoveRef.current = null;
@@ -373,7 +376,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       lastCapturedFace: null,
       detectionFeedback: initialFeedback,
       liveScanNeedsClearerCenter: false,
-  liveScanNeedsDeferredWarmFace: false,
+      liveScanNeedsDeferredWarmFace: false,
+      rescanTargetFace: null,
     }));
     frameProcessor.current?.disableTracking();
     expectedMoveRef.current = null;
@@ -517,6 +521,31 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     beginLiveScan();
   }, [beginLiveScan]);
 
+  const requestRescanFace = useCallback((faceId: FaceId) => {
+    if (phaseRef.current !== 'liveScan') return;
+    if (!liveAccumulator.current.getFaces().has(faceId)) return;
+
+    solveTriggeredRef.current = false;
+    liveAccumulator.current.removeFace(faceId);
+    liveAccumulator.current.setRescanTarget(faceId);
+
+    const faces = liveAccumulator.current.getFaces();
+    setState((s) => ({
+      ...s,
+      rescanTargetFace: faceId,
+      knownFaces: [...faces.keys()],
+      scannedFaceColors: scannedFacesForDisplay(faces),
+      liveScanProgress: faces.size / 6,
+      lastCapturedFace: null,
+      liveScanNeedsClearerCenter: false,
+      liveScanNeedsDeferredWarmFace: false,
+      detectionFeedback: {
+        ...initialFeedback,
+        status: 'searching',
+      },
+    }));
+  }, []);
+
   const processFrame = useCallback(() => {
     const video = videoRef.current;
     const processor = frameProcessor.current;
@@ -617,6 +646,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         liveScanProgress: snapshot.knownFaces.length / 6,
         liveScanNeedsClearerCenter: snapshot.needsClearerCenter,
         liveScanNeedsDeferredWarmFace: snapshot.needsDeferredWarmFace,
+        rescanTargetFace: snapshot.rescanTarget,
         lastCapturedFace: snapshot.newlyCaptured ?? prev.lastCapturedFace,
         detectionFeedback: buildFeedback(
           hasPose,
@@ -953,6 +983,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     currentMove,
     confirmColorLearn,
     startLiveScan,
+    requestRescanFace,
     retryLiveScan,
     retryColorLearn,
     startTracking,

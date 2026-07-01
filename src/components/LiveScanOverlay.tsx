@@ -1,11 +1,13 @@
 import type { AppPhase, FaceId } from '../types';
 import { isAwaitingFirstWhiteCenter } from '../lib/vision/scanWhiteCalibration';
 import { isColorsCalibrated } from '../lib/vision/colorReference';
+import { FACE_CENTER_LABEL } from './ScannedFacesBar';
 
 interface LiveScanOverlayProps {
   phase: AppPhase;
   knownFaces: FaceId[];
   progress: number;
+  rescanTargetFace?: FaceId | null;
   needsNewFace?: boolean;
   needsClearerCenter?: boolean;
   needsDeferredWarmFace?: boolean;
@@ -15,6 +17,7 @@ export function LiveScanOverlay({
   phase,
   knownFaces,
   progress,
+  rescanTargetFace = null,
   needsNewFace = false,
   needsClearerCenter = false,
   needsDeferredWarmFace = false,
@@ -22,6 +25,7 @@ export function LiveScanOverlay({
   if (phase !== 'liveScan') return null;
 
   const awaitingWhite = knownFaces.length === 0 && isAwaitingFirstWhiteCenter();
+  const rescanLabel = rescanTargetFace ? FACE_CENTER_LABEL[rescanTargetFace] : null;
 
   const calibrated = isColorsCalibrated();
 
@@ -31,7 +35,11 @@ export function LiveScanOverlay({
         <div className="calibration-fill" style={{ width: `${progress * 100}%` }} />
       </div>
       <p className="calibration-sub">{knownFaces.length} / 6</p>
-      {awaitingWhite ? (
+      {rescanLabel ? (
+        <p className="calibration-hint">
+          Re-scanning <strong>{rescanLabel}</strong> — align that face to the camera
+        </p>
+      ) : awaitingWhite ? (
         <p className="calibration-hint">
           First face: center <strong>white</strong> sticker, then scan all 9 colors
         </p>
