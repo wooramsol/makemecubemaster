@@ -3,6 +3,7 @@ import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
 import { reconcileLiveScanFaces } from './cubeColorReconcile';
 import { wasLastCenterWarm } from './colorClassifier';
+import { isColorsCalibrated } from './colorReference';
 
 /** Periphery cells only — center is used for face ID and may jitter */
 const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
@@ -82,8 +83,9 @@ function majorityVoteCells(readings: ReadColor[][]): ReadColor[] {
     }
     let best: StickerColor = 'W';
     let bestCount = 0;
+    const calibrated = isColorsCalibrated();
     for (const [color, count] of votes) {
-      if (color === 'R' || color === 'O') continue;
+      if (!calibrated && (color === 'R' || color === 'O')) continue;
       if (count > bestCount) {
         bestCount = count;
         best = color;

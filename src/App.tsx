@@ -209,7 +209,7 @@ export default function App() {
             <p>{state.error ?? webcamState.error}</p>
             <div className="error-actions">
               <button type="button" className="error-button primary" onClick={retryLiveScan}>
-                Re-scan
+                Re-calibrate colors
               </button>
             </div>
           </div>

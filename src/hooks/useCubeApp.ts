@@ -328,22 +328,30 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     [],
   );
 
-  const enterScanReady = useCallback(() => {
+  const enterColorLearn = useCallback(() => {
+    resetColorReferences();
+    resetScanWhiteCalibration();
     liveAccumulator.current.reset();
     solveTriggeredRef.current = false;
     lastPoseRef.current = null;
     setState((s) => ({
       ...s,
-      phase: 'scanReady',
+      phase: 'colorLearn',
       error: null,
+      solution: null,
       knownFaces: [],
       scannedFaceColors: {},
       currentVisibleFace: null,
       liveScanProgress: 0,
       lastCapturedFace: null,
+      colorLearnIndex: 0,
+      colorLearnSample: null,
+      colorLearnReady: false,
+      colorLearnError: null,
+      colorsCalibrated: false,
       detectionFeedback: initialFeedback,
       liveScanNeedsClearerCenter: false,
-  liveScanNeedsDeferredWarmFace: false,
+      liveScanNeedsDeferredWarmFace: false,
     }));
     frameProcessor.current?.disableTracking();
     expectedMoveRef.current = null;
@@ -438,17 +446,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       };
 
       worker.postMessage({ type: 'init' });
-      resetColorReferences();
       liveAccumulator.current.reset();
-      setState((s) => ({
-        ...s,
-        phase: 'scanReady',
-        colorLearnIndex: 0,
-        colorLearnSample: null,
-        colorLearnReady: false,
-        colorLearnError: null,
-        colorsCalibrated: false,
-      }));
+      enterColorLearn();
     } catch (error) {
       setState((s) => ({
         ...s,
@@ -456,7 +455,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         error: error instanceof Error ? error.message : 'Init failed',
       }));
     }
-  }, [clearSolveTimeout]);
+  }, [clearSolveTimeout, enterColorLearn]);
 
   useEffect(() => {
     void init();
@@ -499,7 +498,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       beginLiveScan();
       setState((s) => ({
         ...s,
-        colorsCalibrated: false,
+        colorsCalibrated: true,
         colorLearnError: null,
       }));
       return;
@@ -917,13 +916,12 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
   const retryLiveScan = useCallback(() => {
     clearSolveTimeout();
-    enterScanReady();
-    setState((s) => ({ ...s, solution: null }));
-  }, [clearSolveTimeout, enterScanReady]);
+    enterColorLearn();
+  }, [clearSolveTimeout, enterColorLearn]);
 
   const retryColorLearn = useCallback(() => {
-    retryLiveScan();
-  }, [retryLiveScan]);
+    enterColorLearn();
+  }, [enterColorLearn]);
 
   const skipCurrentMove = useCallback(() => {
     const solution = solutionRef.current;

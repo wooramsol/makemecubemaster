@@ -1,5 +1,6 @@
 import type { AppPhase, FaceId } from '../types';
 import { isAwaitingFirstWhiteCenter } from '../lib/vision/scanWhiteCalibration';
+import { isColorsCalibrated } from '../lib/vision/colorReference';
 
 interface LiveScanOverlayProps {
   phase: AppPhase;
@@ -22,6 +23,8 @@ export function LiveScanOverlay({
 
   const awaitingWhite = knownFaces.length === 0 && isAwaitingFirstWhiteCenter();
 
+  const calibrated = isColorsCalibrated();
+
   return (
     <div className="calibration-overlay live-scan-overlay">
       <div className="calibration-bar">
@@ -30,11 +33,15 @@ export function LiveScanOverlay({
       <p className="calibration-sub">{knownFaces.length} / 6</p>
       {awaitingWhite ? (
         <p className="calibration-hint">
-          First face: center <strong>white</strong> sticker — all 9 colors scan using it as reference
+          First face: center <strong>white</strong> sticker, then scan all 9 colors
+        </p>
+      ) : calibrated ? (
+        <p className="calibration-hint calibration-hint--muted">
+          Using your calibrated colors — show each unscanned face
         </p>
       ) : (
         <p className="calibration-hint calibration-hint--muted">
-          ? cells fill as other faces scan — R/O re-checked from constraints
+          ? cells fill as other faces scan
         </p>
       )}
       {needsNewFace && (
