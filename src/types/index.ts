@@ -47,6 +47,8 @@ export interface CubePose {
 export interface DetectedFace {
   colors: ReadColor[];
   pose: CubePose;
+  /** Per-cell median RGB used for face-aware warm color refinement. */
+  medians?: [number, number, number][];
 }
 
 export interface ScannedFace {

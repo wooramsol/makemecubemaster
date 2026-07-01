@@ -123,6 +123,16 @@ function classifyByLab(r: number, g: number, b: number): StickerColor {
     return 'W';
   }
 
+  const red = scored.find((s) => s.color === 'R')!;
+  const orange = scored.find((s) => s.color === 'O')!;
+  if (best.color === 'R' || best.color === 'O') {
+    const roGap = Math.abs(red.dist - orange.dist);
+    if (roGap < 14) {
+      if (g >= r * 0.72 && g > b) return 'O';
+      if (r > g + 10 && r > b + 5) return 'R';
+    }
+  }
+
   return best.color;
 }
 
@@ -353,17 +363,18 @@ function classifyCellPixels(
   return best;
 }
 
-export function sampleFaceColors(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-): ReadColor[] {
-  const imageData = ctx.getImageData(0, 0, width, height);
-  const data = imageData.data;
-  const cellW = width / 3;
-  const cellH = height / 3;
-  const medians: [number, number, number][] = [];
+export interface FaceCaptureSample {
+  colors: ReadColor[];
+  medians: [number, number, number][];
+}
 
+function collectFaceCellMedians(
+  data: Uint8ClampedArray,
+  width: number,
+  cellW: number,
+  cellH: number,
+): [number, number, number][] {
+  const medians: [number, number, number][] = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const margin = cellSampleMargin(row, col);
@@ -374,15 +385,99 @@ export function sampleFaceColors(
       medians.push(sampleCellMedianRgb(data, width, x0, y0, x1, y1));
     }
   }
+  return medians;
+}
+
+export function medianCellMedians(
+  readings: [number, number, number][][],
+): [number, number, number][] {
+  if (readings.length === 0) return [];
+
+  const result: [number, number, number][] = [];
+  for (let i = 0; i < 9; i++) {
+    result.push([
+      median(readings.map((reading) => reading[i]![0])),
+      median(readings.map((reading) => reading[i]![1])),
+      median(readings.map((reading) => reading[i]![2])),
+    ]);
+  }
+  return result;
+}
+
+const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+
+const RO_LAB_MARGIN = 10;
+
+/** Use learned LAB + face context to fix orange↔red misreads on R/L faces. */
+export function refineWarmReadsForFace(
+  colors: ReadColor[],
+  medians: [number, number, number][],
+  faceId: FaceId,
+): ReadColor[] {
+  if (!isColorsCalibrated() || medians.length !== 9) return [...colors];
+
+  const result = [...colors];
+  const refs = labRefs();
+
+  for (const i of PERIPHERY_INDICES) {
+    const read = result[i];
+    if (read !== 'R' && read !== 'O') continue;
+
+    const [r, g, b] = medians[i]!;
+    const lab = rgbToLab(r, g, b);
+    const dR = labDistance(lab, refs.R);
+    const dO = labDistance(lab, refs.O);
+
+    if (faceId === 'L' && read === 'R') {
+      if (dO + RO_LAB_MARGIN < dR) result[i] = 'O';
+      else if (dR + RO_LAB_MARGIN < dO) result[i] = 'R';
+      else if (g >= r * 0.72 && g > b) result[i] = 'O';
+      else if (r > g + 10) result[i] = 'R';
+      else result[i] = '?';
+      continue;
+    }
+
+    if (faceId === 'R' && read === 'O') {
+      if (dR + RO_LAB_MARGIN < dO) result[i] = 'R';
+      else if (dO + RO_LAB_MARGIN < dR) result[i] = 'O';
+      else if (r > g + 10) result[i] = 'R';
+      else if (g >= r * 0.72 && g > b) result[i] = 'O';
+      else result[i] = '?';
+      continue;
+    }
+
+    if (Math.abs(dR - dO) < RO_LAB_MARGIN) {
+      if (g >= r * 0.72 && g > b) result[i] = 'O';
+      else if (r > g + 10) result[i] = 'R';
+      else result[i] = '?';
+    }
+  }
+
+  return result;
+}
+
+export function sampleFaceCapture(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): FaceCaptureSample {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const cellW = width / 3;
+  const cellH = height / 3;
+  const medians = collectFaceCellMedians(data, width, cellW, cellH);
 
   if (!isColorsCalibrated()) {
     const adjusted = prepareMediansForClassification(medians);
     const center = adjusted[4]!;
     lastCenterWarm = isWarmRedOrangeHue(center[0], center[1], center[2]);
-    return deferRedOrangeInReads(classifyFaceRelative(adjusted));
+    return {
+      colors: deferRedOrangeInReads(classifyFaceRelative(adjusted)),
+      medians,
+    };
   }
 
-  const colors: StickerColor[] = [];
+  const colors: ReadColor[] = [];
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const margin = cellSampleMargin(row, col);
@@ -394,10 +489,16 @@ export function sampleFaceColors(
     }
   }
 
-  return colors;
+  return { colors, medians };
 }
 
-const PERIPHERY_INDICES = [0, 1, 2, 3, 5, 6, 7, 8] as const;
+export function sampleFaceColors(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): ReadColor[] {
+  return sampleFaceCapture(ctx, width, height).colors;
+}
 
 interface FaceMisreadGuard {
   suspect: StickerColor;
@@ -414,8 +515,14 @@ const FACE_MISREAD_GUARDS: Record<FaceId, FaceMisreadGuard[]> = {
 };
 
 /** Cap common lighting misreads on a known face before storing the scan. */
-export function applyFaceAwareReads(colors: ReadColor[], faceId: FaceId): ReadColor[] {
-  const result = [...colors];
+export function applyFaceAwareReads(
+  colors: ReadColor[],
+  faceId: FaceId,
+  medians?: [number, number, number][],
+): ReadColor[] {
+  let result = medians
+    ? refineWarmReadsForFace(colors, medians, faceId)
+    : [...colors];
   const guards = FACE_MISREAD_GUARDS[faceId];
   if (!guards) return result;
 

@@ -588,7 +588,10 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       const hasPose = Boolean(result.pose);
       if (result.pose) lastPoseRef.current = result.pose;
 
-      const snapshot = liveAccumulator.current.update(colors);
+      const snapshot = liveAccumulator.current.update(
+        colors,
+        result.detectedFace?.medians ?? null,
+      );
       const captured = Boolean(snapshot.newlyCaptured);
 
       if (snapshot.isComplete && lastPoseRef.current && !solveTriggeredRef.current) {

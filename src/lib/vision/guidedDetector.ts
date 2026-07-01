@@ -1,18 +1,18 @@
 import type { ReadColor } from '../../types';
-import { sampleFaceColors } from './colorClassifier';
+import { sampleFaceCapture, type FaceCaptureSample } from './colorClassifier';
 import { isKnownColor } from './readColorUtils';
 
 const WARP = 256;
 
-export function sampleGuideRegionColors(
+export function sampleGuideRegionCapture(
   sourceCanvas: HTMLCanvasElement,
   guide: { x: number; y: number; size: number },
-): ReadColor[] {
+): FaceCaptureSample {
   const temp = document.createElement('canvas');
   temp.width = WARP;
   temp.height = WARP;
   const ctx = temp.getContext('2d', { willReadFrequently: true });
-  if (!ctx) return [];
+  if (!ctx) return { colors: [], medians: [] };
 
   ctx.drawImage(
     sourceCanvas,
@@ -26,7 +26,14 @@ export function sampleGuideRegionColors(
     WARP,
   );
 
-  return sampleFaceColors(ctx, WARP, WARP);
+  return sampleFaceCapture(ctx, WARP, WARP);
+}
+
+export function sampleGuideRegionColors(
+  sourceCanvas: HTMLCanvasElement,
+  guide: { x: number; y: number; size: number },
+): ReadColor[] {
+  return sampleGuideRegionCapture(sourceCanvas, guide).colors;
 }
 
 export function measureColorVariance(

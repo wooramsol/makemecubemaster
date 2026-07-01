@@ -3,6 +3,7 @@ import type { OpenCVMat } from '../../types/opencv';
 import {
   isRegionCubeLike,
   measureColorVariance,
+  sampleGuideRegionCapture,
   sampleGuideRegionColors,
 } from './guidedDetector';
 import { estimatePoseFromCorners, orderCorners } from './poseTracker';
@@ -182,7 +183,8 @@ export function detectCubeFace(
   relaxed = false,
 ): DetectedFace | null {
   const guide = getGuideSquare(frameWidth, frameHeight, guideRatio);
-  const colors = sampleGuideRegionColors(sourceCanvas, guide);
+  const capture = sampleGuideRegionCapture(sourceCanvas, guide);
+  const colors = capture.colors;
   const variance = measureColorVariance(sourceCanvas, guide);
 
   const cubeLike = isRegionCubeLike(colors, variance);
@@ -208,7 +210,7 @@ export function detectCubeFace(
   );
   pose.confidence = corners ? 0.85 : 0.7;
 
-  return { colors, pose };
+  return { colors, medians: capture.medians, pose };
 }
 
 /** 풀이 단계 — 실제 코너 쿼드에서 색 샘플링 (가이드 워프 대신) */

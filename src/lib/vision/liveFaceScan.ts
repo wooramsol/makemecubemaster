@@ -2,7 +2,7 @@ import { identifyFaceFromCenter, getFaceCenterColor } from '../cube/colors';
 import type { FaceId, ReadColor, StickerColor } from '../../types';
 import { isKnownColor } from './readColorUtils';
 import { reconcileLiveScanFaces } from './cubeColorReconcile';
-import { wasLastCenterWarm, applyFaceAwareReads } from './colorClassifier';
+import { wasLastCenterWarm, applyFaceAwareReads, medianCellMedians } from './colorClassifier';
 import { isColorsCalibrated } from './colorReference';
 
 /** Periphery cells only — center is used for face ID and may jitter */
@@ -204,6 +204,7 @@ export function canonicalizeScannedFaces(
 export class LiveFaceAccumulator {
   private faces = new Map<FaceId, ReadColor[]>();
   private pendingReadings: ReadColor[][] = [];
+  private pendingMedianReadings: [number, number, number][][] = [];
   private stableSinceMs: number | null = null;
   private stabilityAnchor: ReadColor[] | null = null;
   private rescanTarget: FaceId | null = null;
@@ -211,6 +212,7 @@ export class LiveFaceAccumulator {
   reset(): void {
     this.faces.clear();
     this.pendingReadings = [];
+    this.pendingMedianReadings = [];
     this.stableSinceMs = null;
     this.stabilityAnchor = null;
     this.rescanTarget = null;
@@ -219,6 +221,7 @@ export class LiveFaceAccumulator {
   removeFace(faceId: FaceId): void {
     this.faces.delete(faceId);
     this.pendingReadings = [];
+    this.pendingMedianReadings = [];
     this.stableSinceMs = null;
     this.stabilityAnchor = null;
     if (this.faces.size > 0) {
@@ -229,6 +232,7 @@ export class LiveFaceAccumulator {
   setRescanTarget(faceId: FaceId | null): void {
     this.rescanTarget = faceId;
     this.pendingReadings = [];
+    this.pendingMedianReadings = [];
     this.stableSinceMs = null;
     this.stabilityAnchor = null;
   }
@@ -246,7 +250,11 @@ export class LiveFaceAccumulator {
     this.faces = reconcileLiveScanFaces(this.faces);
   }
 
-  update(colors: ReadColor[] | null, nowMs = Date.now()): LiveScanSnapshot {
+  update(
+    colors: ReadColor[] | null,
+    medians: [number, number, number][] | null = null,
+    nowMs = Date.now(),
+  ): LiveScanSnapshot {
     const stableTargetSec = STABLE_DURATION_MS / 1000;
     const empty: LiveScanSnapshot = {
       faces: this.faces,
@@ -266,6 +274,7 @@ export class LiveFaceAccumulator {
       this.stableSinceMs = null;
       this.stabilityAnchor = null;
       this.pendingReadings = [];
+      this.pendingMedianReadings = [];
       return empty;
     }
 
@@ -277,6 +286,7 @@ export class LiveFaceAccumulator {
       this.stableSinceMs = null;
       this.stabilityAnchor = null;
       this.pendingReadings = [];
+      this.pendingMedianReadings = [];
       return { ...empty, currentFace: storedMatch, needsNewFace: true, rescanTarget: this.rescanTarget };
     }
 
@@ -292,6 +302,7 @@ export class LiveFaceAccumulator {
       this.stabilityAnchor = [...colors];
       this.stableSinceMs = nowMs;
       this.pendingReadings = [];
+      this.pendingMedianReadings = [];
     } else if (this.stableSinceMs === null) {
       this.stableSinceMs = nowMs;
     }
@@ -308,12 +319,23 @@ export class LiveFaceAccumulator {
       if (history.length > MAX_READINGS_PER_FACE) history.shift();
       this.pendingReadings = history;
 
+      if (medians && medians.length === 9) {
+        const medianHistory = [...this.pendingMedianReadings, medians.map((cell) => [...cell] as [number, number, number])];
+        if (medianHistory.length > MAX_READINGS_PER_FACE) medianHistory.shift();
+        this.pendingMedianReadings = medianHistory;
+      }
+
       const voted = majorityVoteCells(history);
+      const votedMedians = medianCellMedians(this.pendingMedianReadings);
       const resolvedFaceId = pickFaceIdForCapture(voted, this.faces, history, this.rescanTarget);
 
       if (resolvedFaceId) {
         const isNew = !this.faces.has(resolvedFaceId);
-        const stored = applyFaceAwareReads([...voted], resolvedFaceId);
+        const stored = applyFaceAwareReads(
+          [...voted],
+          resolvedFaceId,
+          votedMedians.length === 9 ? votedMedians : undefined,
+        );
         stored[4] = getFaceCenterColor(resolvedFaceId);
         this.faces.set(resolvedFaceId, stored);
         if (isNew) newlyCaptured = resolvedFaceId;
@@ -324,6 +346,7 @@ export class LiveFaceAccumulator {
         this.stableSinceMs = null;
         this.stabilityAnchor = null;
         this.pendingReadings = [];
+        this.pendingMedianReadings = [];
       } else {
         needsClearerCenter = true;
         needsDeferredWarmFace =
