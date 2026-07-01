@@ -606,10 +606,6 @@ export function getStickerImbalance(
   return imbalance;
 }
 
-export function isCubeColorBalanced(faces: Map<FaceId, StickerColor[]>): boolean {
-  return isBalanced(countAllStickers(faces));
-}
-
 export function formatImbalanceHint(faces: Map<FaceId, StickerColor[]>): string {
   const imbalance = getStickerImbalance(faces);
   const labels: Record<StickerColor, string> = {
@@ -625,4 +621,79 @@ export function formatImbalanceHint(faces: Map<FaceId, StickerColor[]>): string 
     return `${labels[c]}${n > 0 ? `+${n}` : n}`;
   });
   return parts.length > 0 ? parts.join(', ') : '';
+}
+
+const FACE_LABEL: Record<FaceId, string> = {
+  U: 'W',
+  D: 'Y',
+  F: 'G',
+  B: 'B',
+  R: 'R',
+  L: 'O',
+};
+
+export interface ScanQualityIssue {
+  faceId: FaceId;
+  label: string;
+  message: string;
+}
+
+/** Detect impossible local patterns (e.g. 6 whites on the green face). */
+export function detectSuspiciousScanFaces(
+  faces: Map<FaceId, StickerColor[]>,
+): ScanQualityIssue[] {
+  const issues: ScanQualityIssue[] = [];
+
+  for (const [faceId, colors] of faces) {
+    if (colors.length !== 9) continue;
+
+    const center = FACE_CENTER[faceId];
+    const label = FACE_LABEL[faceId];
+    const tallies = emptyColorCounts();
+
+    for (let i = 0; i < 9; i++) {
+      if (i === 4) continue;
+      tallies[colors[i]!]++;
+    }
+
+    if (center !== 'W' && tallies.W >= 4) {
+      issues.push({
+        faceId,
+        label,
+        message: `${label} face: too many white stickers detected`,
+      });
+      continue;
+    }
+
+    for (const color of STICKER_COLORS) {
+      if (color === center) continue;
+      if (tallies[color] >= 5) {
+        issues.push({
+          faceId,
+          label,
+          message: `${label} face: unlikely ${color} count (${tallies[color]}/8)`,
+        });
+        break;
+      }
+    }
+  }
+
+  return issues;
+}
+
+export function formatScanQualityHint(issues: ScanQualityIssue[]): string {
+  if (issues.length === 0) return '';
+
+  const labels = [...new Set(issues.map((issue) => issue.label))];
+  const primary = issues[0]!.message;
+
+  if (labels.length === 1) {
+    return `${primary}. Tap ${labels[0]} in the bar to re-scan that face.`;
+  }
+
+  return `${primary}. Re-scan these faces: ${labels.join(', ')}.`;
+}
+
+export function isCubeColorBalanced(faces: Map<FaceId, StickerColor[]>): boolean {
+  return isBalanced(countAllStickers(faces));
 }

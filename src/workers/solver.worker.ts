@@ -113,7 +113,7 @@ function solveFaceletInChildWorker(facelet: string, timeoutMs: number): Promise<
 }
 
 const UNSOLVABLE_MESSAGE =
-  'Could not assemble a valid cube from the scanned faces. Colors look consistent — try re-scanning with each face square to the guide.';
+  'Could not build a valid cube from the scan. Colors were likely misread — tap faces in the bar to re-scan.';
 
 self.onmessage = (event: MessageEvent<SolverMessage>) => {
   const msg = event.data;

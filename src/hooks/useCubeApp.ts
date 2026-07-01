@@ -37,7 +37,7 @@ import {
 import { detectWrongMoveFromColors } from '../lib/cube/detectWrongMove';
 import { createSolverWorker, type SolverResponse } from '../lib/cube/solverClient';
 import { emptyColorCounts, getCalibrationFeedback, isColorsReadable } from '../lib/vision/colorClassifier';
-import { reconcileCubeFaces, formatImbalanceHint, isCubeColorBalanced, fillUncertainCells, reconcileLiveScanFaces } from '../lib/vision/cubeColorReconcile';
+import { formatImbalanceHint, isCubeColorBalanced, reconcileLiveScanFaces, hasUncertainCells, detectSuspiciousScanFaces, formatScanQualityHint } from '../lib/vision/cubeColorReconcile';
 import {
   COLOR_LEARN_ORDER,
   calibrateLearnedColor,
@@ -597,21 +597,45 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
         const scannedRecord = scannedFacesForDisplay(snapshot.faces);
 
         try {
-          let solveMap = fillUncertainCells(snapshotFaces);
+          const reconciled = reconcileLiveScanFaces(snapshotFaces);
+
+          if (hasUncertainCells(reconciled)) {
+            setState((s) => ({
+              ...s,
+              phase: 'error',
+              scannedFaceColors: scannedRecord,
+              error: 'Some stickers are still unclear. Re-scan in steadier light.',
+            }));
+            return;
+          }
+
+          const solveMap = new Map<FaceId, StickerColor[]>();
+          for (const [faceId, colors] of reconciled) {
+            solveMap.set(faceId, colors as StickerColor[]);
+          }
+
+          const qualityIssues = detectSuspiciousScanFaces(solveMap);
+          if (qualityIssues.length > 0) {
+            setState((s) => ({
+              ...s,
+              phase: 'error',
+              scannedFaceColors: scannedRecord,
+              error: formatScanQualityHint(qualityIssues),
+            }));
+            return;
+          }
+
           if (!isCubeColorBalanced(solveMap)) {
-            solveMap = reconcileCubeFaces(solveMap);
-            if (!isCubeColorBalanced(solveMap)) {
-              const hint = formatImbalanceHint(solveMap);
-              setState((s) => ({
-                ...s,
-                phase: 'error',
-                scannedFaceColors: scannedRecord,
-                error: hint
-                  ? `Color mismatch (${hint}). Re-scan with clearer lighting.`
-                  : 'Color mismatch. Scan all 6 unique faces.',
-              }));
-              return;
-            }
+            const hint = formatImbalanceHint(solveMap);
+            setState((s) => ({
+              ...s,
+              phase: 'error',
+              scannedFaceColors: scannedRecord,
+              error: hint
+                ? `Color mismatch (${hint}). Tap affected faces in the bar to re-scan.`
+                : 'Color mismatch. Scan all 6 unique faces.',
+            }));
+            return;
           }
 
           const facelet = buildFaceletFromMap(solveMap);
