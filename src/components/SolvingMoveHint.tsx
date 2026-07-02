@@ -6,12 +6,14 @@ import {
   getPanelBesideGuideStyle,
   getSolvingScanOverlayRect,
 } from '../lib/vision/guideOverlay';
-import { SelfieCubeGuide } from './SelfieCubeGuide';
+import { SolvingCubeGuide } from './SolvingCubeGuide';
 
 interface SolvingMoveHintProps {
   visible: boolean;
   move: Move;
   facelet: string;
+  moves: Move[];
+  currentIndex: number;
   rotationProgress: number;
   scanMatch: number;
   handMotionDetected: boolean;
@@ -33,6 +35,8 @@ export function SolvingMoveHint({
   visible,
   move,
   facelet,
+  moves,
+  currentIndex,
   rotationProgress,
   scanMatch,
   handMotionDetected,
@@ -97,7 +101,12 @@ export function SolvingMoveHint({
         </div>
 
         <div className="solving-move-hint-stage">
-          <SelfieCubeGuide move={move} facelet={facelet} />
+          <SolvingCubeGuide
+            facelet={facelet}
+            moves={moves}
+            currentIndex={currentIndex}
+            wrongMove={wrongMove}
+          />
         </div>
 
         <div className="solving-move-hint-meters">

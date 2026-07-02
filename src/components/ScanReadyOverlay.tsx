@@ -24,8 +24,8 @@ export function ScanReadyOverlay({
       <div className="scan-ready-panel">
         <p className="scan-ready-hint">
           {cubeDetected
-            ? 'Center white sticker for color reference, then scan the whole face'
-            : 'Align first face — white center sets lighting reference for all colors'}
+            ? 'Cube detected — press Start to scan all 6 faces'
+            : 'Hold any face of the cube inside the frame'}
         </p>
         <button type="button" className="capture-button" onClick={onStart}>
           Start scan

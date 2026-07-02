@@ -10,7 +10,6 @@ import { SolvingMoveHint } from './components/SolvingMoveHint';
 import { SolvingCubeAROverlay } from './components/SolvingCubeAROverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
-import { SolveCubeViewer } from './components/SolveCubeViewer';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
@@ -99,10 +98,6 @@ export default function App() {
     state.phase === 'computing' ||
     (hasError && Object.keys(state.scannedFaceColors).length > 0);
 
-  const showSolveViewer =
-    (state.phase === 'solving' || state.phase === 'solved') &&
-    Boolean(state.solution?.moves.length);
-
   const liveFaceColors = useMemo(
     () => ({
       ...state.solvingFeedback.visibleFaceColors,
@@ -131,7 +126,7 @@ export default function App() {
   return (
     <main className="app">
       <div
-        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}${showSolveViewer ? ' viewport--solve-viewer' : ''}`}
+        className={`viewport${state.phase === 'liveScan' ? ' viewport--scanning' : ''}${isSolving ? ' viewport--solving' : ''}`}
         ref={viewportRef}
       >
         <CameraView setVideoRef={setVideoRef} onDimensions={handleDimensions} />
@@ -194,14 +189,6 @@ export default function App() {
               needsDeferredWarmFace={state.liveScanNeedsDeferredWarmFace}
             />
 
-            <SolveCubeViewer
-              visible={showSolveViewer}
-              facelet={state.solvingFacelet || null}
-              moves={state.solution?.moves ?? []}
-              currentIndex={state.solution?.currentIndex ?? 0}
-              solved={state.phase === 'solved'}
-            />
-
             <SolvingCubeAROverlay
               active={isSolving && Boolean(currentMove)}
               pose={state.currentPose}
@@ -220,6 +207,8 @@ export default function App() {
                 visible
                 move={currentMove}
                 facelet={state.solvingFacelet}
+                moves={state.solution?.moves ?? []}
+                currentIndex={state.solution?.currentIndex ?? 0}
                 rotationProgress={state.solvingFeedback.rotationProgress}
                 scanMatch={state.solvingFeedback.scanMatch}
                 handMotionDetected={state.solvingFeedback.handMotionDetected}
@@ -238,7 +227,7 @@ export default function App() {
               />
             )}
 
-            {state.phase === 'solved' && !showSolveViewer && (
+            {state.phase === 'solved' && (
               <div className="solved-banner">
                 <p>Done</p>
               </div>
