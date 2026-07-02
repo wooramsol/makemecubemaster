@@ -143,9 +143,12 @@ export class CubeARRenderer {
 
   render(pose: CubePose | null, faceMatchesMove = true): void {
     if (!pose) {
+      // No pose — hide the cube instead of freezing at the last known matrix.
+      this.cubeRoot.visible = false;
       this.renderer.render(this.scene, this.camera);
       return;
     }
+    this.cubeRoot.visible = true;
 
     configureCameraFromIntrinsics(this.camera, pose, this.frameWidth, this.frameHeight);
 

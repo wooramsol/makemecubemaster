@@ -106,11 +106,12 @@ body,
   visibility: visible;
 }
 
+/* Below the solve viewer panel (12) and move hint (14), above the camera feed. */
 .solving-cube-ar-overlay {
   position: absolute;
   pointer-events: none;
   visibility: hidden;
-  z-index: 15;
+  z-index: 11;
   transform: scaleX(-1);
 }
 
