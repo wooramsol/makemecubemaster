@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppTitle } from './components/AppTitle';
 import { GuideLayer } from './components/GuideLayer';
 import { CameraView } from './components/CameraView';
@@ -7,12 +7,15 @@ import { DetectionOverlay } from './components/DetectionOverlay';
 import { LiveScanOverlay } from './components/LiveScanOverlay';
 import { ScannedFacesBar } from './components/ScannedFacesBar';
 import { SolvingMoveHint } from './components/SolvingMoveHint';
+import { SolvingCubeAROverlay } from './components/SolvingCubeAROverlay';
 import { LoadingScreen } from './components/LoadingScreen';
 import { ScanReadyOverlay } from './components/ScanReadyOverlay';
 import { SolveCubeViewer } from './components/SolveCubeViewer';
 import { useCubeApp } from './hooks/useCubeApp';
 import { useWebcam } from './hooks/useWebcam';
 import { COLOR_HEX, COLOR_LEARN_ORDER } from './lib/vision/colorReference';
+import { faceletToFaceMap } from './lib/cube/state';
+import type { FaceId, StickerColor } from './types';
 import './styles/global.css';
 
 export default function App() {
@@ -31,6 +34,7 @@ export default function App() {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [cameraBox, setCameraBox] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     void startWebcam();
@@ -65,6 +69,22 @@ export default function App() {
     return () => observer.disconnect();
   }, []);
 
+  // The camera feed shrinks (e.g. to 42% height) when the solve viewer is
+  // shown, so AR overlays must track the video element box, not the viewport.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const updateBox = () => {
+      setCameraBox({ width: video.clientWidth, height: video.clientHeight });
+    };
+
+    updateBox();
+    const observer = new ResizeObserver(updateBox);
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [videoRef, webcamState.isReady]);
+
   const colorLearnTarget = COLOR_LEARN_ORDER[state.colorLearnIndex] ?? 'R';
 
   const isBooting = state.phase === 'loading' || !webcamState.isReady;
@@ -82,6 +102,31 @@ export default function App() {
   const showSolveViewer =
     (state.phase === 'solving' || state.phase === 'solved') &&
     Boolean(state.solution?.moves.length);
+
+  const liveFaceColors = useMemo(
+    () => ({
+      ...state.solvingFeedback.visibleFaceColors,
+      ...state.solvingFeedback.stableVisibleFaceColors,
+    }),
+    [
+      state.solvingFeedback.visibleFaceColors,
+      state.solvingFeedback.stableVisibleFaceColors,
+    ],
+  );
+
+  const overlayWidth = cameraBox.width || viewportSize.width;
+  const overlayHeight = cameraBox.height || viewportSize.height;
+
+  const solvingFaceColors = useMemo<Partial<Record<FaceId, StickerColor[]>>>(() => {
+    if (!state.solvingFacelet) return {};
+    try {
+      return Object.fromEntries(faceletToFaceMap(state.solvingFacelet)) as Partial<
+        Record<FaceId, StickerColor[]>
+      >;
+    } catch {
+      return {};
+    }
+  }, [state.solvingFacelet]);
 
   return (
     <main className="app">
@@ -155,6 +200,19 @@ export default function App() {
               moves={state.solution?.moves ?? []}
               currentIndex={state.solution?.currentIndex ?? 0}
               solved={state.phase === 'solved'}
+            />
+
+            <SolvingCubeAROverlay
+              active={isSolving && Boolean(currentMove)}
+              pose={state.currentPose}
+              move={currentMove}
+              rotationProgress={state.solvingFeedback.rotationProgress}
+              liveFaceColors={liveFaceColors}
+              scannedFaceColors={solvingFaceColors}
+              frameWidth={dimensions.width}
+              frameHeight={dimensions.height}
+              viewportWidth={overlayWidth}
+              viewportHeight={overlayHeight}
             />
 
             {isSolving && currentMove && (
