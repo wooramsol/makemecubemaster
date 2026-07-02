@@ -48,27 +48,35 @@ function stickerAt(faces: Record<FaceId, string[]>, faceId: FaceId, index: numbe
   return LETTER_TO_STICKER[letter] ?? null;
 }
 
+/*
+ * Standard Singmaster/Kociemba facelet orientation for each face,
+ * viewed from OUTSIDE the cube:
+ *   U: row 0 touches B (z=-1), col 0 at L (x=-1)
+ *   D: row 0 touches F (z=+1), col 0 at L (x=-1)
+ *   R: row 0 touches U (y=+1), col 0 at F (z=+1)
+ *   L: row 0 touches U (y=+1), col 0 at B (z=-1)
+ */
 function indexU(x: number, z: number): number {
-  const row = (-z + 1) / 1;
-  const col = (x + 1) / 1;
+  const row = z + 1;
+  const col = x + 1;
   return row * 3 + col;
 }
 
 function indexD(x: number, z: number): number {
-  const row = (z + 1) / 1;
-  const col = (x + 1) / 1;
+  const row = -z + 1;
+  const col = x + 1;
   return row * 3 + col;
 }
 
 function indexR(y: number, z: number): number {
-  const row = (-y + 1) / 1;
-  const col = (z + 1) / 1;
+  const row = -y + 1;
+  const col = -z + 1;
   return row * 3 + col;
 }
 
 function indexL(y: number, z: number): number {
-  const row = (-y + 1) / 1;
-  const col = (-z + 1) / 1;
+  const row = -y + 1;
+  const col = z + 1;
   return row * 3 + col;
 }
 

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import Cube from 'cubejs';
 import type { FaceId, Move } from '../../types';
-import { moveAngle, moveFace, MOVE_AXES } from '../cube/moves';
+import { FACE_NORMALS, isDoubleMove, isPrimeMove, moveFace, MOVE_AXES } from '../cube/moves';
+import { getMoveHoldFace } from '../cube/moveGuidanceView';
 import {
   CUBIE_BODY_HEX,
   cubiesFromFacelet,
@@ -12,7 +13,30 @@ import type { StickerColor } from '../../types';
 
 const CUBIE_SIZE = 0.94;
 const CUBIE_GAP = 1.02;
-const ANIM_MS = 320;
+const ANIM_MS = 480;
+const CUBE_HALF = CUBIE_GAP * 1.5;
+const ARROW_COLOR = 0xffe14d;
+const ARROW_WRONG_COLOR = 0xff5252;
+
+/**
+ * Visually correct signed angle about the positive MOVE_AXES axis.
+ * A clockwise turn viewed from a face's outward normal is a negative
+ * (right-hand rule) rotation about that normal.
+ */
+export function displayMoveAngle(move: Move): number {
+  const face = moveFace(move);
+  const positiveNormalFace = face === 'U' || face === 'R' || face === 'F';
+  let sign = positiveNormalFace ? -1 : 1;
+  if (isPrimeMove(move)) sign = -sign;
+  return sign * (isDoubleMove(move) ? Math.PI : Math.PI / 2);
+}
+
+/** Cube yaw so the move's hold face points at the camera (+Z). */
+function guideYawForHoldFace(holdFace: FaceId): number {
+  if (holdFace === 'R') return -Math.PI / 2;
+  if (holdFace === 'L') return Math.PI / 2;
+  return 0;
+}
 
 interface CubieMesh {
   group: THREE.Group;
@@ -89,12 +113,15 @@ export class SolveCubeRenderer {
   private readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly cubeRoot = new THREE.Group();
+  private readonly guideRoot = new THREE.Group();
   private cubies: CubieMesh[] = [];
   private animating = false;
   private idleAngle = 0;
   private facelet = '';
   private rafId = 0;
   private disposed = false;
+  private guideMove: Move | null = null;
+  private guideWrong = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene.background = null;
@@ -109,6 +136,7 @@ export class SolveCubeRenderer {
     this.cubeRoot.rotation.x = -0.42;
     this.cubeRoot.rotation.y = 0.62;
     this.scene.add(this.cubeRoot);
+    this.cubeRoot.add(this.guideRoot);
 
     this.camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
     this.camera.position.set(4.2, 3.6, 4.8);
@@ -166,7 +194,7 @@ export class SolveCubeRenderer {
   animateMove(move: Move): Promise<void> {
     if (this.animating) return Promise.resolve();
     const face = moveFace(move);
-    const angle = moveAngle(move);
+    const angle = displayMoveAngle(move);
     const layer = this.cubies.filter((c) => layerFilter(face, c.coords));
     if (layer.length === 0) return Promise.resolve();
 
@@ -225,6 +253,122 @@ export class SolveCubeRenderer {
       this.facelet = cube.asString();
     } catch {
       // Keep visual state from geometry if facelet invalid.
+    }
+  }
+
+  /** Fixed front camera for the solving guide (slightly above cube center). */
+  setGuideView(): void {
+    this.camera.position.set(0, 1.9, 6.2);
+    this.camera.lookAt(0, 0, 0);
+    this.renderFrame();
+  }
+
+  /**
+   * Orient the cube the way the user should hold it for this move:
+   * hold face toward the camera, turning layer peeking into view.
+   */
+  orientForMove(move: Move): void {
+    const holdFace = getMoveHoldFace(move);
+    const layer = moveFace(move);
+    const baseYaw = guideYawForHoldFace(holdFace);
+
+    let pitch = 0;
+    let sideYaw = -0.32;
+    if (layer === 'D') {
+      pitch = -0.5;
+    } else if (layer !== 'U') {
+      const normal = new THREE.Vector3(...FACE_NORMALS[layer]);
+      normal.applyEuler(new THREE.Euler(0, baseYaw, 0));
+      sideYaw = normal.x >= 0 ? -0.45 : 0.45;
+    }
+
+    this.cubeRoot.rotation.set(pitch, baseYaw + sideYaw, 0);
+    this.renderFrame();
+  }
+
+  /** Draw (or clear) the rotation arrow + layer highlight for the next move. */
+  setMoveArrow(move: Move | null, wrong = false): void {
+    if (move === this.guideMove && wrong === this.guideWrong) return;
+    this.guideMove = move;
+    this.guideWrong = wrong;
+    this.clearGuide();
+    if (!move) {
+      this.renderFrame();
+      return;
+    }
+
+    const face = moveFace(move);
+    const color = wrong ? ARROW_WRONG_COLOR : ARROW_COLOR;
+    const normal = new THREE.Vector3(...FACE_NORMALS[face]).normalize();
+
+    const highlight = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.05, 3.05),
+      new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.16,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
+    );
+    highlight.position.copy(normal.clone().multiplyScalar(CUBE_HALF + 0.02));
+    highlight.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    this.guideRoot.add(highlight);
+
+    // Right-handed basis on the face plane: increasing arc angle is
+    // counterclockwise viewed from the face's outward normal.
+    let ref = new THREE.Vector3(0, 1, 0);
+    if (Math.abs(normal.dot(ref)) > 0.9) ref.set(0, 0, 1);
+    const perp = new THREE.Vector3().crossVectors(normal, ref).normalize();
+    ref = new THREE.Vector3().crossVectors(perp, normal).normalize();
+
+    const sweep =
+      (isPrimeMove(move) ? 1 : -1) * (isDoubleMove(move) ? Math.PI : Math.PI / 2);
+    // Center the arc on the camera-facing side of the move face.
+    const phase = -sweep / 2;
+    const radius = 1.22;
+    const surface = normal.clone().multiplyScalar(CUBE_HALF + 0.18);
+    const steps = 40;
+
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = phase + (sweep * i) / steps;
+      points.push(
+        ref
+          .clone()
+          .multiplyScalar(Math.cos(t) * radius)
+          .add(perp.clone().multiplyScalar(Math.sin(t) * radius))
+          .add(surface),
+      );
+    }
+
+    const curve = new THREE.CatmullRomCurve3(points);
+    const trackMat = new THREE.MeshBasicMaterial({ color, depthWrite: false });
+    this.guideRoot.add(new THREE.Mesh(new THREE.TubeGeometry(curve, steps, 0.07, 10, false), trackMat));
+
+    const tip = points[points.length - 1]!;
+    const prev = points[points.length - 2] ?? tip;
+    const dir = new THREE.Vector3().subVectors(tip, prev).normalize();
+    const head = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.36, 14), trackMat.clone());
+    head.position.copy(tip).add(dir.clone().multiplyScalar(0.12));
+    head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    this.guideRoot.add(head);
+
+    this.renderFrame();
+  }
+
+  private clearGuide(): void {
+    while (this.guideRoot.children.length > 0) {
+      const child = this.guideRoot.children[0]!;
+      this.guideRoot.remove(child);
+      child.traverse((node) => {
+        const mesh = node as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+          for (const m of mats) m.dispose();
+        }
+      });
     }
   }
 
