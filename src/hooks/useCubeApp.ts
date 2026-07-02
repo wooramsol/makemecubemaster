@@ -360,6 +360,29 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
     expectedMoveRef.current = null;
   }, []);
 
+  const enterScanReady = useCallback(() => {
+    resetScanWhiteCalibration();
+    liveAccumulator.current.reset();
+    solveTriggeredRef.current = false;
+    lastPoseRef.current = null;
+    setState((s) => ({
+      ...s,
+      phase: 'scanReady',
+      error: null,
+      knownFaces: [],
+      scannedFaceColors: {},
+      currentVisibleFace: null,
+      liveScanProgress: 0,
+      lastCapturedFace: null,
+      detectionFeedback: initialFeedback,
+      liveScanNeedsClearerCenter: false,
+      liveScanNeedsDeferredWarmFace: false,
+      rescanTargetFace: null,
+    }));
+    frameProcessor.current?.disableTracking();
+    expectedMoveRef.current = null;
+  }, []);
+
   const beginLiveScan = useCallback(() => {
     resetScanWhiteCalibration();
     liveAccumulator.current.reset();
@@ -499,7 +522,8 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
 
     const nextIndex = index + 1;
     if (nextIndex >= COLOR_LEARN_ORDER.length) {
-      beginLiveScan();
+      // Wait for an explicit "Start scan" tap instead of scanning immediately.
+      enterScanReady();
       setState((s) => ({
         ...s,
         colorsCalibrated: true,
@@ -515,7 +539,7 @@ export function useCubeApp(videoRef: React.RefObject<HTMLVideoElement | null>) {
       colorLearnReady: false,
       colorLearnError: null,
     }));
-  }, [videoRef, beginLiveScan]);
+  }, [videoRef, enterScanReady]);
 
   const startLiveScan = useCallback(() => {
     beginLiveScan();
